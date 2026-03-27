@@ -247,11 +247,11 @@ class ChangelogBuilder:
     ) -> Dict[str, SemanticVersion]:
         versions: Dict[str, SemanticVersion] = {}
         for commit_hash, tag_names in tags_by_commit.items():
-            parsed_versions_raw = [
+            all_parsed_versions = [
                 parse_semantic_version(tag_name) for tag_name in tag_names
             ]
             parsed_versions: List[SemanticVersion] = [
-                version for version in parsed_versions_raw if version is not None
+                version for version in all_parsed_versions if version is not None
             ]
             if parsed_versions:
                 versions[commit_hash] = max(parsed_versions)
@@ -265,6 +265,37 @@ class ChangelogBuilder:
         if tags_by_commit:
             return self._build_sections_from_tags(items, tags_by_commit)
         return self._build_synthetic_sections(items)
+
+    def _build_unreleased_section(
+        self,
+        bucket: List[ChangelogItem],
+        latest_version: Optional[SemanticVersion],
+    ) -> ReleaseSection:
+        """Build the trailing ``Unreleased`` section common to both tag-based
+        and synthetic release strategies.
+
+        Args:
+            bucket: Commits accumulated after the last tagged release.
+            latest_version: The most recent tagged (or synthetic) version, used
+                to predict what the next version will be.
+
+        Returns:
+            A :class:`ReleaseSection` with ``title="Unreleased"`` that includes
+            the predicted next release type and version when they can be inferred.
+        """
+        predicted_release_type = highest_release_type(bucket)
+        predicted_version = (
+            latest_version.bump(predicted_release_type)
+            if latest_version is not None and predicted_release_type is not None
+            else None
+        )
+        return ReleaseSection(
+            title="Unreleased",
+            date=None,
+            items=tuple(bucket),
+            predicted_release_type=predicted_release_type,
+            predicted_version=predicted_version,
+        )
 
     def _build_sections_from_tags(
         self,
@@ -290,19 +321,7 @@ class ChangelogBuilder:
             )
             bucket = []
 
-        predicted_release_type = highest_release_type(bucket)
-        predicted_version = (
-            latest_version.bump(predicted_release_type)
-            if latest_version is not None and predicted_release_type is not None
-            else None
-        )
-        unreleased = ReleaseSection(
-            title="Unreleased",
-            date=None,
-            items=tuple(bucket),
-            predicted_release_type=predicted_release_type,
-            predicted_version=predicted_version,
-        )
+        unreleased = self._build_unreleased_section(bucket, latest_version)
         return [unreleased] + list(reversed(sections))
 
     def _build_synthetic_sections(
@@ -329,19 +348,7 @@ class ChangelogBuilder:
             )
             bucket = []
 
-        predicted_release_type = highest_release_type(bucket)
-        predicted_version = (
-            current_version.bump(predicted_release_type)
-            if current_version is not None and predicted_release_type is not None
-            else None
-        )
-        unreleased = ReleaseSection(
-            title="Unreleased",
-            date=None,
-            items=tuple(bucket),
-            predicted_release_type=predicted_release_type,
-            predicted_version=predicted_version,
-        )
+        unreleased = self._build_unreleased_section(bucket, current_version)
         return [unreleased] + list(reversed(sections))
 
     def _render(self, sections: Sequence[ReleaseSection]) -> str:

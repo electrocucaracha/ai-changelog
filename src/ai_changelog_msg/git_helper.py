@@ -1,3 +1,5 @@
+"""Git repository helper for reading commits, diffs, and git notes."""
+
 import logging
 import re
 import subprocess
@@ -203,7 +205,7 @@ class GitRepository:
             for a freshly initialised repository with no commits.
         """
         try:
-            self.repo.head.commit
+            _ = self.repo.head.commit
             return True
         except Exception:
             return False

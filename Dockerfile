@@ -11,9 +11,17 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 WORKDIR /app
 
+RUN groupadd -g 1000 appuser && \
+    useradd -u 1000 -g appuser -d /app appuser
+
 COPY pyproject.toml uv.lock ./
 COPY src/ ./src/
 
-RUN uv sync --no-dev --frozen
+RUN uv sync --no-dev --frozen && \
+    chown -R appuser:appuser /app
+
+USER appuser
+
+HEALTHCHECK NONE
 
 ENTRYPOINT ["uv", "run", "ai-changelog"]

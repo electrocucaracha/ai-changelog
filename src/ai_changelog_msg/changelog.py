@@ -15,7 +15,6 @@
 
 """Changelog management for AI Changelog Generator."""
 
-
 from __future__ import annotations
 
 import re

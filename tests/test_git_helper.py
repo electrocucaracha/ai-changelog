@@ -22,6 +22,7 @@ from ai_changelog_msg.git_helper import GitRepository
 
 
 class _FakeGit:
+
     def __init__(
         self, *, diff_result=None, show_result=None, note_result=None, tag_result=""
     ):

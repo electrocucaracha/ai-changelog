@@ -9,6 +9,7 @@ from ai_changelog_msg import main
 
 
 class DummyRepo:
+
     def __init__(self, repo_path: str) -> None:
         self.repo_path = Path(repo_path)
         self.cleared_namespace: Optional[str] = None
@@ -19,6 +20,7 @@ class DummyRepo:
 
 
 class DummyProcessingRepo:
+
     def __init__(
         self, repo_path: str, commits, notes_by_commit=None, diff_by_commit=None
     ):
@@ -57,6 +59,7 @@ class DummyProcessingRepo:
 
 
 class DummyTagRepo:
+
     def __init__(self, tags_by_commit, notes_by_commit=None):
         self.tags_by_commit = tags_by_commit
         self.notes_by_commit = notes_by_commit or {}
@@ -246,6 +249,7 @@ def test_cli_processes_commits_upgrades_legacy_notes_and_writes_changelog(
     monkeypatch.setattr(main, "GitRepository", lambda repo_path: repo)
 
     class FakeAIProvider:
+
         def __init__(self, config):
             self.config = config
 
@@ -277,6 +281,7 @@ def test_cli_reports_no_commits_and_exits(tmp_path, monkeypatch):
     monkeypatch.setattr(main, "GitRepository", lambda repo_path: repo)
 
     class FakeAIProvider:
+
         def __init__(self, config):
             self.config = config
 

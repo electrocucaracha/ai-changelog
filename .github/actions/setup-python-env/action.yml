@@ -1,11 +1,8 @@
 name: Setup Python Environment
-description: Checks out the repository and configures uv with Python.
+description: Configures uv with Python. Requires actions/checkout to have been run first.
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # 6.0.2
-      with:
-        persist-credentials: false
     - name: Install uv
       uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # 7.3.0
       with:

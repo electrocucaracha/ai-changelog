@@ -20,7 +20,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 SEMVER_TAG_PATTERN = re.compile(r"^v?(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)$")
 CONVENTIONAL_COMMIT_PATTERN = re.compile(
@@ -155,12 +155,12 @@ class ChangelogBuilder:
 
     def build(
         self,
-        commits: Iterable[object],
+        commits: Iterable[Any],
         get_note: Callable[[str, str], Optional[str]],
         tags_by_commit: Optional[Dict[str, List[str]]] = None,
         generate_entry: Optional[Callable[[str, str, str, bool], str]] = None,
         commit_url_for_hash: Optional[Callable[[str], Optional[str]]] = None,
-        get_diff: Optional[Callable[[object], str]] = None,
+        get_diff: Optional[Callable[[Any], str]] = None,
     ) -> str:
         """Return a rendered ``CHANGELOG.md`` document.
 
@@ -199,11 +199,11 @@ class ChangelogBuilder:
 
     def _build_item(
         self,
-        commit: object,
+        commit: Any,
         get_note: Callable[[str, str], Optional[str]],
         generate_entry: Optional[Callable[[str, str, str, bool], str]],
         commit_url_for_hash: Optional[Callable[[str], Optional[str]]],
-        get_diff: Optional[Callable[[object], str]],
+        get_diff: Optional[Callable[[Any], str]],
     ) -> ChangelogItem:
         parsed = parse_conventional_commit(commit.message)
         raw_note = get_note(commit.hexsha, self.namespace) or parsed.description
@@ -247,11 +247,11 @@ class ChangelogBuilder:
     ) -> Dict[str, SemanticVersion]:
         versions: Dict[str, SemanticVersion] = {}
         for commit_hash, tag_names in tags_by_commit.items():
-            parsed_versions = [
+            parsed_versions_raw = [
                 parse_semantic_version(tag_name) for tag_name in tag_names
             ]
-            parsed_versions = [
-                version for version in parsed_versions if version is not None
+            parsed_versions: List[SemanticVersion] = [
+                version for version in parsed_versions_raw if version is not None
             ]
             if parsed_versions:
                 versions[commit_hash] = max(parsed_versions)

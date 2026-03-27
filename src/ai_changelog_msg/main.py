@@ -18,7 +18,7 @@
 import logging
 import re
 import sys
-from typing import Iterable, Optional
+from typing import Any, Iterable, Optional
 
 import click
 
@@ -74,7 +74,7 @@ def _configure_logging(log_level: str) -> None:
 
 def _create_semver_tags_if_needed(
     repo: GitRepository,
-    commits: Iterable[object],
+    commits: Iterable[Any],
     namespace: str,
     create_semver_tags: bool,
     limit: Optional[int],
@@ -325,7 +325,11 @@ def cli(
                         skipped += 1
                         continue
 
-                    parsed = parse_conventional_commit(commit.message)
+                    parsed = parse_conventional_commit(
+                        commit.message
+                        if isinstance(commit.message, str)
+                        else commit.message.decode("utf-8", errors="replace")
+                    )
                     added_lines, removed_lines = (0, 0)
                     if diff and not diff.startswith("[Error retrieving diff:"):
                         added_lines, removed_lines = count_diff_lines(diff)
@@ -358,7 +362,11 @@ def cli(
 
                     logger.debug("Generating summary for %s", commit.hexsha[:8])
                     summary = ai_provider.summarize_diff(
-                        commit_message=commit.message,
+                        commit_message=(
+                            commit.message
+                            if isinstance(commit.message, str)
+                            else commit.message.decode("utf-8", errors="replace")
+                        ),
                         diff=diff,
                         author=commit.author.name if commit.author else "Unknown",
                     )

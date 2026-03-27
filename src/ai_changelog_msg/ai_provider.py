@@ -119,7 +119,6 @@ class AIProvider:
         )
 
         try:
-
             response = litellm.completion(
                 model=self.model,
                 messages=[
@@ -188,7 +187,6 @@ class AIProvider:
         )
 
         try:
-
             response = litellm.completion(
                 model=self.model,
                 messages=[

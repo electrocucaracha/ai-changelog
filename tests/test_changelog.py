@@ -147,7 +147,9 @@ def test_build_changelog_prefers_ai_generated_entries():
         commits=commits,
         get_note=lambda commit_hash, namespace: notes.get(commit_hash),
         tags_by_commit={},
-        generate_entry=lambda commit_message, note, category, is_breaking: "Fixed CLI namespace handling when notes are missing.",
+        generate_entry=lambda commit_message, note, category, is_breaking: (
+            "Fixed CLI namespace handling when notes are missing."
+        ),
     )
 
     assert (
@@ -165,18 +167,24 @@ def test_build_changelog_renders_commit_markdown_links_when_available():
         )
     ]
     notes = {
-        "eeeeeee5fffffff6789012345678901234567890": "Improved governance API interactions by adding new CLI flags to forward custom HTTP headers for more flexible requests.",
+        "eeeeeee5fffffff6789012345678901234567890": (
+            "Improved governance API interactions by adding new CLI flags"
+            " to forward custom HTTP headers for more flexible requests."
+        ),
     }
 
     changelog = builder.build(
         commits=commits,
         get_note=lambda commit_hash, namespace: notes.get(commit_hash),
         tags_by_commit={},
-        commit_url_for_hash=lambda commit_hash: f"https://gecgithub01.walmart.com/v0m078y/metaregistry-catalog-checkers/commit/{commit_hash}",
+        commit_url_for_hash=lambda commit_hash: (
+            f"https://gecgithub01.walmart.com/v0m078y/metaregistry-catalog-checkers/commit/{commit_hash}"
+        ),
     )
 
     assert (
-        "Improved governance API interactions by adding new CLI flags to forward custom HTTP headers for more flexible requests. "
+        "Improved governance API interactions by adding new CLI flags"
+        " to forward custom HTTP headers for more flexible requests. "
         "[eeeeeee5](https://gecgithub01.walmart.com/v0m078y/metaregistry-catalog-checkers/commit/"
         "eeeeeee5fffffff6789012345678901234567890)"
     ) in changelog

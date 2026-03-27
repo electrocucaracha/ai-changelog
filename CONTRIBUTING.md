@@ -90,7 +90,7 @@ make func
 
 Follow conventional commit format:
 
-```
+```text
 feat: Add new summary feature
 fix: Correct git note handling
 docs: Update README
@@ -157,4 +157,4 @@ Use GitHub issues with:
 
 - Ask questions in GitHub discussions
 - Check existing issues for similar problems
-- Review documentation in README and this guide
+- Review documentation in readme and this guide

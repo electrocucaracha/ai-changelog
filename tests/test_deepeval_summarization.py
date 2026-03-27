@@ -121,7 +121,7 @@ index 5555555..6666666 100644
 def _ollama_available(base_url: str) -> bool:
     try:
         with urlopen(f"{base_url.rstrip('/')}/api/tags", timeout=3) as response:
-            return response.status == 200
+            return response.status == 200  # type: ignore[no-any-return]
     except (OSError, URLError):
         return False
 

@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
+from typing import List, Optional, Tuple
 
 from click.testing import CliRunner
 
@@ -8,10 +9,9 @@ from ai_changelog_msg import main
 
 
 class DummyRepo:
-
     def __init__(self, repo_path: str) -> None:
         self.repo_path = Path(repo_path)
-        self.cleared_namespace = None
+        self.cleared_namespace: Optional[str] = None
 
     def clear_notes(self, namespace: str) -> bool:
         self.cleared_namespace = namespace
@@ -19,7 +19,6 @@ class DummyRepo:
 
 
 class DummyProcessingRepo:
-
     def __init__(
         self, repo_path: str, commits, notes_by_commit=None, diff_by_commit=None
     ):
@@ -27,8 +26,8 @@ class DummyProcessingRepo:
         self._commits = commits
         self.notes_by_commit = notes_by_commit or {}
         self.diff_by_commit = diff_by_commit or {}
-        self.saved_notes = []
-        self.created_tags = []
+        self.saved_notes: List[Tuple[str, str, str]] = []
+        self.created_tags: List[Tuple[str, str]] = []
 
     def get_all_commits(self, limit=None):
         return self._commits[:limit] if limit else self._commits
@@ -58,7 +57,6 @@ class DummyProcessingRepo:
 
 
 class DummyTagRepo:
-
     def __init__(self, tags_by_commit, notes_by_commit=None):
         self.tags_by_commit = tags_by_commit
         self.notes_by_commit = notes_by_commit or {}
@@ -248,7 +246,6 @@ def test_cli_processes_commits_upgrades_legacy_notes_and_writes_changelog(
     monkeypatch.setattr(main, "GitRepository", lambda repo_path: repo)
 
     class FakeAIProvider:
-
         def __init__(self, config):
             self.config = config
 
@@ -280,7 +277,6 @@ def test_cli_reports_no_commits_and_exits(tmp_path, monkeypatch):
     monkeypatch.setattr(main, "GitRepository", lambda repo_path: repo)
 
     class FakeAIProvider:
-
         def __init__(self, config):
             self.config = config
 

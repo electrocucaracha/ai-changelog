@@ -18,7 +18,7 @@
 import logging
 import re
 import sys
-from typing import Iterable, Optional
+from typing import Any, Iterable, Optional
 
 import click
 
@@ -72,9 +72,27 @@ def _configure_logging(log_level: str) -> None:
         litellm_logger.propagate = False
 
 
+def _commit_message_str(message: Any) -> str:
+    """Return *message* as a plain string, decoding bytes if necessary.
+
+    GitPython may expose ``commit.message`` as either ``str`` or ``bytes``
+    depending on the repository encoding. This helper normalises both cases
+    so callers always receive a ``str``.
+
+    Args:
+        message: A value from ``Commit.message``; either ``str`` or ``bytes``.
+
+    Returns:
+        The message text as a ``str``.
+    """
+    if isinstance(message, bytes):
+        return message.decode("utf-8", errors="replace")
+    return str(message)
+
+
 def _create_semver_tags_if_needed(
     repo: GitRepository,
-    commits: Iterable[object],
+    commits: Iterable[Any],
     namespace: str,
     create_semver_tags: bool,
     limit: Optional[int],
@@ -325,7 +343,9 @@ def cli(
                         skipped += 1
                         continue
 
-                    parsed = parse_conventional_commit(commit.message)
+                    parsed = parse_conventional_commit(
+                        _commit_message_str(commit.message)
+                    )
                     added_lines, removed_lines = (0, 0)
                     if diff and not diff.startswith("[Error retrieving diff:"):
                         added_lines, removed_lines = count_diff_lines(diff)
@@ -358,7 +378,7 @@ def cli(
 
                     logger.debug("Generating summary for %s", commit.hexsha[:8])
                     summary = ai_provider.summarize_diff(
-                        commit_message=commit.message,
+                        commit_message=_commit_message_str(commit.message),
                         diff=diff,
                         author=commit.author.name if commit.author else "Unknown",
                     )

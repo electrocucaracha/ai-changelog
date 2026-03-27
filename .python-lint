@@ -1,0 +1,30 @@
+[main]
+jobs = 1
+
+[messages_control]
+disable =
+    C0114,
+    C0115,
+    C0116,
+    C1803,
+    E0401,
+    E1120,
+    R0801,
+    R0902,
+    R0903,
+    R0911,
+    R0912,
+    R0913,
+    R0914,
+    R0915,
+    R0917,
+    W0212,
+    W0613,
+    W0621,
+    W0718,
+
+[format]
+max-line-length = 120
+
+[similarities]
+min-similarity-lines = 10

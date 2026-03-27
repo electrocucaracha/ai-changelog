@@ -106,6 +106,8 @@ target-version = ["py39"]
 [tool.isort]
 profile = "black"
 line_length = 88
+src_paths = ["src"]
+known_first_party = ["ai_changelog_msg"]
 
 [tool.ruff]
 line-length = 88
@@ -123,6 +125,14 @@ disallow_untyped_defs = false
 
 [[tool.mypy.overrides]]
 module = "requests.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "litellm.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "git.*"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

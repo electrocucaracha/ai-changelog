@@ -167,7 +167,10 @@ def test_build_changelog_renders_commit_markdown_links_when_available():
         )
     ]
     notes = {
-        "eeeeeee5fffffff6789012345678901234567890": "Improved governance API interactions by adding new CLI flags to forward custom HTTP headers for more flexible requests.",
+        "eeeeeee5fffffff6789012345678901234567890": (
+            "Improved governance API interactions by adding new CLI flags"
+            " to forward custom HTTP headers for more flexible requests."
+        ),
     }
 
     changelog = builder.build(
@@ -180,7 +183,8 @@ def test_build_changelog_renders_commit_markdown_links_when_available():
     )
 
     assert (
-        "Improved governance API interactions by adding new CLI flags to forward custom HTTP headers for more flexible requests. "
+        "Improved governance API interactions by adding new CLI flags"
+        " to forward custom HTTP headers for more flexible requests. "
         "[eeeeeee5](https://gecgithub01.walmart.com/v0m078y/metaregistry-catalog-checkers/commit/"
         "eeeeeee5fffffff6789012345678901234567890)"
     ) in changelog

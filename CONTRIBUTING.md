@@ -90,7 +90,7 @@ make func
 
 Follow conventional commit format:
 
-```
+```text
 feat: Add new summary feature
 fix: Correct git note handling
 docs: Update README

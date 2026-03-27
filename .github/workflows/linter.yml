@@ -51,6 +51,9 @@ jobs:
           SAVE_SUPER_LINTER_OUTPUT: true
           KUBERNETES_KUBECONFORM_OPTIONS: "-ignore-missing-schemas"
           DEFAULT_BRANCH: ${{ github.head_ref || github.ref_name }}
+          # Disabled: project uses black+pyink (Google style) for formatting,
+          # which conflicts with ruff format (Black style) on blank lines after
+          # class definitions. The project's own tox lint-check enforces this.
           VALIDATE_PYTHON_RUFF_FORMAT: false
       - uses: GrantBirki/git-diff-action@b27608d18e6dd9b31b46ede56a93e045d3881a28 # 3.0.0
         id: git-diff

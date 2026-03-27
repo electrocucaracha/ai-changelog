@@ -6,11 +6,11 @@
 
 ## Overview
 
-AI Changelog Generator is a tool designed to automate the creation of changelogs by generating AI-powered summaries of git commit diffs. It simplifies the process of documenting changes in a repository by leveraging AI models to analyze commit histories and produce concise, meaningful summaries. These summaries are stored in git notes and used to generate a `CHANGELOG.md` file in a structured format.
+AI Changelog Generator is a tool designed to automate the creation of changelogs by generating AI-powered summaries of Git commit diffs. It simplifies the process of documenting changes in a repository by leveraging AI models to analyze commit histories and produce concise, meaningful summaries. These summaries are stored in Git notes and used to generate a `CHANGELOG.md` file in a structured format.
 
 ### What Problem Does It Solve?
 
-Maintaining changelogs manually can be time-consuming and error-prone. This tool automates the process, ensuring that changelogs are consistent, up-to-date, and easy to understand. It supports multiple AI providers and integrates seamlessly with git, making it a powerful solution for developers and teams.
+Maintaining changelogs manually can be time-consuming and error-prone. This tool automates the process, ensuring that changelogs are consistent, up-to-date, and easy to understand. It supports multiple AI providers and integrates seamlessly with Git, making it a powerful solution for developers and teams.
 
 ## How to Use
 
@@ -48,7 +48,7 @@ uv run ai-changelog /path/to/repository
 
 ### Viewing Git Notes
 
-Summaries are stored in git notes under the namespace `ai-changelog`. To view them, use:
+Summaries are stored in Git notes under the namespace `ai-changelog`. To view them, use:
 
 ```bash
 git log --show-notes=refs/notes/ai-changelog
@@ -60,7 +60,7 @@ git log --show-notes=refs/notes/ai-changelog
 - Git notes integration for persistent, non-intrusive storage
 - Batch processing of all commits in repository history
 - Customizable summaries with configurable prompts
-- Automatic changelog generation from git notes and commit history
+- Automatic changelog generation from Git notes and commit history
 - Error handling and retry logic
 
 ## How It Works
@@ -68,7 +68,7 @@ git log --show-notes=refs/notes/ai-changelog
 1. **Repository Scanning**: Walks through all commits in the repository.
 2. **Diff Analysis**: Extracts and analyzes file changes for each commit.
 3. **Summary Generation**: Uses the configured AI model to create concise summaries.
-4. **Notes Storage**: Stores summaries in git notes (non-invasive, doesn't alter commit history).
+4. **Notes Storage**: Stores summaries in Git notes (non-invasive, doesn't alter commit history).
 5. **Tag Generation**: Optionally creates semantic version tags from git-note categories.
 6. **Changelog Rendering**: Builds a changelog using generated notes and semantic version tags, appending only missing release sections when `CHANGELOG.md` already exists.
 

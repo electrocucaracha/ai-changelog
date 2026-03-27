@@ -157,4 +157,4 @@ Use GitHub issues with:
 
 - Ask questions in GitHub discussions
 - Check existing issues for similar problems
-- Review documentation in README and this guide
+- Review documentation in readme and this guide

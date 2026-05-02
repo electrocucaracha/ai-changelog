@@ -1,4 +1,0 @@
-paths:
-  .github/workflows/update.yml:
-    ignore:
-      - 'unknown permission scope "workflows"'

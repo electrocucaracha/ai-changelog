@@ -46,3 +46,28 @@ class TestConfig:
 
         with pytest.raises(ValueError):
             Config(max_diff_size=-1)
+
+    def test_config_from_env_reads_litellm_gateway_settings(self, monkeypatch):
+        """Test optional LiteLLM gateway values from environment."""
+        monkeypatch.setenv("CHANGELOG_LITELLM_API_BASE", "https://gateway.example")
+        monkeypatch.setenv("CHANGELOG_LITELLM_API_KEY", "secret")
+        monkeypatch.setenv(
+            "CHANGELOG_LITELLM_HEADERS_JSON",
+            '{"X-Org": "platform", "X-Product": "ai-changelog"}',
+        )
+
+        config = Config.from_env()
+
+        assert config.litellm_api_base == "https://gateway.example"
+        assert config.litellm_api_key == "secret"
+        assert config.litellm_extra_headers == {
+            "X-Org": "platform",
+            "X-Product": "ai-changelog",
+        }
+
+    def test_config_from_env_rejects_invalid_headers_json(self, monkeypatch):
+        """Test invalid JSON in LiteLLM headers environment variable."""
+        monkeypatch.setenv("CHANGELOG_LITELLM_HEADERS_JSON", "not-json")
+
+        with pytest.raises(ValueError, match="must be valid JSON"):
+            Config.from_env()

@@ -18,9 +18,10 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Callable
 
 SEMVER_TAG_PATTERN = re.compile(r"^v?(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)$")
 CONVENTIONAL_COMMIT_PATTERN = re.compile(
@@ -51,7 +52,7 @@ class SemanticVersion:
     minor: int
     patch: int
 
-    def bump(self, release_type: str) -> "SemanticVersion":
+    def bump(self, release_type: str) -> SemanticVersion:
         """Return the next version for *release_type*."""
         if release_type == "major":
             return SemanticVersion(self.major + 1, 0, 0)
@@ -71,10 +72,10 @@ class ParsedCommit:
 
     raw_message: str
     description: str
-    commit_type: Optional[str]
-    scope: Optional[str]
+    commit_type: str | None
+    scope: str | None
     is_breaking: bool
-    release_type: Optional[str]
+    release_type: str | None
 
 
 @dataclass(frozen=True)
@@ -88,12 +89,12 @@ class ChangelogItem:
     commit_hash: str
     committed_at: datetime
     category: str
-    release_type: Optional[str]
+    release_type: str | None
     note: str
     description: str
     is_breaking: bool
-    changelog_entry: Optional[str] = None
-    commit_url: Optional[str] = None
+    changelog_entry: str | None = None
+    commit_url: str | None = None
 
     @property
     def summary(self) -> str:
@@ -132,10 +133,10 @@ class ReleaseSection:
     """Rendered changelog release section."""
 
     title: str
-    date: Optional[str]
+    date: str | None
     items: Sequence[ChangelogItem]
-    predicted_release_type: Optional[str] = None
-    predicted_version: Optional[SemanticVersion] = None
+    predicted_release_type: str | None = None
+    predicted_version: SemanticVersion | None = None
 
 
 class ChangelogBuilder:
@@ -156,11 +157,11 @@ class ChangelogBuilder:
     def build(
         self,
         commits: Iterable[Any],
-        get_note: Callable[[str, str], Optional[str]],
-        tags_by_commit: Optional[Dict[str, List[str]]] = None,
-        generate_entry: Optional[Callable[[str, str, str, bool], str]] = None,
-        commit_url_for_hash: Optional[Callable[[str], Optional[str]]] = None,
-        get_diff: Optional[Callable[[Any], str]] = None,
+        get_note: Callable[[str, str], str | None],
+        tags_by_commit: dict[str, list[str]] | None = None,
+        generate_entry: Callable[[str, str, str, bool], str] | None = None,
+        commit_url_for_hash: Callable[[str], str | None] | None = None,
+        get_diff: Callable[[Any], str] | None = None,
     ) -> str:
         """Return a rendered ``CHANGELOG.md`` document.
 
@@ -180,7 +181,7 @@ class ChangelogBuilder:
                 improve category inference.
         """
         ordered_commits = sorted(
-            list(commits),
+            commits,
             key=lambda commit: (commit.committed_datetime, commit.hexsha),
         )
         items = [
@@ -200,10 +201,10 @@ class ChangelogBuilder:
     def _build_item(
         self,
         commit: Any,
-        get_note: Callable[[str, str], Optional[str]],
-        generate_entry: Optional[Callable[[str, str, str, bool], str]],
-        commit_url_for_hash: Optional[Callable[[str], Optional[str]]],
-        get_diff: Optional[Callable[[Any], str]],
+        get_note: Callable[[str, str], str | None],
+        generate_entry: Callable[[str, str, str, bool], str] | None,
+        commit_url_for_hash: Callable[[str], str | None] | None,
+        get_diff: Callable[[Any], str] | None,
     ) -> ChangelogItem:
         parsed = parse_conventional_commit(commit.message)
         raw_note = get_note(commit.hexsha, self.namespace) or parsed.description
@@ -243,14 +244,14 @@ class ChangelogBuilder:
         )
 
     def _normalise_tags(
-        self, tags_by_commit: Dict[str, List[str]]
-    ) -> Dict[str, SemanticVersion]:
-        versions: Dict[str, SemanticVersion] = {}
+        self, tags_by_commit: dict[str, list[str]]
+    ) -> dict[str, SemanticVersion]:
+        versions: dict[str, SemanticVersion] = {}
         for commit_hash, tag_names in tags_by_commit.items():
             all_parsed_versions = [
                 parse_semantic_version(tag_name) for tag_name in tag_names
             ]
-            parsed_versions: List[SemanticVersion] = [
+            parsed_versions: list[SemanticVersion] = [
                 version for version in all_parsed_versions if version is not None
             ]
             if parsed_versions:
@@ -260,16 +261,16 @@ class ChangelogBuilder:
     def _build_sections(
         self,
         items: Sequence[ChangelogItem],
-        tags_by_commit: Dict[str, SemanticVersion],
-    ) -> List[ReleaseSection]:
+        tags_by_commit: dict[str, SemanticVersion],
+    ) -> list[ReleaseSection]:
         if tags_by_commit:
             return self._build_sections_from_tags(items, tags_by_commit)
         return self._build_synthetic_sections(items)
 
     def _build_unreleased_section(
         self,
-        bucket: List[ChangelogItem],
-        latest_version: Optional[SemanticVersion],
+        bucket: list[ChangelogItem],
+        latest_version: SemanticVersion | None,
     ) -> ReleaseSection:
         """Build the trailing ``Unreleased`` section common to both tag-based
         and synthetic release strategies.
@@ -300,11 +301,11 @@ class ChangelogBuilder:
     def _build_sections_from_tags(
         self,
         items: Sequence[ChangelogItem],
-        tags_by_commit: Dict[str, SemanticVersion],
-    ) -> List[ReleaseSection]:
-        sections: List[ReleaseSection] = []
-        bucket: List[ChangelogItem] = []
-        latest_version: Optional[SemanticVersion] = None
+        tags_by_commit: dict[str, SemanticVersion],
+    ) -> list[ReleaseSection]:
+        sections: list[ReleaseSection] = []
+        bucket: list[ChangelogItem] = []
+        latest_version: SemanticVersion | None = None
 
         for item in items:
             bucket.append(item)
@@ -326,10 +327,10 @@ class ChangelogBuilder:
 
     def _build_synthetic_sections(
         self, items: Sequence[ChangelogItem]
-    ) -> List[ReleaseSection]:
-        sections: List[ReleaseSection] = []
-        bucket: List[ChangelogItem] = []
-        current_version: Optional[SemanticVersion] = None
+    ) -> list[ReleaseSection]:
+        sections: list[ReleaseSection] = []
+        bucket: list[ChangelogItem] = []
+        current_version: SemanticVersion | None = None
 
         for item in items:
             bucket.append(item)
@@ -398,8 +399,8 @@ class ChangelogBuilder:
     def _group_items_by_category(
         self,
         items: Sequence[ChangelogItem],
-    ) -> Dict[str, List[ChangelogItem]]:
-        grouped: Dict[str, List[ChangelogItem]] = {
+    ) -> dict[str, list[ChangelogItem]]:
+        grouped: dict[str, list[ChangelogItem]] = {
             category: [] for category in CATEGORY_ORDER
         }
         for item in items:
@@ -407,7 +408,7 @@ class ChangelogBuilder:
         return {category: entries for category, entries in grouped.items() if entries}
 
 
-def parse_semantic_version(tag_name: str) -> Optional[SemanticVersion]:
+def parse_semantic_version(tag_name: str) -> SemanticVersion | None:
     """Parse a tag name like ``v1.2.3`` into :class:`SemanticVersion`.
 
     Examples:
@@ -469,7 +470,7 @@ def parse_conventional_commit(message: str) -> ParsedCommit:
     )
 
 
-def infer_release_type(commit_type: Optional[str], is_breaking: bool) -> Optional[str]:
+def infer_release_type(commit_type: str | None, is_breaking: bool) -> str | None:
     """Map conventional-commit metadata to semantic-release bump types."""
     if is_breaking:
         return "major"
@@ -481,7 +482,7 @@ def infer_release_type(commit_type: Optional[str], is_breaking: bool) -> Optiona
 
 
 def infer_category(
-    commit_type: Optional[str],
+    commit_type: str | None,
     description: str,
     is_breaking: bool,
     added_lines: int = 0,
@@ -514,7 +515,7 @@ def infer_category(
     return "Changed"
 
 
-def count_diff_lines(diff_text: str) -> Tuple[int, int]:
+def count_diff_lines(diff_text: str) -> tuple[int, int]:
     """Count added and removed lines in a unified diff.
 
     Diff metadata lines (``+++``, ``---``, and hunk headers) are excluded.
@@ -522,7 +523,7 @@ def count_diff_lines(diff_text: str) -> Tuple[int, int]:
     added_lines = 0
     removed_lines = 0
     for line in diff_text.splitlines():
-        if line.startswith("+++") or line.startswith("---") or line.startswith("@@"):
+        if line.startswith(("+++", "---", "@@")):
             continue
         if line.startswith("+"):
             added_lines += 1
@@ -545,7 +546,7 @@ def format_note(category: str, summary: str) -> str:
     return f"Category: {normalized_category}\n\n{cleaned_summary}"
 
 
-def parse_note_metadata(note_text: str) -> Tuple[Optional[str], str]:
+def parse_note_metadata(note_text: str) -> tuple[str | None, str]:
     """Extract optional category metadata and summary body from a git note.
 
     Supports notes written as:
@@ -571,7 +572,7 @@ def parse_note_metadata(note_text: str) -> Tuple[Optional[str], str]:
     return category, summary or "No summary available."
 
 
-def highest_release_type(items: Sequence[ChangelogItem]) -> Optional[str]:
+def highest_release_type(items: Sequence[ChangelogItem]) -> str | None:
     """Return the highest semantic-release bump required by *items*.
 
     Examples:
@@ -583,7 +584,7 @@ def highest_release_type(items: Sequence[ChangelogItem]) -> Optional[str]:
         'minor'
     """
     priorities = {"patch": 1, "minor": 2, "major": 3}
-    highest: Optional[str] = None
+    highest: str | None = None
     highest_priority = 0
     for item in items:
         if item.release_type is None:

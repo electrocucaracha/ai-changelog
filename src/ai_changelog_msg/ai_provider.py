@@ -15,9 +15,10 @@
 
 """AI provider abstraction for generating commit summaries via LiteLLM."""
 
+from __future__ import annotations
+
 import logging
 import os
-from typing import Optional
 
 import litellm
 
@@ -47,6 +48,13 @@ class AIProvider:
     def __init__(self, config: Config) -> None:
         self.config = config
         self.model = config.get_model()
+        self._litellm_kwargs: dict[str, object] = {}
+        if config.litellm_api_base:
+            self._litellm_kwargs["api_base"] = config.litellm_api_base
+        if config.litellm_api_key:
+            self._litellm_kwargs["api_key"] = config.litellm_api_key
+        if config.litellm_extra_headers:
+            self._litellm_kwargs["extra_headers"] = config.litellm_extra_headers
         # Keep LiteLLM quiet so progress/log output stays readable.
         os.environ["LITELLM_LOG"] = "ERROR"
         # Keep LiteLLM's noisy diagnostic/info output disabled by default so
@@ -69,7 +77,7 @@ class AIProvider:
         self,
         commit_message: str,
         diff: str,
-        author: Optional[str] = None,
+        author: str | None = None,
     ) -> str:
         """Generate an AI summary for a single git commit diff.
 
@@ -148,6 +156,7 @@ class AIProvider:
                 ],
                 temperature=0.3,
                 max_tokens=500,
+                **self._litellm_kwargs,
             )
             logger.debug("Response received from model '%s'", self.model)
         except Exception as error:
@@ -207,8 +216,9 @@ class AIProvider:
                 ],
                 temperature=0.2,
                 max_tokens=120,
+                **self._litellm_kwargs,
             )
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001
             logger.warning("Falling back to note text for changelog entry: %s", error)
             return note.strip() or commit_message.strip()
 
@@ -219,7 +229,7 @@ class AIProvider:
         self,
         commit_message: str,
         diff: str,
-        author: Optional[str],
+        author: str | None,
     ) -> str:
         """Assemble the user-facing prompt sent to the AI model.
 

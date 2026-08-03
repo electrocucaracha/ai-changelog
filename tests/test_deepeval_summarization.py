@@ -14,8 +14,8 @@
 # limitations under the License.
 
 import os
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 from urllib.error import URLError
 from urllib.request import urlopen
 

@@ -35,6 +35,43 @@ Run the tool directly from the repository:
 uv run ai-changelog /path/to/repository
 ```
 
+### Internal LiteLLM Gateway Routing
+
+To route requests through an internal LiteLLM gateway while keeping project-level
+autonomy over model selection and prompts, set optional gateway variables:
+
+```bash
+export CHANGELOG_LITELLM_API_BASE="https://your-internal-gateway.example/v1"
+export CHANGELOG_LITELLM_API_KEY="<gateway-token>"
+export CHANGELOG_LITELLM_HEADERS_JSON='{"X-Team":"developer-tools"}'
+```
+
+Then run the tool normally (or pass the equivalent CLI options).
+
+### Using uvx
+
+You can consume this tool with `uvx` in two common ways.
+
+Git-direct method with environment variables:
+
+```bash
+export CHANGELOG_MODEL=gpt-4o-mini
+export CHANGELOG_LITELLM_API_BASE="https://your-internal-gateway.example/v1"
+export CHANGELOG_LITELLM_API_KEY="<gateway-token>"
+export CHANGELOG_LITELLM_HEADERS_JSON='{"X-Team":"developer-tools"}'
+
+uvx --from "git+https://github.com/electrocucaracha/ai-changelog.git" \
+  ai-changelog /path/to/repository
+```
+
+Local checkout method:
+
+uvx --from . ai-changelog /path/to/repository
+
+If your environment requires private index resolution for your model gateway
+client dependencies, configure your `uv` index/sources in `pyproject.toml`
+(or your org-standard `uv` configuration) before invoking `uvx`.
+
 ### Options
 
 - `--model`: Specify the AI model (default: ollama/llama3.1)
@@ -45,6 +82,9 @@ uv run ai-changelog /path/to/repository
 - `--limit`: Process only the last N commits
 - `--log-level`: Set logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`)
 - `--changelog-file`: Specify the output path for the changelog (default: `CHANGELOG.md`)
+- `--litellm-api-base`: Optional internal LiteLLM gateway base URL
+- `--litellm-api-key`: Optional API key for gateway authentication
+- `--litellm-headers-json`: Optional JSON object with request headers for gateway routing or policy metadata
 
 ### Viewing Git Notes
 

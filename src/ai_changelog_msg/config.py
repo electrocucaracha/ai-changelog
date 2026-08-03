@@ -15,9 +15,12 @@
 
 """Configuration management for AI Changelog Generator."""
 
+from __future__ import annotations
+
+import json
 import os
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any
 
 
 @dataclass
@@ -65,7 +68,10 @@ class Config:
     namespace: str = "ai-changelog"
     api_timeout: int = 60
     max_diff_size: int = 50000
-    api_calls_timeout: Optional[int] = 300
+    api_calls_timeout: int | None = 300
+    litellm_api_base: str | None = None
+    litellm_api_key: str | None = None
+    litellm_extra_headers: dict[str, str] | None = None
 
     def __post_init__(self) -> None:
         """Validate field values after dataclass initialisation.
@@ -81,9 +87,17 @@ class Config:
             raise ValueError("Max diff size must be positive")
         if self.api_timeout <= 0:
             raise ValueError("API timeout must be positive")
+        if self.litellm_extra_headers is not None:
+            if not isinstance(self.litellm_extra_headers, dict):
+                raise ValueError("LiteLLM extra headers must be a dictionary")
+            for key, value in self.litellm_extra_headers.items():
+                if not isinstance(key, str) or not isinstance(value, str):
+                    raise TypeError(
+                        "LiteLLM extra headers must contain string keys and values"
+                    )
 
     @classmethod
-    def from_env(cls, **overrides) -> "Config":
+    def from_env(cls, **overrides) -> Config:
         """Create a :class:`Config` from environment variables.
 
         Reads ``CHANGELOG_MODEL`` and ``CHANGELOG_NAMESPACE`` from the
@@ -113,10 +127,44 @@ class Config:
         """
         model = os.getenv("CHANGELOG_MODEL", "ollama/llama3.1")
         namespace = os.getenv("CHANGELOG_NAMESPACE", "ai-changelog")
+        litellm_api_base = os.getenv("CHANGELOG_LITELLM_API_BASE")
+        litellm_api_key = os.getenv("CHANGELOG_LITELLM_API_KEY")
+        litellm_extra_headers: dict[str, str] | None = None
+
+        headers_env = os.getenv("CHANGELOG_LITELLM_HEADERS_JSON")
+        if headers_env:
+            litellm_extra_headers = cls._parse_headers_json(headers_env)
+
         return cls(
             model=overrides.get("model", model),
             namespace=overrides.get("namespace", namespace),
+            litellm_api_base=overrides.get("litellm_api_base", litellm_api_base),
+            litellm_api_key=overrides.get("litellm_api_key", litellm_api_key),
+            litellm_extra_headers=overrides.get(
+                "litellm_extra_headers", litellm_extra_headers
+            ),
         )
+
+    @staticmethod
+    def _parse_headers_json(raw: str) -> dict[str, str]:
+        """Parse a JSON object into string-based HTTP headers."""
+        try:
+            parsed: Any = json.loads(raw)
+        except json.JSONDecodeError as error:
+            raise ValueError(
+                "CHANGELOG_LITELLM_HEADERS_JSON must be valid JSON"
+            ) from error
+        if not isinstance(parsed, dict):
+            raise TypeError("CHANGELOG_LITELLM_HEADERS_JSON must be a JSON object")
+
+        headers: dict[str, str] = {}
+        for key, value in parsed.items():
+            if not isinstance(key, str):
+                raise TypeError("CHANGELOG_LITELLM_HEADERS_JSON keys must be strings")
+            if not isinstance(value, str):
+                raise TypeError("CHANGELOG_LITELLM_HEADERS_JSON values must be strings")
+            headers[key] = value
+        return headers
 
     def get_model(self) -> str:
         """Return the configured LiteLLM model identifier.

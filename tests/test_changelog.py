@@ -202,17 +202,7 @@ def test_build_changelog_uses_diff_line_counts_for_category():
     notes = {
         "fffffff6": "Removed obsolete compatibility paths from the project.",
     }
-    removal_heavy_diff = "\n".join(
-        [
-            "diff --git a/x b/x",
-            "--- a/x",
-            "+++ b/x",
-            "@@ -1,4 +0,0 @@",
-            "-line one",
-            "-line two",
-            "-line three",
-        ]
-    )
+    removal_heavy_diff = "diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -1,4 +0,0 @@\n-line one\n-line two\n-line three"
 
     changelog = builder.build(
         commits=commits,

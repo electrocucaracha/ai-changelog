@@ -100,3 +100,30 @@ def test_generate_changelog_entry_falls_back_to_note_on_failure(monkeypatch):
     )
 
     assert result == "Refreshed README details."
+
+
+def test_summarize_diff_passes_litellm_gateway_kwargs(monkeypatch):
+    captured = {}
+
+    def fake_completion(**kwargs):
+        captured.update(kwargs)
+        return _make_response("Added gateway support.")
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
+    )
+
+    provider = AIProvider(
+        Config(
+            litellm_api_base="https://gateway.example",
+            litellm_api_key="token",
+            litellm_extra_headers={"X-Org": "platform"},
+        )
+    )
+
+    result = provider.summarize_diff("feat: add support", "+new behavior")
+
+    assert result == "Added gateway support."
+    assert captured["api_base"] == "https://gateway.example"
+    assert captured["api_key"] == "token"
+    assert captured["extra_headers"] == {"X-Org": "platform"}

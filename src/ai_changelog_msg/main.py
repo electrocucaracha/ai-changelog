@@ -15,10 +15,14 @@
 
 """Main CLI entry point for AI Changelog Generator."""
 
+from __future__ import annotations
+
+import json
 import logging
 import re
 import sys
-from typing import Any, Iterable, Optional
+from collections.abc import Iterable
+from typing import Any
 
 import click
 
@@ -95,7 +99,7 @@ def _create_semver_tags_if_needed(
     commits: Iterable[Any],
     namespace: str,
     create_semver_tags: bool,
-    limit: Optional[int],
+    limit: int | None,
 ) -> int:
     """Create semantic-version tags for untagged repositories.
 
@@ -138,10 +142,10 @@ def _create_semver_tags_if_needed(
         return 0
 
     ordered_commits = sorted(
-        list(commits),
+        commits,
         key=lambda commit: (commit.committed_datetime, commit.hexsha),
     )
-    current_version: Optional[SemanticVersion] = None
+    current_version: SemanticVersion | None = None
     created = 0
     category_to_release_type = {
         "Removed": "major",
@@ -274,6 +278,24 @@ def _merge_missing_release_sections(
     help="Write a changelog file into the target repository after note generation",
     show_default=True,
 )
+@click.option(
+    "--litellm-api-base",
+    default=None,
+    envvar="CHANGELOG_LITELLM_API_BASE",
+    help="Optional LiteLLM API base URL (for internal gateway routing)",
+)
+@click.option(
+    "--litellm-api-key",
+    default=None,
+    envvar="CHANGELOG_LITELLM_API_KEY",
+    help="Optional LiteLLM API key for gateway authentication",
+)
+@click.option(
+    "--litellm-headers-json",
+    default=None,
+    envvar="CHANGELOG_LITELLM_HEADERS_JSON",
+    help="Optional JSON object with extra headers for LiteLLM requests",
+)
 def cli(
     repo_path: str,
     model: str,
@@ -281,9 +303,12 @@ def cli(
     force: bool,
     clear_all: bool,
     create_semver_tags: bool,
-    limit: Optional[int],
+    limit: int | None,
     log_level: str,
     changelog_file: str,
+    litellm_api_base: str | None,
+    litellm_api_key: str | None,
+    litellm_headers_json: str | None,
 ) -> None:
     """Generate AI git notes and an associated changelog for a repository.
 
@@ -295,10 +320,34 @@ def cli(
     """
     _configure_logging(log_level)
     try:
+        litellm_extra_headers: dict[str, str] | None = None
+        if litellm_headers_json:
+            try:
+                raw_headers = json.loads(litellm_headers_json)
+            except json.JSONDecodeError as error:
+                raise ValueError("--litellm-headers-json must be valid JSON") from error
+
+            if not isinstance(raw_headers, dict):
+                raise ValueError("--litellm-headers-json must be a JSON object")
+
+            litellm_extra_headers = {}
+            for key, value in raw_headers.items():
+                if not isinstance(key, str) or not isinstance(value, str):
+                    raise TypeError(
+                        "--litellm-headers-json must contain string keys and values"
+                    )
+                litellm_extra_headers[key] = value
+
         logger.debug(
             "Initialising configuration: model=%s namespace=%s", model, namespace
         )
-        config = Config(model=model, namespace=namespace)
+        config = Config(
+            model=model,
+            namespace=namespace,
+            litellm_api_base=litellm_api_base,
+            litellm_api_key=litellm_api_key,
+            litellm_extra_headers=litellm_extra_headers,
+        )
 
         logger.debug("Opening repository at %s", repo_path)
         repo = GitRepository(repo_path)

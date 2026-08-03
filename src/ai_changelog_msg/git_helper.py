@@ -1,10 +1,11 @@
 """Git repository helper for reading commits, diffs, and git notes."""
 
+from __future__ import annotations
+
 import logging
 import re
 import subprocess
 from pathlib import Path
-from typing import Dict, List, Optional
 
 from git import Commit, Repo
 
@@ -47,7 +48,7 @@ class GitRepository:
         self.repo = Repo(self.repo_path)
         logger.debug("Repository opened: %s", self.repo_path)
 
-    def get_all_commits(self, limit: Optional[int] = None) -> List[Commit]:
+    def get_all_commits(self, limit: int | None = None) -> list[Commit]:
         """Return commits reachable from ``HEAD``, newest first.
 
         Args:
@@ -90,13 +91,13 @@ class GitRepository:
                 "Diff size for %s: %d chars", commit.hexsha[:8], len(diff_output or "")
             )
             return diff_output if diff_output else "[No changes to display]"
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001
             logger.warning(
                 "Could not retrieve diff for %s: %s", commit.hexsha[:8], error
             )
             return f"[Error retrieving diff: {error}]"
 
-    def get_note(self, commit_hash: str, namespace: str) -> Optional[str]:
+    def get_note(self, commit_hash: str, namespace: str) -> str | None:
         """Retrieve an existing git note attached to *commit_hash*.
 
         Args:
@@ -110,7 +111,7 @@ class GitRepository:
         try:
             result = self.repo.git.notes("--ref", namespace, "show", commit_hash)
             return result if result else None
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None
 
     def set_note(self, commit_hash: str, content: str, namespace: str) -> None:
@@ -207,17 +208,17 @@ class GitRepository:
         try:
             _ = self.repo.head.commit
             return True
-        except Exception:
+        except Exception:  # noqa: BLE001
             return False
 
-    def get_semantic_version_tags(self) -> Dict[str, List[str]]:
+    def get_semantic_version_tags(self) -> dict[str, list[str]]:
         """Return semantic-version tag names grouped by target commit hash.
 
         Tags are returned as a mapping of ``commit.hexsha`` to a list of tag
         names such as ``v1.2.3`` or ``1.2.3``. Non-semantic-version tags are
         filtered out by the caller.
         """
-        tags_by_commit: Dict[str, List[str]] = {}
+        tags_by_commit: dict[str, list[str]] = {}
         for tag in self.repo.tags:
             commit_hash = tag.commit.hexsha
             tags_by_commit.setdefault(commit_hash, []).append(tag.name)
@@ -265,7 +266,7 @@ class GitRepository:
         path = Path(file_path)
         return path if path.is_absolute() else self.repo_path / path
 
-    def get_repository_web_url(self) -> Optional[str]:
+    def get_repository_web_url(self) -> str | None:
         """Return the best-effort web URL for the repository origin remote.
 
         Supports common remote URL forms such as:
@@ -279,7 +280,7 @@ class GitRepository:
         """
         try:
             remote_url = self.repo.remotes.origin.url
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None
 
         if not remote_url:
@@ -301,7 +302,7 @@ class GitRepository:
 
         return None
 
-    def get_commit_web_url(self, commit_hash: str) -> Optional[str]:
+    def get_commit_web_url(self, commit_hash: str) -> str | None:
         """Return the web URL to view *commit_hash* in the origin repository.
 
         Args:

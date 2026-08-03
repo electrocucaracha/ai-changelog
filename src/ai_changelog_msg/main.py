@@ -63,7 +63,14 @@ def _build_execution_command(
 
     Sensitive values are not emitted directly.
     """
-    args: list[str] = ["ai-changelog", repo_path, "--model", model, "--namespace", namespace]
+    args: list[str] = [
+        "ai-changelog",
+        repo_path,
+        "--model",
+        model,
+        "--namespace",
+        namespace,
+    ]
 
     if force:
         args.append("--force")

@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import shlex
 import sys
 from collections.abc import Iterable
 from typing import Any
@@ -42,6 +43,47 @@ from ai_changelog_msg.git_helper import GitRepository
 
 logger = logging.getLogger(__name__)
 RELEASE_SECTION_HEADING_RE = re.compile(r"^## \[[^\]]+\](?: - .*)?$", re.MULTILINE)
+
+
+def _build_execution_command(
+    repo_path: str,
+    model: str,
+    namespace: str,
+    force: bool,
+    clear_all: bool,
+    create_semver_tags: bool,
+    limit: int | None,
+    log_level: str,
+    changelog_file: str,
+    litellm_api_base: str | None,
+    litellm_api_key: str | None,
+    litellm_headers_json: str | None,
+) -> str:
+    """Build a shell-safe command summary of the current CLI execution.
+
+    Sensitive values are not emitted directly.
+    """
+    args: list[str] = ["ai-changelog", repo_path, "--model", model, "--namespace", namespace]
+
+    if force:
+        args.append("--force")
+    if clear_all:
+        args.append("--clear-all")
+    if create_semver_tags:
+        args.append("--create-semver-tags")
+    if limit is not None:
+        args.extend(["--limit", str(limit)])
+
+    args.extend(["--log-level", log_level, "--changelog-file", changelog_file])
+
+    if litellm_api_base:
+        args.extend(["--litellm-api-base", litellm_api_base])
+    if litellm_api_key:
+        args.extend(["--litellm-api-key", "$CHANGELOG_LITELLM_API_KEY"])
+    if litellm_headers_json:
+        args.extend(["--litellm-headers-json", "$CHANGELOG_LITELLM_HEADERS_JSON"])
+
+    return " ".join(shlex.quote(part) for part in args)
 
 
 def _configure_logging(log_level: str) -> None:
@@ -235,6 +277,7 @@ def _merge_missing_release_sections(
 @click.option(
     "--model",
     default="ollama/llama3.1",
+    envvar="CHANGELOG_MODEL",
     help="AI model to use for summaries (default: ollama/llama3.1)",
 )
 @click.option(
@@ -352,6 +395,23 @@ def cli(
         logger.debug("Opening repository at %s", repo_path)
         repo = GitRepository(repo_path)
         click.echo(f"Repository: {repo.repo_path}")
+        click.echo(
+            "Execution command: "
+            + _build_execution_command(
+                repo_path=repo_path,
+                model=model,
+                namespace=namespace,
+                force=force,
+                clear_all=clear_all,
+                create_semver_tags=create_semver_tags,
+                limit=limit,
+                log_level=log_level,
+                changelog_file=changelog_file,
+                litellm_api_base=litellm_api_base,
+                litellm_api_key=litellm_api_key,
+                litellm_headers_json=litellm_headers_json,
+            )
+        )
 
         if clear_all:
             logger.info("Clearing all git notes in namespace '%s'", namespace)

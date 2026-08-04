@@ -38,6 +38,7 @@ if ! command -v uvx >/dev/null; then
     curl -LsSf https://astral.sh/uv/install.sh | sh
 fi
 uv sync --upgrade
+uvx pre-commit autoupdate
 
 # Update GitHub Action commit hashes
 gh_actions=$(grep -r "uses: [A-Za-z0-9_.-]*/[\_a-z\-]*@" .github/ | sed 's/@.*//' | awk -F ': ' '{ print $3 }' | sort -u)

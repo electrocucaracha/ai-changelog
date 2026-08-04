@@ -45,6 +45,7 @@ logger = logging.getLogger(__name__)
 RELEASE_SECTION_HEADING_RE = re.compile(r"^## \[[^\]]+\](?: - .*)?$", re.MULTILINE)
 
 
+# jscpd:ignore-start
 def _build_execution_command(
     repo_path: str,
     model: str,
@@ -58,7 +59,7 @@ def _build_execution_command(
     litellm_api_base: str | None,
     litellm_api_key: str | None,
     litellm_headers_json: str | None,
-) -> str:
+) -> str:  # jscpd:ignore-end
     """Build a shell-safe command summary of the current CLI execution.
 
     Sensitive values are not emitted directly.

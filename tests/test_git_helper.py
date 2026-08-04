@@ -22,6 +22,24 @@ import pytest
 from ai_changelog_msg.git_helper import GitRepository
 
 
+def _make_subprocess_recorder() -> tuple[list, object]:
+    """Return (calls, _run) where _run records positional subprocess.run args."""
+    calls: list = []
+
+    def _run(cmd, check, capture_output, text):
+        calls.append(
+            {
+                "cmd": cmd,
+                "check": check,
+                "capture_output": capture_output,
+                "text": text,
+            }
+        )
+        return SimpleNamespace(returncode=0)
+
+    return calls, _run
+
+
 class _FakeGit:
     def __init__(
         self, *, diff_result=None, show_result=None, note_result=None, tag_result=""
@@ -119,19 +137,7 @@ def test_get_commit_diff_returns_placeholder_when_empty():
 
 def test_set_note_invokes_git_notes_add_with_force(monkeypatch):
     repo = _make_repo()
-    calls = []
-
-    def _run(cmd, check, capture_output, text):
-        calls.append(
-            {
-                "cmd": cmd,
-                "check": check,
-                "capture_output": capture_output,
-                "text": text,
-            }
-        )
-        return SimpleNamespace(returncode=0)
-
+    calls, _run = _make_subprocess_recorder()
     monkeypatch.setattr(subprocess, "run", _run)
 
     repo.set_note("abc123", "hello world", "ai-changelog")
@@ -256,19 +262,7 @@ def test_create_tag_returns_false_when_tag_exists(monkeypatch):
 
 def test_create_tag_invokes_git_tag_command(monkeypatch):
     repo = _make_repo(fake_git=_FakeGit(tag_result=""))
-    calls = []
-
-    def _run(cmd, check, capture_output, text):
-        calls.append(
-            {
-                "cmd": cmd,
-                "check": check,
-                "capture_output": capture_output,
-                "text": text,
-            }
-        )
-        return SimpleNamespace(returncode=0)
-
+    calls, _run = _make_subprocess_recorder()
     monkeypatch.setattr(subprocess, "run", _run)
 
     assert repo.create_tag("v1.2.3", "abc123") is True

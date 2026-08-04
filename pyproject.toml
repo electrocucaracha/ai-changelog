@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Generate AI-powered summaries of git commit diffs and store them in git notes"
 readme = "README.md"
 license = {text = "Apache-2.0"}
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 keywords = ["git", "ai", "summary", "changelog", "notes"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -24,24 +24,24 @@ classifiers = [
 ]
 
 dependencies = [
-    "litellm>=1.0.0",
-    "gitpython>=3.1.30",
-    "python-dotenv>=1.0.0",
-    "click>=8.1.0",
-    "pydantic>=2.0.0",
+    "litellm",
+    "gitpython",
+    "python-dotenv",
+    "click",
+    "pydantic",
 ]
 
 [project.optional-dependencies]
 
 test = [
-    "pytest>=7.0",
-    "pytest-mock>=3.10",
-    "pytest-cov>=4.0",
-    "mutmut>=3.0",
+    "pytest",
+    "pytest-mock",
+    "pytest-cov",
+    "mutmut",
 ]
 eval = [
-    "deepeval>=3.0.0",
-    "ollama>=0.4.0",
+    "deepeval",
+    "ollama",
 ]
 
 [project.scripts]

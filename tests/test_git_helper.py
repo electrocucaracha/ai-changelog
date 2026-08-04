@@ -40,6 +40,15 @@ def _make_subprocess_recorder() -> tuple[list, object]:
     return calls, _run
 
 
+def _assert_single_subprocess_call(calls: list, expected_cmd: list[str]) -> None:
+    """Assert a single successful subprocess.run call with the expected args."""
+    assert len(calls) == 1
+    assert calls[0]["check"] is True
+    assert calls[0]["capture_output"] is True
+    assert calls[0]["text"] is True
+    assert calls[0]["cmd"] == expected_cmd
+
+
 class _FakeGit:
     def __init__(
         self, *, diff_result=None, show_result=None, note_result=None, tag_result=""
@@ -142,11 +151,7 @@ def test_set_note_invokes_git_notes_add_with_force(monkeypatch):
 
     repo.set_note("abc123", "hello world", "ai-changelog")
 
-    assert len(calls) == 1
-    assert calls[0]["check"] is True
-    assert calls[0]["capture_output"] is True
-    assert calls[0]["text"] is True
-    assert calls[0]["cmd"] == [
+    _assert_single_subprocess_call(calls, [
         "git",
         "-C",
         "/tmp/repo",
@@ -158,7 +163,7 @@ def test_set_note_invokes_git_notes_add_with_force(monkeypatch):
         "hello world",
         "-f",
         "abc123",
-    ]
+    ])
 
 
 def test_set_note_raises_runtime_error_on_subprocess_failure(monkeypatch):
@@ -266,18 +271,14 @@ def test_create_tag_invokes_git_tag_command(monkeypatch):
     monkeypatch.setattr(subprocess, "run", _run)
 
     assert repo.create_tag("v1.2.3", "abc123") is True
-    assert len(calls) == 1
-    assert calls[0]["check"] is True
-    assert calls[0]["capture_output"] is True
-    assert calls[0]["text"] is True
-    assert calls[0]["cmd"] == [
+    _assert_single_subprocess_call(calls, [
         "git",
         "-C",
         "/tmp/repo",
         "tag",
         "v1.2.3",
         "abc123",
-    ]
+    ])
 
 
 def test_create_tag_raises_runtime_error_on_subprocess_failure(monkeypatch):

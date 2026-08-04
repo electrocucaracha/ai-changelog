@@ -45,10 +45,10 @@ uv run ai-changelog /path/to/repository
 
 - Every CLI option supports an environment-variable equivalent.
 - Full flag-to-environment mapping: [cli-reference.md](cli-reference.md#environment-variables)
-- Optional internal LiteLLM gateway via:
-  - CHANGELOG_LITELLM_API_BASE
-  - CHANGELOG_LITELLM_API_KEY
-  - CHANGELOG_LITELLM_HEADERS_JSON
+- Optional LiteLLM provider and gateway configuration via native LiteLLM env vars,
+  such as OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY, XAI_API_KEY,
+  OPENAI_BASE_URL, and AZURE_API_BASE.
+- Optional per-request custom headers via CHANGELOG_LITELLM_HEADERS_JSON.
 
 ## Docs map
 

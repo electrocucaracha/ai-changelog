@@ -19,8 +19,8 @@ uv run ai-changelog /path/to/repository [options]
 
 ## LiteLLM gateway options
 
-- --litellm-api-base: Gateway base URL.
-- --litellm-api-key: Gateway API key.
+- --litellm-api-base: Optional API base override for this run.
+- --litellm-api-key: Optional API key override for this run.
 - --litellm-headers-json: JSON object of additional request headers.
 
 ## Environment variables
@@ -36,9 +36,39 @@ CLI arguments and flags still take precedence over environment values.
 - --limit -> CHANGELOG_LIMIT
 - --log-level -> CHANGELOG_LOG_LEVEL
 - --changelog-file -> CHANGELOG_CHANGELOG_FILE
-- --litellm-api-base -> CHANGELOG_LITELLM_API_BASE
-- --litellm-api-key -> CHANGELOG_LITELLM_API_KEY
 - --litellm-headers-json -> CHANGELOG_LITELLM_HEADERS_JSON
+
+LiteLLM-native environment variables are preferred for authentication and provider routing.
+The application passes model/provider resolution to LiteLLM,
+so set provider credentials directly in your shell.
+
+Common provider-specific key variables:
+
+- OPENAI_API_KEY
+- ANTHROPIC_API_KEY
+- GEMINI_API_KEY
+- XAI_API_KEY
+- TOGETHERAI_API_KEY
+- REPLICATE_API_KEY
+- FIREWORKS_AI_API_KEY
+- LITELLM_PROXY_API_KEY
+
+Common base/version variables:
+
+- OPENAI_BASE_URL
+- AZURE_API_BASE
+- AZURE_API_VERSION
+- AZURE_API_TYPE
+
+Cloud/provider context variables supported by LiteLLM include:
+
+- azure_ad_token
+- vertex_project
+- vertex_location
+- aws_region_name
+- project
+- region_name
+- token
 
 ## Example
 
@@ -46,8 +76,8 @@ CLI arguments and flags still take precedence over environment values.
 CHANGELOG_MODEL=gpt-4o-mini \
 CHANGELOG_NAMESPACE=ai-changelog \
 CHANGELOG_FORCE=1 \
-CHANGELOG_LITELLM_API_BASE="https://your-internal-gateway.example/v1" \
-CHANGELOG_LITELLM_API_KEY="<gateway-token>" \
+OPENAI_BASE_URL="https://your-internal-gateway.example/v1" \
+OPENAI_API_KEY="<provider-or-gateway-token>" \
 CHANGELOG_LITELLM_HEADERS_JSON='{"X-Team":"developer-tools"}' \
 uv run ai-changelog /path/to/repository --limit 100
 ```

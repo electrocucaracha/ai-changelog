@@ -87,7 +87,7 @@ def _build_execution_command(
     if litellm_api_base:
         args.extend(["--litellm-api-base", litellm_api_base])
     if litellm_api_key:
-        args.extend(["--litellm-api-key", "$CHANGELOG_LITELLM_API_KEY"])
+        args.extend(["--litellm-api-key", "[REDACTED]"])
     if litellm_headers_json:
         args.extend(["--litellm-headers-json", "$CHANGELOG_LITELLM_HEADERS_JSON"])
 
@@ -339,14 +339,20 @@ def _merge_missing_release_sections(
 @click.option(
     "--litellm-api-base",
     default=None,
-    envvar="CHANGELOG_LITELLM_API_BASE",
-    help="Optional LiteLLM API base URL (for internal gateway routing)",
+    help=(
+        "Optional LiteLLM API base URL override for this run. "
+        "Prefer provider-native env vars such as OPENAI_BASE_URL or "
+        "AZURE_API_BASE."
+    ),
 )
 @click.option(
     "--litellm-api-key",
     default=None,
-    envvar="CHANGELOG_LITELLM_API_KEY",
-    help="Optional LiteLLM API key for gateway authentication",
+    help=(
+        "Optional LiteLLM API key override for this run. "
+        "Prefer provider-native env vars such as OPENAI_API_KEY, "
+        "ANTHROPIC_API_KEY, GEMINI_API_KEY, or LITELLM_PROXY_API_KEY."
+    ),
 )
 @click.option(
     "--litellm-headers-json",

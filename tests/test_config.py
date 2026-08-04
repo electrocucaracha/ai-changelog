@@ -47,10 +47,8 @@ class TestConfig:
         with pytest.raises(ValueError):
             Config(max_diff_size=-1)
 
-    def test_config_from_env_reads_litellm_gateway_settings(self, monkeypatch):
-        """Test optional LiteLLM gateway values from environment."""
-        monkeypatch.setenv("CHANGELOG_LITELLM_API_BASE", "https://gateway.example")
-        monkeypatch.setenv("CHANGELOG_LITELLM_API_KEY", "secret")
+    def test_config_from_env_reads_litellm_headers_json(self, monkeypatch):
+        """Test optional LiteLLM header overrides from environment."""
         monkeypatch.setenv(
             "CHANGELOG_LITELLM_HEADERS_JSON",
             '{"X-Org": "platform", "X-Product": "ai-changelog"}',
@@ -58,8 +56,8 @@ class TestConfig:
 
         config = Config.from_env()
 
-        assert config.litellm_api_base == "https://gateway.example"
-        assert config.litellm_api_key == "secret"
+        assert config.litellm_api_base is None
+        assert config.litellm_api_key is None
         assert config.litellm_extra_headers == {
             "X-Org": "platform",
             "X-Product": "ai-changelog",

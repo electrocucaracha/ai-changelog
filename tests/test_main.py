@@ -106,8 +106,8 @@ def test_cli_reads_options_from_environment_variables(tmp_path, monkeypatch):
     monkeypatch.setenv("CHANGELOG_LIMIT", "5")
     monkeypatch.setenv("CHANGELOG_LOG_LEVEL", "DEBUG")
     monkeypatch.setenv("CHANGELOG_CHANGELOG_FILE", "docs/CHANGELOG.md")
-    monkeypatch.setenv("CHANGELOG_LITELLM_API_BASE", "https://gateway.example/v1")
-    monkeypatch.setenv("CHANGELOG_LITELLM_API_KEY", "secret")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://gateway.example/v1")
+    monkeypatch.setenv("OPENAI_API_KEY", "secret")
     monkeypatch.setenv("CHANGELOG_LITELLM_HEADERS_JSON", '{"X-Team":"devtools"}')
 
     runner = CliRunner()
@@ -123,8 +123,8 @@ def test_cli_reads_options_from_environment_variables(tmp_path, monkeypatch):
     assert "--limit 5" in result.output
     assert "--log-level DEBUG" in result.output
     assert "--changelog-file docs/CHANGELOG.md" in result.output
-    assert "--litellm-api-base https://gateway.example/v1" in result.output
-    assert "--litellm-api-key '$CHANGELOG_LITELLM_API_KEY'" in result.output
+    assert "--litellm-api-base" not in result.output
+    assert "--litellm-api-key" not in result.output
     assert "--litellm-headers-json '$CHANGELOG_LITELLM_HEADERS_JSON'" in result.output
 
 

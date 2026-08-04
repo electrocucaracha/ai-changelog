@@ -127,8 +127,11 @@ class Config:
         """
         model = os.getenv("CHANGELOG_MODEL", "ollama/llama3.1")
         namespace = os.getenv("CHANGELOG_NAMESPACE", "ai-changelog")
-        litellm_api_base = os.getenv("CHANGELOG_LITELLM_API_BASE")
-        litellm_api_key = os.getenv("CHANGELOG_LITELLM_API_KEY")
+        # Prefer LiteLLM-native provider environment variables (for example
+        # OPENAI_API_KEY, ANTHROPIC_API_KEY, OPENAI_BASE_URL, AZURE_API_BASE)
+        # and keep explicit CLI args as the override mechanism in this app.
+        litellm_api_base = None
+        litellm_api_key = None
         litellm_extra_headers: dict[str, str] | None = None
 
         headers_env = os.getenv("CHANGELOG_LITELLM_HEADERS_JSON")

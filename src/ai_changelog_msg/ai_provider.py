@@ -134,22 +134,21 @@ class AIProvider:
                     {
                         "role": "system",
                         "content": (
-                            "You produce standardized release-note summaries for git commits. "
-                            "These summaries are stored as git notes and later parsed into a "
-                            "Keep a Changelog style CHANGELOG.md. Follow this output contract "
-                            "exactly. Output plain text only. Do not use markdown, headings, "
-                            "bullets, numbered lists, labels like Summary or Why, code fences, "
-                            "or emphasis markers. Return either one or two short paragraphs. "
-                            "Paragraph 1 is mandatory and must be exactly one sentence that starts "
-                            "with an action verb (Added, Fixed, Changed, Removed, Improved, or "
-                            "Refactored), clearly states the primary outcome, and ends with a period. "
-                            "Paragraph 2 is optional and must be 1-2 sentences describing scope, "
-                            "motivation, and impact only when useful for maintainers or users. "
-                            "Explicitly mention breaking changes, behavioral changes, API or CLI "
-                            "changes, config changes, migration implications, or security impact when "
-                            "present. Avoid line-by-line implementation details, commit metadata, file "
-                            "paths, and vague filler language. Keep the style neutral, concise, and "
-                            "consistent across commits."
+                            "You write human-readable release notes for a Keep a Changelog style "
+                            "CHANGELOG.md. Entries must communicate user- or maintainer-facing impact, "
+                            "not low-level implementation details. Output plain text only — no markdown, "
+                            "headings, bullets, numbered lists, code fences, or emphasis markers. "
+                            "Return one mandatory paragraph and one optional paragraph. "
+                            "Paragraph 1 (required): exactly one sentence starting with one of the "
+                            "official Keep a Changelog verbs — Added, Changed, Deprecated, Removed, "
+                            "Fixed, or Security — that states what changed and why it matters to the "
+                            "user, ending with a period. "
+                            "Paragraph 2 (optional): 1–2 sentences covering scope, motivation, or "
+                            "impact that is genuinely useful to a technical user; include it only when "
+                            "it adds meaningful context. Always flag breaking changes, API or CLI "
+                            "changes, config schema changes, migration steps, and security impact when "
+                            "present. Never mention file paths, variable names, line numbers, or "
+                            "commit metadata. Keep tone precise, direct, and consistent."
                         ),
                     },
                     {"role": "user", "content": prompt},
@@ -190,10 +189,12 @@ class AIProvider:
             f"Breaking Change: {'yes' if is_breaking else 'no'}\n"
             f"Original Commit Message:\n{commit_message}\n\n"
             f"Existing Summary:\n{note}\n\n"
-            "Rewrite this into exactly one changelog-ready sentence. "
-            "Keep it factual and concise. Focus on the user- or maintainer-visible outcome. "
-            "Do not use markdown, bullets, commit hashes, file names, or implementation trivia. "
-            "If the change is internal-only, say that clearly."
+            "Rewrite the summary above into exactly one Keep a Changelog entry sentence. "
+            "The sentence must describe the user- or maintainer-visible outcome, not internal "
+            "implementation steps. Use the active voice and match the tone to the provided "
+            "category. If the change is purely internal with no observable effect, state that "
+            "clearly in one sentence. Do not use markdown, bullets, commit hashes, file paths, "
+            "or code identifiers."
         )
 
         try:
@@ -203,13 +204,16 @@ class AIProvider:
                     {
                         "role": "system",
                         "content": (
-                            "You rewrite engineering summaries into one standardized changelog "
-                            "sentence. Output exactly one sentence in plain text with no markdown, "
-                            "no list markers, no labels, and no quotes. Start with a suitable action "
-                            "verb that aligns with the provided category. Keep it factual, specific, "
-                            "and user- or maintainer-facing. Mention breaking behavior explicitly when "
-                            "applicable. Do not include commit hashes, file paths, code identifiers, "
-                            "or implementation trivia."
+                            "You normalize engineering summaries into one uniform Keep a Changelog "
+                            "entry sentence written for a technical audience. Output exactly one "
+                            "sentence in plain text with no markdown, list markers, labels, or quotes. "
+                            "Start with one of the official Keep a Changelog verbs — Added, Changed, "
+                            "Deprecated, Removed, Fixed, or Security — that matches the provided "
+                            "category. Describe the observable impact for developers or operators; "
+                            "never describe internal code mechanics. State breaking behavior, API "
+                            "contract changes, or migration requirements explicitly. Do not include "
+                            "commit hashes, file paths, code identifiers, or implementation trivia. "
+                            "Every entry must read as if written by the same author."
                         ),
                     },
                     {"role": "user", "content": prompt},
@@ -267,7 +271,7 @@ class AIProvider:
         prompt_parts.append(f"Original Commit Message:\n{commit_message}\n")
         prompt_parts.append(f"Diff:\n```\n{diff}\n```\n")
         prompt_parts.append(
-            "Please provide a clear, concise summary of the changes made in this commit. "
-            "Focus on the 'what' and 'why' rather than detailed line-by-line analysis."
+            "Summarize what changed for users or maintainers and why it matters. "
+            "Focus on observable behavior and impact, not line-by-line code mechanics."
         )
         return "\n".join(prompt_parts)

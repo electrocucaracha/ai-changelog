@@ -41,13 +41,65 @@ uv sync --upgrade
 uvx pre-commit autoupdate
 
 # Update GitHub Action commit hashes
-gh_actions=$(grep -r "uses: [A-Za-z0-9_.-]*/[\_a-z\-]*@" .github/ | sed 's/@.*//' | awk -F ': ' '{ print $3 }' | sort -u)
-exceptions=('reviewdog/action-misspell' 'actions/attest-build-provenance' 'GrantBirki/git-diff-action')
+gh_actions=$(grep -rhoE 'uses: [^@]+@' .github | sed -E 's/uses: ([^@]+)@/\1/' | sort -u)
+exceptions=('reviewdog/action-misspell' 'actions/attest-build-provenance' 'GrantBirki/git-diff-action' 'golangci/golangci-lint-action' 'actions/checkout' 'actions/upload-artifact')
+# Actions pinned to a specific version and excluded from auto-updates.
+# Remove an entry only once the underlying issue is confirmed resolved.
+# austenstone/copilot-cli: v3.0+ depends on actions/setup-copilot@v0 which does
+# not yet exist publicly; keep at v2.0 until that action is released.
+readonly pinned_actions=('austenstone/copilot-cli')
 for action in $gh_actions; do
+    is_pinned=false
+    for pinned in "${pinned_actions[@]}"; do
+        if [[ $action == "$pinned" ]]; then
+            is_pinned=true
+            break
+        fi
+    done
+    if [[ $is_pinned == "true" ]]; then
+        echo "Skipping auto-update for pinned action: $action"
+        continue
+    fi
     if [[ ${exceptions[*]} =~ (^|[^[:alpha:]])$action([^[:alpha:]]|$) ]]; then
-        commit_hash=$(git ls-remote "https://github.com/$action" | grep 'refs/tags/[v]\?[0-9][0-9\.]*\^{}$' | sed 's|refs/tags/[vV]\?[\.]\?||g; s|\^{}$||g' | sort -u -k2 -V | tail -1 | awk '{ printf "%s # %s\n",$1,$2 }')
+        commit_hash=$(
+            git ls-remote --tags "https://github.com/$action" |
+                awk '
+        {
+            sha=$1
+            tag=$2
+
+            sub(/^refs\/tags\//, "", tag)
+            sub(/\^\{\}$/, "", tag)
+
+            if (tag ~ /^v?[0-9]+(\.[0-9]+)*$/) {
+                sortkey=tag
+                sub(/^v/, "", sortkey)
+                print sortkey "\t" sha "\t" tag
+            }
+        }' |
+                sort -V |
+                tail -1 |
+                awk -F'\t' '{ printf "%s # %s\n", $2, $3 }'
+        )
     else
-        commit_hash=$(git ls-remote "https://github.com/$action" | grep 'refs/tags/[v]\?[0-9][0-9\.]*$' | sed 's|refs/tags/[vV]\?[\.]\?||g' | sort -u -k2 -V | tail -1 | awk '{ printf "%s # %s\n",$1,$2 }')
+        commit_hash=$(
+            git ls-remote "https://github.com/$action" |
+                grep 'refs/tags/[vV]\?[0-9][0-9\.]*$' |
+                awk '
+        {
+            sha=$1
+            tag=$2
+
+            sortkey=tag
+            sub(/^refs\/tags\//, "", tag)          # preserve original tag
+            sub(/^refs\/tags\/[vV]/, "", sortkey)  # normalize for sorting
+
+            printf "%s\t%s\t%s\n", sortkey, sha, tag
+        }' |
+                sort -u -k1,1 -V |
+                tail -1 |
+                awk -F'\t' '{ printf "%s # %s\n", $2, $3 }'
+        )
     fi
     # shellcheck disable=SC2267
     grep -ElRZ "uses: $action@" .github/ | xargs -0 -l sed -i -e "s|uses: $action@.*|uses: $action@$commit_hash|g"

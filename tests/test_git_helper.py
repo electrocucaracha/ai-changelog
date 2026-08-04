@@ -151,19 +151,22 @@ def test_set_note_invokes_git_notes_add_with_force(monkeypatch):
 
     repo.set_note("abc123", "hello world", "ai-changelog")
 
-    _assert_single_subprocess_call(calls, [
-        "git",
-        "-C",
-        "/tmp/repo",
-        "notes",
-        "--ref",
-        "ai-changelog",
-        "add",
-        "-m",
-        "hello world",
-        "-f",
-        "abc123",
-    ])
+    _assert_single_subprocess_call(
+        calls,
+        [
+            "git",
+            "-C",
+            "/tmp/repo",
+            "notes",
+            "--ref",
+            "ai-changelog",
+            "add",
+            "-m",
+            "hello world",
+            "-f",
+            "abc123",
+        ],
+    )
 
 
 def test_set_note_raises_runtime_error_on_subprocess_failure(monkeypatch):
@@ -271,14 +274,17 @@ def test_create_tag_invokes_git_tag_command(monkeypatch):
     monkeypatch.setattr(subprocess, "run", _run)
 
     assert repo.create_tag("v1.2.3", "abc123") is True
-    _assert_single_subprocess_call(calls, [
-        "git",
-        "-C",
-        "/tmp/repo",
-        "tag",
-        "v1.2.3",
-        "abc123",
-    ])
+    _assert_single_subprocess_call(
+        calls,
+        [
+            "git",
+            "-C",
+            "/tmp/repo",
+            "tag",
+            "v1.2.3",
+            "abc123",
+        ],
+    )
 
 
 def test_create_tag_raises_runtime_error_on_subprocess_failure(monkeypatch):

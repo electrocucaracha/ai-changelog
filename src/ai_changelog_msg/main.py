@@ -290,32 +290,38 @@ def _merge_missing_release_sections(
 @click.option(
     "--namespace",
     default="ai-changelog",
+    envvar="CHANGELOG_NAMESPACE",
     help="Git notes namespace (default: ai-changelog)",
 )
 @click.option(
     "--force",
     is_flag=True,
+    envvar="CHANGELOG_FORCE",
     help="Re-generate summaries for commits that already have notes",
 )
 @click.option(
     "--clear-all",
     is_flag=True,
+    envvar="CHANGELOG_CLEAR_ALL",
     help="Remove all git notes in the selected namespace and exit",
 )
 @click.option(
     "--create-semver-tags",
     is_flag=True,
+    envvar="CHANGELOG_CREATE_SEMVER_TAGS",
     help="Create semantic version tags when the repository has no semantic tags",
 )
 @click.option(
     "--limit",
     type=int,
     default=None,
+    envvar="CHANGELOG_LIMIT",
     help="Process only the last N commits",
 )
 @click.option(
     "--log-level",
     default="INFO",
+    envvar="CHANGELOG_LOG_LEVEL",
     type=click.Choice(
         ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], case_sensitive=False
     ),
@@ -325,6 +331,7 @@ def _merge_missing_release_sections(
 @click.option(
     "--changelog-file",
     default="CHANGELOG.md",
+    envvar="CHANGELOG_CHANGELOG_FILE",
     help="Write a changelog file into the target repository after note generation",
     show_default=True,
 )

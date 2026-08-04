@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from pathlib import Path
+import subprocess
 from types import SimpleNamespace
 
 import pytest
@@ -99,6 +100,202 @@ def test_get_note_returns_none_when_missing():
     repo = _make_repo(fake_git=_FakeGit(note_result=RuntimeError("missing")))
 
     assert repo.get_note("abc", "ai-changelog") is None
+
+
+def test_get_note_returns_note_content_when_present():
+    repo = _make_repo(fake_git=_FakeGit(note_result="existing note"))
+
+    assert repo.get_note("abc", "ai-changelog") == "existing note"
+
+
+def test_get_commit_diff_returns_placeholder_when_empty():
+    repo = _make_repo(fake_git=_FakeGit(diff_result=""))
+    commit = SimpleNamespace(
+        hexsha="abc12345", parents=[SimpleNamespace(hexsha="parent")]
+    )
+
+    assert repo.get_commit_diff(commit) == "[No changes to display]"
+
+
+def test_set_note_invokes_git_notes_add_with_force(monkeypatch):
+    repo = _make_repo()
+    calls = []
+
+    def _run(cmd, check, capture_output, text):
+        calls.append(
+            {
+                "cmd": cmd,
+                "check": check,
+                "capture_output": capture_output,
+                "text": text,
+            }
+        )
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(subprocess, "run", _run)
+
+    repo.set_note("abc123", "hello world", "ai-changelog")
+
+    assert len(calls) == 1
+    assert calls[0]["check"] is True
+    assert calls[0]["capture_output"] is True
+    assert calls[0]["text"] is True
+    assert calls[0]["cmd"] == [
+        "git",
+        "-C",
+        "/tmp/repo",
+        "notes",
+        "--ref",
+        "ai-changelog",
+        "add",
+        "-m",
+        "hello world",
+        "-f",
+        "abc123",
+    ]
+
+
+def test_set_note_raises_runtime_error_on_subprocess_failure(monkeypatch):
+    repo = _make_repo()
+
+    def _run(*args, **kwargs):
+        raise subprocess.CalledProcessError(
+            1,
+            kwargs.get("args", args[0] if args else "git"),
+            stderr="failure",
+        )
+
+    monkeypatch.setattr(subprocess, "run", _run)
+
+    with pytest.raises(RuntimeError, match="Failed to set git note"):
+        repo.set_note("abc123", "hello world", "ai-changelog")
+
+
+def test_clear_notes_returns_false_when_namespace_missing(monkeypatch):
+    repo = _make_repo()
+    calls = []
+
+    def _run(cmd, check, capture_output, text):
+        calls.append({"cmd": cmd, "check": check})
+        return SimpleNamespace(returncode=1)
+
+    monkeypatch.setattr(subprocess, "run", _run)
+
+    assert repo.clear_notes("ai-changelog") is False
+    assert len(calls) == 1
+    assert calls[0]["check"] is False
+    assert calls[0]["cmd"][-1] == "refs/notes/ai-changelog"
+
+
+def test_clear_notes_deletes_existing_namespace(monkeypatch):
+    repo = _make_repo()
+    calls = []
+
+    def _run(cmd, check, capture_output, text):
+        calls.append({"cmd": cmd, "check": check})
+        if "show-ref" in cmd:
+            return SimpleNamespace(returncode=0)
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(subprocess, "run", _run)
+
+    assert repo.clear_notes("ai-changelog") is True
+    assert len(calls) == 2
+    assert calls[0]["check"] is False
+    assert calls[1]["check"] is True
+    assert calls[1]["cmd"] == [
+        "git",
+        "-C",
+        "/tmp/repo",
+        "update-ref",
+        "-d",
+        "refs/notes/ai-changelog",
+    ]
+
+
+def test_clear_notes_raises_runtime_error_when_delete_fails(monkeypatch):
+    repo = _make_repo()
+
+    def _run(cmd, check, capture_output, text):
+        if "show-ref" in cmd:
+            return SimpleNamespace(returncode=0)
+        raise subprocess.CalledProcessError(1, cmd, stderr="cannot delete")
+
+    monkeypatch.setattr(subprocess, "run", _run)
+
+    with pytest.raises(RuntimeError, match="Failed to clear git notes namespace"):
+        repo.clear_notes("ai-changelog")
+
+
+def test_has_commits_false_when_head_commit_access_raises():
+    repo = _make_repo()
+
+    class _BrokenHead:
+        @property
+        def commit(self):
+            raise RuntimeError("no commits")
+
+    repo.repo = SimpleNamespace(head=_BrokenHead())
+    assert repo.has_commits() is False
+
+
+def test_create_tag_returns_false_when_tag_exists(monkeypatch):
+    repo = _make_repo(fake_git=_FakeGit(tag_result="v1.0.0"))
+    run_called = False
+
+    def _run(*args, **kwargs):
+        nonlocal run_called
+        run_called = True
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(subprocess, "run", _run)
+
+    assert repo.create_tag("v1.0.0", "abc123") is False
+    assert run_called is False
+
+
+def test_create_tag_invokes_git_tag_command(monkeypatch):
+    repo = _make_repo(fake_git=_FakeGit(tag_result=""))
+    calls = []
+
+    def _run(cmd, check, capture_output, text):
+        calls.append(
+            {
+                "cmd": cmd,
+                "check": check,
+                "capture_output": capture_output,
+                "text": text,
+            }
+        )
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(subprocess, "run", _run)
+
+    assert repo.create_tag("v1.2.3", "abc123") is True
+    assert len(calls) == 1
+    assert calls[0]["check"] is True
+    assert calls[0]["capture_output"] is True
+    assert calls[0]["text"] is True
+    assert calls[0]["cmd"] == [
+        "git",
+        "-C",
+        "/tmp/repo",
+        "tag",
+        "v1.2.3",
+        "abc123",
+    ]
+
+
+def test_create_tag_raises_runtime_error_on_subprocess_failure(monkeypatch):
+    repo = _make_repo(fake_git=_FakeGit(tag_result=""))
+
+    def _run(*args, **kwargs):
+        raise subprocess.CalledProcessError(1, args[0], stderr="cannot create")
+
+    monkeypatch.setattr(subprocess, "run", _run)
+
+    with pytest.raises(RuntimeError, match="Failed to create tag"):
+        repo.create_tag("v1.2.3", "abc123")
 
 
 def test_get_semantic_version_tags_and_resolve_output_path():

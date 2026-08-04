@@ -94,6 +94,40 @@ def test_cli_clear_all_removes_namespace_notes_and_exits(tmp_path, monkeypatch):
     assert "Removed all git notes from namespace: custom-notes" in result.output
 
 
+def test_cli_reads_options_from_environment_variables(tmp_path, monkeypatch):
+    repo = DummyRepo(str(tmp_path))
+    monkeypatch.setattr(main, "GitRepository", lambda repo_path: repo)
+
+    monkeypatch.setenv("CHANGELOG_MODEL", "gpt-4o-mini")
+    monkeypatch.setenv("CHANGELOG_NAMESPACE", "env-notes")
+    monkeypatch.setenv("CHANGELOG_FORCE", "1")
+    monkeypatch.setenv("CHANGELOG_CLEAR_ALL", "1")
+    monkeypatch.setenv("CHANGELOG_CREATE_SEMVER_TAGS", "1")
+    monkeypatch.setenv("CHANGELOG_LIMIT", "5")
+    monkeypatch.setenv("CHANGELOG_LOG_LEVEL", "DEBUG")
+    monkeypatch.setenv("CHANGELOG_CHANGELOG_FILE", "docs/CHANGELOG.md")
+    monkeypatch.setenv("CHANGELOG_LITELLM_API_BASE", "https://gateway.example/v1")
+    monkeypatch.setenv("CHANGELOG_LITELLM_API_KEY", "secret")
+    monkeypatch.setenv("CHANGELOG_LITELLM_HEADERS_JSON", '{"X-Team":"devtools"}')
+
+    runner = CliRunner()
+    result = runner.invoke(main.cli, [str(tmp_path)])
+
+    assert result.exit_code == 0
+    assert repo.cleared_namespace == "env-notes"
+    assert "--model gpt-4o-mini" in result.output
+    assert "--namespace env-notes" in result.output
+    assert "--force" in result.output
+    assert "--clear-all" in result.output
+    assert "--create-semver-tags" in result.output
+    assert "--limit 5" in result.output
+    assert "--log-level DEBUG" in result.output
+    assert "--changelog-file docs/CHANGELOG.md" in result.output
+    assert "--litellm-api-base https://gateway.example/v1" in result.output
+    assert "--litellm-api-key '$CHANGELOG_LITELLM_API_KEY'" in result.output
+    assert "--litellm-headers-json '$CHANGELOG_LITELLM_HEADERS_JSON'" in result.output
+
+
 def test_create_semver_tags_if_needed_creates_tags_when_none_exist():
     repo = DummyTagRepo(
         tags_by_commit={},

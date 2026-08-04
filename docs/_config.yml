@@ -1,0 +1,4 @@
+title: AI Changelog Generator
+description: AI-powered changelog generation from Git commit history
+theme: minima
+markdown: kramdown

@@ -67,38 +67,38 @@ for action in $gh_actions; do
         {
             sha=$1
             tag=$2
-
+            deref = (tag ~ /\^\{\}$/) ? 1 : 0
             sub(/^refs\/tags\//, "", tag)
             sub(/\^\{\}$/, "", tag)
-
             if (tag ~ /^v?[0-9]+(\.[0-9]+)*$/) {
                 sortkey=tag
                 sub(/^v/, "", sortkey)
-                print sortkey "\t" sha "\t" tag
+                print sortkey "\t" deref "\t" sha "\t" tag
             }
         }' |
-                sort -V |
+                sort -V -k1,1 -k2,2n |
                 tail -1 |
-                awk -F'\t' '{ printf "%s # %s\n", $2, $3 }'
+                awk -F'\t' '{ printf "%s # %s\n", $3, $4 }'
         )
     else
         commit_hash=$(
-            git ls-remote "https://github.com/$action" |
-                grep 'refs/tags/[vV]\?[0-9][0-9\.]*$' |
+            git ls-remote --tags "https://github.com/$action" |
                 awk '
         {
             sha=$1
             tag=$2
-
-            sortkey=tag
-            sub(/^refs\/tags\//, "", tag)          # preserve original tag
-            sub(/^refs\/tags\/[vV]/, "", sortkey)  # normalize for sorting
-
-            printf "%s\t%s\t%s\n", sortkey, sha, tag
+            deref = (tag ~ /\^\{\}$/) ? 1 : 0
+            sub(/^refs\/tags\//, "", tag)
+            sub(/\^\{\}$/, "", tag)
+            if (tag ~ /^[vV]?[0-9]+(\.[0-9]+)*$/) {
+                sortkey=tag
+                sub(/^[vV]/, "", sortkey)
+                print sortkey "\t" deref "\t" sha "\t" tag
+            }
         }' |
-                sort -u -k1,1 -V |
+                sort -V -k1,1 -k2,2n |
                 tail -1 |
-                awk -F'\t' '{ printf "%s # %s\n", $2, $3 }'
+                awk -F'\t' '{ printf "%s # %s\n", $3, $4 }'
         )
     fi
     # shellcheck disable=SC2267

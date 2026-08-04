@@ -21,7 +21,7 @@ while preserving identical rendered output.
 ## Markdown Structure
 
 - Keep headings short, descriptive, and consistently capitalized with the surrounding document style.
-- Leave a blank line before and after headings, lists, block quotes, and fenced code blocks.
+- Leave a empty line before and after headings, lists, block quotes, and fenced code blocks.
 - Keep one list item per line unless a wrapped continuation is needed for clarity.
 - Prefer ordered and unordered lists when they make content easier to scan than dense paragraphs.
 - Preserve existing Markdown features such as tables, code fences, link syntax, and callouts.

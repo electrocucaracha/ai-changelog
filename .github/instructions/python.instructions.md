@@ -52,7 +52,7 @@ Target Python 3.9+ and keep code aligned with this project's `src/` layout, CLI 
 - Avoid hidden side effects and surprising mutation.
 - Favor small, testable units over dense inline logic.
 - Prefer pure functions for transformation logic when practical.
-- Isolate I/O, subprocess, network, and git interactions so they are easier to mock in tests.
+- Isolate I/O, subprocess, network, and Git interactions so they are easier to mock in tests.
 - Preserve backwards-compatible behavior unless the task requires a change.
 - Add brief comments only when intent would otherwise be unclear from the code and docstring.
 

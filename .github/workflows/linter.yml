@@ -68,19 +68,22 @@ jobs:
         if: failure()
         run: |
           find ./super-linter-output/super-linter/ -name '*.json' -exec sh -c 'jq -e ".Exitval != 0" "$1" >/dev/null && printf "%s\0" "$1"' _ {} \; | xargs -0 jq -s '.' > linter-errors.json
+      - name: Install Copilot CLI
+        if: failure()
+        run: npm install -g @github/copilot
       - uses: actions/ai-inference@2c43c91ae16266ca159d311430343c67a5ffa222 # v3
         id: ai-linter-analysis
         if: failure()
+        continue-on-error: true
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          model: mistral-ai/Ministral-3B
-          input: |
-            diff: ${{ steps.git-diff.outputs.raw-diff }}
+          model: gpt-4.1
           prompt-file: ./linter-errors.json
           system-prompt: |
             You are an expert software engineer who specializes in diagnosing and fixing software build and runtime failures. Always provide structured reasoning and propose concrete fixes when possible.
 
-            Task: Analyze the logs of the super-linter-output/ folder from the failed `ubuntu-latest` CI workflow run. Cross-reference the errors with the code diff to determine the root cause of the failure.
-            {{ diff }}
+            Task: Analyze the logs of the super-linter-output/ folder from the failed `ubuntu-latest` CI workflow run to determine the root cause of the failure.
 
             Objectives:
             1. **Diagnosis:** Identify patterns, anomalies, or dependencies that could explain the failure. What is the most probable root cause?

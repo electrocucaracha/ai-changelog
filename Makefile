@@ -1,4 +1,4 @@
-.PHONY: help install install-dev lint format test func clean run lock
+.PHONY: help install install-dev lint format test func mutation clean run lock
 # SPDX-license-identifier: Apache-2.0
 ##############################################################################
 # Copyright (c) 2026
@@ -18,6 +18,7 @@ help:
 	@echo "  fmt   - Format code using shfmt, yamlfmt, prettier, and tox lint"
 	@echo "  clean - Remove build artifacts and caches"
 	@echo "  run   - Run the application (requires REPO_PATH)"
+	@echo "  mutation - Run mutation tests using mutmut"
 	@echo "  help  - Show this help message"
 
 .PHONY: test
@@ -27,6 +28,14 @@ test: clean
 	uv sync --extra test
 	uvx tox
 	@echo "Tests complete!"
+
+.PHONY: mutation
+mutation:
+	command -v uv > /dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
+	uv sync --extra test
+	uv run mutmut run
+	uv run mutmut results
+	@echo "Mutation tests complete!"
 
 .PHONY: func
 func:

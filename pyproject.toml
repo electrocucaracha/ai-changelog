@@ -37,6 +37,7 @@ test = [
     "pytest>=7.0",
     "pytest-mock>=3.10",
     "pytest-cov>=4.0",
+    "mutmut>=3.0",
 ]
 eval = [
     "deepeval>=3.0.0",
@@ -94,6 +95,11 @@ commands =
     black --check src/ tests/
     isort --check src/ tests/
 """
+
+[tool.mutmut]
+source_paths = ["src/ai_changelog_msg/"]
+paths_to_exclude = ["src/ai_changelog_msg/__init__.py"]
+test_command = "python -m pytest tests/ -x -q"
 
 [tool.black]
 line-length = 88

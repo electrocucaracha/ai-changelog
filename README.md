@@ -6,111 +6,70 @@
 
 ## Overview
 
-AI Changelog Generator is a tool designed to automate the creation of changelogs by generating AI-powered summaries of Git commit diffs. It simplifies the process of documenting changes in a repository by leveraging AI models to analyze commit histories and produce concise, meaningful summaries. These summaries are stored in Git notes and used to generate a `CHANGELOG.md` file in a structured format.
+AI Changelog Generator automates release-note creation from Git history.
+It analyzes commit diffs with an AI model,
+stores per-commit summaries in Git notes,
+and renders a structured CHANGELOG.md.
 
-### What Problem Does It Solve?
+### What Problem Does It Solve
 
-Maintaining changelogs manually can be time-consuming and error-prone. This tool automates the process, ensuring that changelogs are consistent, up-to-date, and easy to understand. It supports multiple AI providers and integrates seamlessly with Git, making it a powerful solution for developers and teams.
+Writing changelogs by hand is repetitive,
+easy to delay,
+and often inconsistent across releases.
+This project solves that by generating changelog content directly from commits,
+so release notes are faster to produce and easier to keep accurate.
 
-## How to Use
+## Core Features
 
-### Requirements
+- AI-powered summaries generated from commit diffs
+- Git notes storage that does not rewrite history
+- Multi-provider support through LiteLLM
+- Changelog rendering with semantic version release sections
+- Optional semantic tag creation when tags are missing
+
+## Quick Start
+
+Requirements:
 
 - Python 3.9+
-- `uv` (a Python task runner)
+- uv
 
-### Installation
-
-Clone the repository and ensure you have the required dependencies installed. You can use the following command to activate the virtual environment:
-
-```bash
-source .venv/bin/activate
-```
-
-### Running the Tool
-
-Run the tool directly from the repository:
+Run:
 
 ```bash
 uv run ai-changelog /path/to/repository
 ```
 
-### Internal LiteLLM Gateway Routing
+All CLI flags can also be supplied through environment variables.
+See [docs/cli-reference.md](docs/cli-reference.md#environment-variables) for the full mapping.
 
-To route requests through an internal LiteLLM gateway while keeping project-level
-autonomy over model selection and prompts, set optional gateway variables:
+### Run with LiteLLM GitHub Copilot provider
 
-```bash
-export CHANGELOG_LITELLM_API_BASE="https://your-internal-gateway.example/v1"
-export CHANGELOG_LITELLM_API_KEY="<gateway-token>"
-export CHANGELOG_LITELLM_HEADERS_JSON='{"X-Team":"developer-tools"}'
-```
-
-Then run the tool normally (or pass the equivalent CLI options).
-
-### Using uvx
-
-You can consume this tool with `uvx` in two common ways.
-
-Git-direct method with environment variables:
+Set the model to the GitHub Copilot provider route:
 
 ```bash
-export CHANGELOG_MODEL=gpt-4o-mini
-export CHANGELOG_LITELLM_API_BASE="https://your-internal-gateway.example/v1"
-export CHANGELOG_LITELLM_API_KEY="<gateway-token>"
-export CHANGELOG_LITELLM_HEADERS_JSON='{"X-Team":"developer-tools"}'
-
-uvx --from "git+https://github.com/electrocucaracha/ai-changelog.git" \
-  ai-changelog /path/to/repository
+export CHANGELOG_MODEL="github_copilot/gpt-4"
+uv run ai-changelog /path/to/repository
 ```
 
-Local checkout method:
+On first run,
+LiteLLM will start the GitHub device authentication flow.
+Follow the verification URL and device code prompt in your terminal.
 
-uvx --from . ai-changelog /path/to/repository
-
-If your environment requires private index resolution for your model gateway
-client dependencies, configure your `uv` index/sources in `pyproject.toml`
-(or your org-standard `uv` configuration) before invoking `uvx`.
-
-### Options
-
-- `--model`: Specify the AI model (default: ollama/llama3.1)
-- `--namespace`: Git notes namespace (default: ai-changelog)
-- `--force`: Re-generate summaries for commits that already have notes
-- `--clear-all`: Remove all notes from the selected namespace and exit
-- `--create-semver-tags`: Create semantic version tags if none exist
-- `--limit`: Process only the last N commits
-- `--log-level`: Set logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`)
-- `--changelog-file`: Specify the output path for the changelog (default: `CHANGELOG.md`)
-- `--litellm-api-base`: Optional internal LiteLLM gateway base URL
-- `--litellm-api-key`: Optional API key for gateway authentication
-- `--litellm-headers-json`: Optional JSON object with request headers for gateway routing or policy metadata
-
-### Viewing Git Notes
-
-Summaries are stored in Git notes under the namespace `ai-changelog`. To view them, use:
+Optional token storage customization:
 
 ```bash
-git log --show-notes=refs/notes/ai-changelog
+export GITHUB_COPILOT_TOKEN_DIR="~/.config/litellm/github_copilot"
+export GITHUB_COPILOT_ACCESS_TOKEN_FILE="access-token"
+export GITHUB_COPILOT_API_KEY_FILE="api-key.json"
 ```
 
-## Features
+## Documentation
 
-- Multi-provider AI support via LiteLLM (Claude, OpenAI, local models, etc.)
-- Git notes integration for persistent, non-intrusive storage
-- Batch processing of all commits in repository history
-- Customizable summaries with configurable prompts
-- Automatic changelog generation from Git notes and commit history
-- Error handling and retry logic
-
-## How It Works
-
-1. **Repository Scanning**: Walks through all commits in the repository.
-2. **Diff Analysis**: Extracts and analyzes file changes for each commit.
-3. **Summary Generation**: Uses the configured AI model to create concise summaries.
-4. **Notes Storage**: Stores summaries in Git notes (non-invasive, doesn't alter commit history).
-5. **Tag Generation**: Optionally creates semantic version tags from git-note categories.
-6. **Changelog Rendering**: Builds a changelog using generated notes and semantic version tags, appending only missing release sections when `CHANGELOG.md` already exists.
+- Project docs site: [docs/index.md](docs/index.md)
+- Quickstart: [docs/quickstart.md](docs/quickstart.md)
+- CLI options: [docs/cli-reference.md](docs/cli-reference.md)
+- Processing flow: [docs/how-it-works.md](docs/how-it-works.md)
 
 ## Contributing
 

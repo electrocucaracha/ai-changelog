@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -141,17 +141,17 @@ def test_create_semver_tags_if_needed_creates_tags_when_none_exist():
         SimpleNamespace(
             hexsha="a1",
             message="feat(api): add endpoint",
-            committed_datetime=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            committed_datetime=datetime(2026, 1, 1, tzinfo=UTC),
         ),
         SimpleNamespace(
             hexsha="b2",
             message="docs: update readme",
-            committed_datetime=datetime(2026, 1, 2, tzinfo=timezone.utc),
+            committed_datetime=datetime(2026, 1, 2, tzinfo=UTC),
         ),
         SimpleNamespace(
             hexsha="c3",
             message="fix(api): handle edge case",
-            committed_datetime=datetime(2026, 1, 3, tzinfo=timezone.utc),
+            committed_datetime=datetime(2026, 1, 3, tzinfo=UTC),
         ),
     ]
 
@@ -173,7 +173,7 @@ def test_create_semver_tags_if_needed_skips_when_semver_tags_exist():
         SimpleNamespace(
             hexsha="a1",
             message="feat(api): add endpoint",
-            committed_datetime=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            committed_datetime=datetime(2026, 1, 1, tzinfo=UTC),
         )
     ]
 
@@ -258,13 +258,13 @@ def test_cli_processes_commits_upgrades_legacy_notes_and_writes_changelog(
         SimpleNamespace(
             hexsha="a1b2c3d4",
             message="feat(cli): add changelog output",
-            committed_datetime=datetime(2026, 3, 1, tzinfo=timezone.utc),
+            committed_datetime=datetime(2026, 3, 1, tzinfo=UTC),
             author=SimpleNamespace(name="Alice"),
         ),
         SimpleNamespace(
             hexsha="b2c3d4e5",
             message="fix(cli): handle legacy note",
-            committed_datetime=datetime(2026, 3, 2, tzinfo=timezone.utc),
+            committed_datetime=datetime(2026, 3, 2, tzinfo=UTC),
             author=SimpleNamespace(name="Bob"),
         ),
     ]

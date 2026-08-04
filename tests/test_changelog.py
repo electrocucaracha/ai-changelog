@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 from ai_changelog_msg.changelog import (
@@ -54,17 +54,17 @@ def test_build_synthetic_changelog_without_tags():
         make_commit(
             "11111111",
             "docs: document usage",
-            datetime(2026, 3, 10, tzinfo=timezone.utc),
+            datetime(2026, 3, 10, tzinfo=UTC),
         ),
         make_commit(
             "22222222",
             "feat(cli): generate changelog",
-            datetime(2026, 3, 11, tzinfo=timezone.utc),
+            datetime(2026, 3, 11, tzinfo=UTC),
         ),
         make_commit(
             "33333333",
             "fix(notes): handle empty note",
-            datetime(2026, 3, 12, tzinfo=timezone.utc),
+            datetime(2026, 3, 12, tzinfo=UTC),
         ),
     ]
     notes = {
@@ -95,17 +95,17 @@ def test_build_changelog_with_semver_tags_and_predicted_next_version():
         make_commit(
             "aaaaaaa1",
             "feat: initial public release",
-            datetime(2026, 3, 1, tzinfo=timezone.utc),
+            datetime(2026, 3, 1, tzinfo=UTC),
         ),
         make_commit(
             "bbbbbbb2",
             "fix: patch release bug",
-            datetime(2026, 3, 2, tzinfo=timezone.utc),
+            datetime(2026, 3, 2, tzinfo=UTC),
         ),
         make_commit(
             "ccccccc3",
             "feat(api): add comparison mode",
-            datetime(2026, 3, 3, tzinfo=timezone.utc),
+            datetime(2026, 3, 3, tzinfo=UTC),
         ),
     ]
     notes = {
@@ -136,7 +136,7 @@ def test_build_changelog_prefers_ai_generated_entries():
         make_commit(
             "ddddddd4",
             "fix(cli): handle missing namespace",
-            datetime(2026, 3, 4, tzinfo=timezone.utc),
+            datetime(2026, 3, 4, tzinfo=UTC),
         )
     ]
     notes = {
@@ -163,7 +163,7 @@ def test_build_changelog_renders_commit_markdown_links_when_available():
         make_commit(
             "eeeeeee5fffffff6789012345678901234567890",
             "feat(api): expose governance headers",
-            datetime(2026, 3, 5, tzinfo=timezone.utc),
+            datetime(2026, 3, 5, tzinfo=UTC),
         )
     ]
     notes = {
@@ -196,7 +196,7 @@ def test_build_changelog_uses_diff_line_counts_for_category():
         make_commit(
             "fffffff6",
             "chore: cleanup legacy paths",
-            datetime(2026, 3, 6, tzinfo=timezone.utc),
+            datetime(2026, 3, 6, tzinfo=UTC),
         )
     ]
     notes = {
@@ -229,7 +229,7 @@ def test_build_changelog_prefers_note_category_metadata():
         make_commit(
             "99999999",
             "fix(core): adjust parser",
-            datetime(2026, 3, 7, tzinfo=timezone.utc),
+            datetime(2026, 3, 7, tzinfo=UTC),
         )
     ]
     notes = {

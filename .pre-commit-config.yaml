@@ -20,7 +20,7 @@ repos:
     hooks:
       - id: shellcheck
         args: ["-x"]
-  - repo: https://opendev.org/openstack/bashate.git
+  - repo: https://github.com/openstack/bashate.git
     rev: 2.1.1
     hooks:
       - id: bashate

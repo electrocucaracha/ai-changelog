@@ -14,6 +14,9 @@ uv run ai-changelog /path/to/repository [options]
 - --clear-all: Delete all notes in the selected namespace and exit.
 - --create-semver-tags: Create semantic version tags when missing.
 - --limit: Process only the most recent N commits.
+- --workers: Maximum worker threads for AI summarization.
+- --retry-attempts: Max retry attempts for transient AI API failures. Default is 3.
+- --retry-backoff-seconds: Base retry delay in seconds. Default is 1.0.
 - --log-level: Set log verbosity.
 - --changelog-file: Output path for changelog. Default is CHANGELOG.md.
 
@@ -34,9 +37,13 @@ CLI arguments and flags still take precedence over environment values.
 - --clear-all -> CHANGELOG_CLEAR_ALL
 - --create-semver-tags -> CHANGELOG_CREATE_SEMVER_TAGS
 - --limit -> CHANGELOG_LIMIT
+- --workers -> CHANGELOG_WORKERS
+- --retry-attempts -> CHANGELOG_RETRY_ATTEMPTS
+- --retry-backoff-seconds -> CHANGELOG_RETRY_BACKOFF_SECONDS
 - --log-level -> CHANGELOG_LOG_LEVEL
 - --changelog-file -> CHANGELOG_CHANGELOG_FILE
 - --litellm-headers-json -> CHANGELOG_LITELLM_HEADERS_JSON
+- (optional) enable Headroom callback -> CHANGELOG_ENABLE_HEADROOM
 
 LiteLLM-native environment variables are preferred for authentication and provider routing.
 The application passes model/provider resolution to LiteLLM,
@@ -52,6 +59,10 @@ Common provider-specific key variables:
 - REPLICATE_API_KEY
 - FIREWORKS_AI_API_KEY
 - LITELLM_PROXY_API_KEY
+
+Optional compression-specific variable:
+
+- CHANGELOG_ENABLE_HEADROOM (true/false, defaults to true)
 
 Common base/version variables:
 

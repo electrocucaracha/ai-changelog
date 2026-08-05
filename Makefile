@@ -49,6 +49,7 @@ lint: clean
 	sudo -E $(DOCKER_CMD) run --rm -v $$(pwd):/tmp/lint \
 	-e RUN_LOCAL=true \
 	-e LINTER_RULES_PATH=/ \
+	-e DEFAULT_BRANCH=main \
 	ghcr.io/super-linter/super-linter
 	command -v uvx > /dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
 	uvx tox -e lint-check

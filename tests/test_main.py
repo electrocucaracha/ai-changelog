@@ -74,6 +74,15 @@ class DummyTagRepo:
         return True
 
 
+def _invoke_cli_with_dummy_repo(tmp_path, monkeypatch, args: list[str]):
+    repo = DummyRepo(str(tmp_path))
+    monkeypatch.setattr(main, "GitRepository", lambda repo_path: repo)
+
+    runner = CliRunner()
+    result = runner.invoke(main.cli, [str(tmp_path), *args])
+    return repo, result
+
+
 def test_cli_clear_all_removes_namespace_notes_and_exits(tmp_path, monkeypatch):
     repo = DummyRepo(str(tmp_path))
 
@@ -129,13 +138,8 @@ def test_cli_reads_options_from_environment_variables(tmp_path, monkeypatch):
 
 
 def test_cli_includes_workers_in_execution_command(tmp_path, monkeypatch):
-    repo = DummyRepo(str(tmp_path))
-    monkeypatch.setattr(main, "GitRepository", lambda repo_path: repo)
-
-    runner = CliRunner()
-    result = runner.invoke(
-        main.cli,
-        [str(tmp_path), "--clear-all", "--workers", "7"],
+    _, result = _invoke_cli_with_dummy_repo(
+        tmp_path, monkeypatch, ["--clear-all", "--workers", "7"]
     )
 
     assert result.exit_code == 0
@@ -143,14 +147,10 @@ def test_cli_includes_workers_in_execution_command(tmp_path, monkeypatch):
 
 
 def test_cli_includes_retry_flags_in_execution_command(tmp_path, monkeypatch):
-    repo = DummyRepo(str(tmp_path))
-    monkeypatch.setattr(main, "GitRepository", lambda repo_path: repo)
-
-    runner = CliRunner()
-    result = runner.invoke(
-        main.cli,
+    _, result = _invoke_cli_with_dummy_repo(
+        tmp_path,
+        monkeypatch,
         [
-            str(tmp_path),
             "--clear-all",
             "--retry-attempts",
             "5",
@@ -164,6 +164,17 @@ def test_cli_includes_retry_flags_in_execution_command(tmp_path, monkeypatch):
     assert "--retry-backoff-seconds 2.5" in result.output
 
 
+def test_cli_includes_overall_progress_mode_in_execution_command(tmp_path, monkeypatch):
+    _, result = _invoke_cli_with_dummy_repo(
+        tmp_path,
+        monkeypatch,
+        ["--clear-all", "--overall-progress-mode", "work-units"],
+    )
+
+    assert result.exit_code == 0
+    assert "--overall-progress-mode work-units" in result.output
+
+
 def test_resolve_worker_count_auto_and_override(monkeypatch):
     monkeypatch.setattr(main.os, "cpu_count", lambda: 12)
 
@@ -171,6 +182,283 @@ def test_resolve_worker_count_auto_and_override(monkeypatch):
     assert main._resolve_worker_count(None, 20) == 12
     assert main._resolve_worker_count(5, 20) == 5
     assert main._resolve_worker_count(50, 3) == 3
+
+
+def test_resolve_overall_progress_total_modes():
+    assert main._resolve_overall_progress_total("commits", 57, 57) == 57
+    assert main._resolve_overall_progress_total("work-units", 57, 57) == 114
+
+
+def test_cli_prints_auto_selected_worker_count(tmp_path, monkeypatch):
+    commits = [
+        SimpleNamespace(
+            hexsha="a1b2c3d4",
+            message="feat(cli): add changelog output",
+            committed_datetime=datetime(2026, 3, 1, tzinfo=UTC),
+            author=SimpleNamespace(name="Alice"),
+        )
+    ]
+    repo = DummyProcessingRepo(
+        str(tmp_path),
+        commits=commits,
+        diff_by_commit={"a1b2c3d4": "+new line"},
+    )
+
+    monkeypatch.setattr(main, "GitRepository", lambda repo_path: repo)
+    monkeypatch.setattr(main.os, "cpu_count", lambda: 8)
+
+    class FakeAIProvider:
+        def __init__(self, config):
+            self.config = config
+
+        def summarize_diff(self, commit_message, diff, author=None):
+            return "Added summary."
+
+        def generate_changelog_entry(self, commit_message, note, category, is_breaking):
+            return note.splitlines()[0] if note else commit_message
+
+    monkeypatch.setattr(main, "AIProvider", FakeAIProvider)
+
+    runner = CliRunner()
+    result = runner.invoke(main.cli, [str(tmp_path)])
+
+    assert result.exit_code == 0
+    assert "Using 1 worker(s) (auto-selected from 8 CPU core(s))" in result.output
+
+
+def test_cli_prints_explicit_worker_count(tmp_path, monkeypatch):
+    commits = [
+        SimpleNamespace(
+            hexsha="a1b2c3d4",
+            message="feat(cli): add changelog output",
+            committed_datetime=datetime(2026, 3, 1, tzinfo=UTC),
+            author=SimpleNamespace(name="Alice"),
+        )
+    ]
+    repo = DummyProcessingRepo(
+        str(tmp_path),
+        commits=commits,
+        diff_by_commit={"a1b2c3d4": "+new line"},
+    )
+
+    monkeypatch.setattr(main, "GitRepository", lambda repo_path: repo)
+
+    class FakeAIProvider:
+        def __init__(self, config):
+            self.config = config
+
+        def summarize_diff(self, commit_message, diff, author=None):
+            return "Added summary."
+
+        def generate_changelog_entry(self, commit_message, note, category, is_breaking):
+            return note.splitlines()[0] if note else commit_message
+
+    monkeypatch.setattr(main, "AIProvider", FakeAIProvider)
+
+    runner = CliRunner()
+    result = runner.invoke(main.cli, [str(tmp_path), "--workers", "4"])
+
+    assert result.exit_code == 0
+    assert "Using 1 worker(s) (from --workers)" in result.output
+
+
+def test_cli_prints_per_worker_summary_progress(tmp_path, monkeypatch):
+    commits = [
+        SimpleNamespace(
+            hexsha="a1b2c3d4",
+            message="feat(cli): add changelog output",
+            committed_datetime=datetime(2026, 3, 1, tzinfo=UTC),
+            author=SimpleNamespace(name="Alice"),
+        ),
+        SimpleNamespace(
+            hexsha="b2c3d4e5",
+            message="fix(cli): refine parsing",
+            committed_datetime=datetime(2026, 3, 2, tzinfo=UTC),
+            author=SimpleNamespace(name="Bob"),
+        ),
+    ]
+    repo = DummyProcessingRepo(
+        str(tmp_path),
+        commits=commits,
+        diff_by_commit={
+            "a1b2c3d4": "+new line",
+            "b2c3d4e5": "+another line",
+        },
+    )
+
+    monkeypatch.setattr(main, "GitRepository", lambda repo_path: repo)
+
+    class FakeAIProvider:
+        def __init__(self, config):
+            self.config = config
+
+        def summarize_diff(self, commit_message, diff, author=None):
+            return "Added summary."
+
+        def generate_changelog_entry(self, commit_message, note, category, is_breaking):
+            return note.splitlines()[0] if note else commit_message
+
+    monkeypatch.setattr(main, "AIProvider", FakeAIProvider)
+
+    runner = CliRunner()
+    result = runner.invoke(main.cli, [str(tmp_path), "--workers", "2"])
+
+    assert result.exit_code == 0
+    assert "Overall progress mode: commits" in result.output
+    assert "Overall progress" in result.output
+    assert "Per-worker summary progress:" in result.output
+    assert "Worker  1:" in result.output
+    assert "Worker  2:" in result.output
+
+
+def test_cli_prints_work_units_mode_when_requested(tmp_path, monkeypatch):
+    commits = [
+        SimpleNamespace(
+            hexsha="a1b2c3d4",
+            message="feat(cli): add changelog output",
+            committed_datetime=datetime(2026, 3, 1, tzinfo=UTC),
+            author=SimpleNamespace(name="Alice"),
+        )
+    ]
+    repo = DummyProcessingRepo(
+        str(tmp_path),
+        commits=commits,
+        diff_by_commit={"a1b2c3d4": "+new line"},
+    )
+
+    monkeypatch.setattr(main, "GitRepository", lambda repo_path: repo)
+
+    class FakeAIProvider:
+        def __init__(self, config):
+            self.config = config
+
+        def summarize_diff(self, commit_message, diff, author=None):
+            return "Added summary."
+
+        def generate_changelog_entry(self, commit_message, note, category, is_breaking):
+            return note.splitlines()[0] if note else commit_message
+
+    monkeypatch.setattr(main, "AIProvider", FakeAIProvider)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        main.cli,
+        [str(tmp_path), "--overall-progress-mode", "work-units"],
+    )
+
+    assert result.exit_code == 0
+    assert "Overall progress mode: work-units" in result.output
+
+
+def test_cli_reports_when_no_summaries_need_generation(tmp_path, monkeypatch):
+    commits = [
+        SimpleNamespace(
+            hexsha="a1b2c3d4",
+            message="feat(cli): add changelog output",
+            committed_datetime=datetime(2026, 3, 1, tzinfo=UTC),
+            author=SimpleNamespace(name="Alice"),
+        )
+    ]
+    repo = DummyProcessingRepo(
+        str(tmp_path),
+        commits=commits,
+        notes_by_commit={
+            "a1b2c3d4": "Category: Added\n\nAdded summary already exists."
+        },
+        diff_by_commit={"a1b2c3d4": "+new line"},
+    )
+
+    monkeypatch.setattr(main, "GitRepository", lambda repo_path: repo)
+
+    class FakeAIProvider:
+        def __init__(self, config):
+            self.config = config
+
+        def summarize_diff(self, commit_message, diff, author=None):
+            raise AssertionError("summarize_diff should not be called")
+
+        def generate_changelog_entry(self, commit_message, note, category, is_breaking):
+            return note.splitlines()[0] if note else commit_message
+
+    monkeypatch.setattr(main, "AIProvider", FakeAIProvider)
+
+    runner = CliRunner()
+    result = runner.invoke(main.cli, [str(tmp_path)])
+
+    assert result.exit_code == 0
+    assert (
+        "No AI summaries to generate: all processable commits already have notes"
+        in result.output
+    )
+    assert (
+        "No notes were updated in this run; continuing with changelog "
+        "finalization from existing notes" in result.output
+    )
+    assert "Finalizing release metadata and changelog..." in result.output
+    assert "Finalization" in result.output
+
+
+def test_per_worker_progress_redraws_in_interactive_tty(monkeypatch):
+    output_chunks: list[str] = []
+
+    monkeypatch.setattr(main.sys.stdout, "isatty", lambda: True)
+    monkeypatch.setattr(
+        main.click, "echo", lambda text="", nl=True: output_chunks.append(text)
+    )
+
+    class FastProvider:
+        def summarize_diff(self, commit_message, diff, author=None):
+            return "ok"
+
+    prepared = [
+        main._PreparedCommit(
+            commit=SimpleNamespace(hexsha="a", author=SimpleNamespace(name="A")),
+            commit_message="feat: a",
+            category="Added",
+            existing_note=None,
+            diff="+a",
+        ),
+        main._PreparedCommit(
+            commit=SimpleNamespace(hexsha="b", author=SimpleNamespace(name="B")),
+            commit_message="feat: b",
+            category="Added",
+            existing_note=None,
+            diff="+b",
+        ),
+    ]
+
+    results = main._generate_summaries_concurrently(FastProvider(), prepared, workers=2)
+
+    assert len(results) == 2
+    assert any("\x1b[" in chunk for chunk in output_chunks)
+
+
+def test_per_worker_progress_appends_in_non_interactive_output(monkeypatch):
+    output_chunks: list[str] = []
+
+    monkeypatch.setattr(main.sys.stdout, "isatty", lambda: False)
+    monkeypatch.setattr(
+        main.click, "echo", lambda text="", nl=True: output_chunks.append(text)
+    )
+
+    class FastProvider:
+        def summarize_diff(self, commit_message, diff, author=None):
+            return "ok"
+
+    prepared = [
+        main._PreparedCommit(
+            commit=SimpleNamespace(hexsha="a", author=SimpleNamespace(name="A")),
+            commit_message="feat: a",
+            category="Added",
+            existing_note=None,
+            diff="+a",
+        )
+    ]
+
+    results = main._generate_summaries_concurrently(FastProvider(), prepared, workers=1)
+
+    assert len(results) == 1
+    assert not any("\x1b[" in chunk for chunk in output_chunks)
 
 
 def test_create_semver_tags_if_needed_creates_tags_when_none_exist():

@@ -23,7 +23,9 @@ import os
 import re
 import shlex
 import sys
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 from typing import Any
 
 import click
@@ -46,6 +48,26 @@ logger = logging.getLogger(__name__)
 RELEASE_SECTION_HEADING_RE = re.compile(r"^## \[[^\]]+\](?: - .*)?$", re.MULTILINE)
 
 
+@dataclass(frozen=True)
+class _PreparedCommit:
+    """Prepared commit payload for processing in the CLI workflow."""
+
+    commit: Any
+    commit_message: str
+    category: str
+    existing_note: str | None
+    diff: str
+
+
+@dataclass(frozen=True)
+class _SummaryResult:
+    """Result from a single AI summary generation task."""
+
+    commit_hash: str
+    summary: str | None = None
+    error: Exception | None = None
+
+
 # jscpd:ignore-start
 def _build_execution_command(
     repo_path: str,
@@ -63,6 +85,7 @@ def _build_execution_command(
     workers: int | None = None,
     retry_attempts: int | None = None,
     retry_backoff_seconds: float | None = None,
+    overall_progress_mode: str | None = None,
 ) -> str:  # jscpd:ignore-end
     """Build a shell-safe command summary of the current CLI execution.
 
@@ -91,6 +114,8 @@ def _build_execution_command(
         args.extend(["--retry-attempts", str(retry_attempts)])
     if retry_backoff_seconds is not None:
         args.extend(["--retry-backoff-seconds", str(retry_backoff_seconds)])
+    if overall_progress_mode is not None:
+        args.extend(["--overall-progress-mode", overall_progress_mode])
 
     args.extend(["--log-level", log_level, "--changelog-file", changelog_file])
 
@@ -125,6 +150,17 @@ def _resolve_worker_count(requested_workers: int | None, item_count: int) -> int
     return max(1, min(requested_workers, item_count))
 
 
+def _resolve_overall_progress_total(
+    overall_progress_mode: str,
+    prepared_commits_count: int,
+    summaries_to_generate_count: int,
+) -> int:
+    """Return total units for the selected overall progress mode."""
+    if overall_progress_mode == "work-units":
+        return prepared_commits_count + summaries_to_generate_count
+    return prepared_commits_count
+
+
 def _configure_logging(log_level: str) -> None:
     """Configure the root logger for the application.
 
@@ -155,6 +191,107 @@ def _configure_logging(log_level: str) -> None:
         # Prevent LiteLLM's own logger handlers from polluting CLI progress output.
         litellm_logger.handlers.clear()
         litellm_logger.propagate = False
+
+
+def _render_worker_progress_bar(done: int, total: int, width: int = 20) -> str:
+    """Return a fixed-width progress bar string for worker progress."""
+    if total <= 0:
+        completed = width
+    else:
+        completed = min(width, int((done / total) * width))
+    return f"[{'#' * completed}{'-' * (width - completed)}]"
+
+
+def _generate_summary_for_commit(
+    ai_provider: AIProvider,
+    prepared: _PreparedCommit,
+) -> _SummaryResult:
+    """Generate an AI summary for one commit and capture failures as data."""
+    try:
+        summary = ai_provider.summarize_diff(
+            commit_message=prepared.commit_message,
+            diff=prepared.diff,
+            author=(
+                prepared.commit.author.name
+                if getattr(prepared.commit, "author", None)
+                else None
+            ),
+        )
+    except Exception as error:  # noqa: BLE001
+        return _SummaryResult(commit_hash=prepared.commit.hexsha, error=error)
+
+    return _SummaryResult(commit_hash=prepared.commit.hexsha, summary=summary)
+
+
+def _generate_summaries_concurrently(
+    ai_provider: AIProvider,
+    prepared_commits: list[_PreparedCommit],
+    workers: int,
+    on_summary_completed: Callable[[], None] | None = None,
+) -> dict[str, _SummaryResult]:
+    """Generate AI summaries concurrently with per-worker progress output."""
+    if not prepared_commits:
+        return {}
+
+    assignments: dict[str, int] = {}
+    totals: dict[int, int] = {}
+    completed: dict[int, int] = {}
+    for index, prepared in enumerate(prepared_commits):
+        worker_id = index % workers
+        assignments[prepared.commit.hexsha] = worker_id
+        totals[worker_id] = totals.get(worker_id, 0) + 1
+        completed.setdefault(worker_id, 0)
+
+    interactive = bool(getattr(sys.stdout, "isatty", lambda: False)())
+
+    def render_worker_lines() -> list[str]:
+        lines = ["Per-worker summary progress:"]
+        for worker_id in range(workers):
+            total = totals.get(worker_id, 0)
+            done = completed.get(worker_id, 0)
+            bar = _render_worker_progress_bar(done, total)
+            lines.append(f"  Worker {worker_id + 1:>2}: {bar} {done}/{total}")
+        return lines
+
+    last_line_count = 0
+
+    def draw() -> None:
+        nonlocal last_line_count
+        lines = render_worker_lines()
+        if interactive and last_line_count > 0:
+            # Move cursor to previously rendered block start and clear line-by-line.
+            click.echo(f"\x1b[{last_line_count}A", nl=False)
+            for _ in range(last_line_count):
+                click.echo("\r\x1b[2K", nl=False)
+                click.echo("\x1b[1B", nl=False)
+            click.echo(f"\x1b[{last_line_count}A", nl=False)
+
+        for line in lines:
+            click.echo(line)
+
+        last_line_count = len(lines)
+
+    draw()
+
+    results: dict[str, _SummaryResult] = {}
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [
+            executor.submit(_generate_summary_for_commit, ai_provider, prepared)
+            for prepared in prepared_commits
+        ]
+        for future in as_completed(futures):
+            result = future.result()
+            results[result.commit_hash] = result
+            worker_id = assignments[result.commit_hash]
+            completed[worker_id] = completed.get(worker_id, 0) + 1
+            if on_summary_completed is not None:
+                on_summary_completed()
+            draw()
+
+    if interactive:
+        click.echo()
+
+    return results
 
 
 def _commit_message_str(message: Any) -> str:
@@ -324,9 +461,12 @@ def _merge_missing_release_sections(
 )
 @click.option(
     "--model",
-    default="ollama/llama3.1",
+    default="auto",
     envvar="CHANGELOG_MODEL",
-    help="AI model to use for summaries (default: ollama/llama3.1)",
+    help=(
+        "AI model to use for summaries. Use 'auto' to select a platform-aware "
+        "default (Apple Silicon: ollama/llama3.1:8b-instruct-q4_K_M)."
+    ),
 )
 @click.option(
     "--namespace",
@@ -381,6 +521,17 @@ def _merge_missing_release_sections(
     help="Base backoff delay in seconds between retry attempts.",
 )
 @click.option(
+    "--overall-progress-mode",
+    type=click.Choice(["commits", "work-units"], case_sensitive=False),
+    default="commits",
+    envvar="CHANGELOG_OVERALL_PROGRESS_MODE",
+    help=(
+        "Overall progress counting mode: 'commits' counts each commit once, "
+        "'work-units' counts summary generation and commit processing separately."
+    ),
+    show_default=True,
+)
+@click.option(
     "--log-level",
     default="INFO",
     envvar="CHANGELOG_LOG_LEVEL",
@@ -432,6 +583,7 @@ def cli(
     workers: int | None,
     retry_attempts: int | None,
     retry_backoff_seconds: float | None,
+    overall_progress_mode: str,
     log_level: str,
     changelog_file: str,
     litellm_api_base: str | None,
@@ -489,7 +641,7 @@ def cli(
             "Execution command: "
             + _build_execution_command(
                 repo_path=repo_path,
-                model=model,
+                model=config.model,
                 namespace=namespace,
                 force=force,
                 clear_all=clear_all,
@@ -503,6 +655,7 @@ def cli(
                 workers=workers,
                 retry_attempts=retry_attempts,
                 retry_backoff_seconds=retry_backoff_seconds,
+                overall_progress_mode=overall_progress_mode,
             )
         )
 
@@ -533,79 +686,152 @@ def cli(
         )
 
         click.echo(f"Found {total_commits} commits to process")
+        if workers is None:
+            click.echo(
+                "Using "
+                f"{effective_workers} worker(s) "
+                f"(auto-selected from {os.cpu_count() or 1} CPU core(s))"
+            )
+        else:
+            click.echo(f"Using {effective_workers} worker(s) (from --workers)")
 
-        processed = 0
-        skipped = 0
-        failed = 0
+        prepared_commits: list[_PreparedCommit] = []
+        summaries_to_generate: list[_PreparedCommit] = []
 
         with click.progressbar(
-            commits, label="Processing commits", show_pos=True
+            commits, label="Preparing commits", show_pos=True
         ) as progress:
             for commit in progress:
-                try:
-                    logger.debug("Checking commit %s", commit.hexsha[:8])
-                    existing_note = repo.get_note(commit.hexsha, namespace)
-                    diff = repo.get_commit_diff(commit)
-                    if not diff.strip():
-                        logger.debug("Skipping %s — empty diff", commit.hexsha[:8])
-                        click.echo(f"\nSkipping {commit.hexsha[:8]} (empty diff)")
-                        skipped += 1
-                        continue
+                commit_message = _commit_message_str(commit.message)
+                existing_note = repo.get_note(commit.hexsha, namespace)
+                diff = repo.get_commit_diff(commit)
 
-                    parsed = parse_conventional_commit(
-                        _commit_message_str(commit.message)
-                    )
-                    added_lines, removed_lines = (0, 0)
-                    if diff and not diff.startswith("[Error retrieving diff:"):
-                        added_lines, removed_lines = count_diff_lines(diff)
-                    category = infer_category(
-                        parsed.commit_type,
-                        parsed.description,
-                        parsed.is_breaking,
-                        added_lines=added_lines,
-                        removed_lines=removed_lines,
-                    )
+                parsed = parse_conventional_commit(commit_message)
+                added_lines, removed_lines = (0, 0)
+                if diff and not diff.startswith("[Error retrieving diff:"):
+                    added_lines, removed_lines = count_diff_lines(diff)
+                category = infer_category(
+                    parsed.commit_type,
+                    parsed.description,
+                    parsed.is_breaking,
+                    added_lines=added_lines,
+                    removed_lines=removed_lines,
+                )
 
-                    if existing_note and not force:
-                        existing_category, existing_summary = parse_note_metadata(
-                            existing_note
-                        )
-                        if existing_category is not None:
-                            logger.debug(
-                                "Skipping %s — note already exists", commit.hexsha[:8]
-                            )
+                prepared = _PreparedCommit(
+                    commit=commit,
+                    commit_message=commit_message,
+                    category=category,
+                    existing_note=existing_note,
+                    diff=diff,
+                )
+                prepared_commits.append(prepared)
+                if (not existing_note or force) and diff.strip():
+                    summaries_to_generate.append(prepared)
+
+        if not summaries_to_generate:
+            click.echo(
+                "No AI summaries to generate: all processable commits already have notes"
+            )
+
+        overall_total = _resolve_overall_progress_total(
+            overall_progress_mode=overall_progress_mode,
+            prepared_commits_count=len(prepared_commits),
+            summaries_to_generate_count=len(summaries_to_generate),
+        )
+        click.echo(f"Overall progress mode: {overall_progress_mode}")
+        with click.progressbar(
+            length=overall_total,
+            label="Overall progress",
+            show_pos=True,
+        ) as overall_progress:
+            summary_results = _generate_summaries_concurrently(
+                ai_provider=ai_provider,
+                prepared_commits=summaries_to_generate,
+                workers=effective_workers,
+                on_summary_completed=(
+                    (lambda: overall_progress.update(1))
+                    if overall_progress_mode == "work-units"
+                    else None
+                ),
+            )
+
+            processed = 0
+            skipped = 0
+            failed = 0
+
+            with click.progressbar(
+                prepared_commits, label="Processing commits", show_pos=True
+            ) as progress:
+                for prepared in progress:
+                    commit = prepared.commit
+                    try:
+                        logger.debug("Checking commit %s", commit.hexsha[:8])
+                        existing_note = prepared.existing_note
+                        diff = prepared.diff
+                        if not diff.strip():
+                            logger.debug("Skipping %s — empty diff", commit.hexsha[:8])
+                            click.echo(f"\nSkipping {commit.hexsha[:8]} (empty diff)")
                             skipped += 1
                             continue
-                        note_payload = format_note(
-                            category=category,
-                            summary=existing_summary or existing_note,
-                        )
-                        repo.set_note(commit.hexsha, note_payload, namespace)
-                        logger.debug("Upgraded note format for %s", commit.hexsha[:8])
-                        processed += 1
-                        continue
 
-                    logger.debug("Generating summary for %s", commit.hexsha[:8])
-                    summary = ai_provider.summarize_diff(
-                        commit_message=_commit_message_str(commit.message),
-                        diff=diff,
-                        author=commit.author.name if commit.author else None,
-                    )
-                    note_payload = format_note(category=category, summary=summary)
-                    repo.set_note(commit.hexsha, note_payload, namespace)
-                    # Keep per-commit status at DEBUG so the progress bar output
-                    # remains readable at default INFO log level.
-                    logger.debug("Stored note for %s", commit.hexsha[:8])
-                    processed += 1
-                except Exception as error:
-                    logger.error(
-                        "Failed to process %s: %s",
-                        commit.hexsha[:8],
-                        error,
-                        exc_info=logger.isEnabledFor(logging.DEBUG),
-                    )
-                    click.echo(f"\nError processing {commit.hexsha[:8]}: {error}")
-                    failed += 1
+                        category = prepared.category
+
+                        if existing_note and not force:
+                            existing_category, existing_summary = parse_note_metadata(
+                                existing_note
+                            )
+                            if existing_category is not None:
+                                logger.debug(
+                                    "Skipping %s — note already exists",
+                                    commit.hexsha[:8],
+                                )
+                                skipped += 1
+                                continue
+                            note_payload = format_note(
+                                category=category,
+                                summary=existing_summary or existing_note,
+                            )
+                            repo.set_note(commit.hexsha, note_payload, namespace)
+                            logger.debug(
+                                "Upgraded note format for %s", commit.hexsha[:8]
+                            )
+                            processed += 1
+                            continue
+
+                        logger.debug(
+                            "Reading generated summary for %s", commit.hexsha[:8]
+                        )
+                        summary_result = summary_results.get(commit.hexsha)
+                        if summary_result is None:
+                            raise RuntimeError(
+                                f"No summary result generated for {commit.hexsha[:8]}"
+                            )
+                        if summary_result.error is not None:
+                            raise summary_result.error
+                        summary = summary_result.summary
+                        if summary is None:
+                            raise RuntimeError(
+                                f"Summary result is empty for {commit.hexsha[:8]}"
+                            )
+
+                        note_payload = format_note(category=category, summary=summary)
+                        repo.set_note(commit.hexsha, note_payload, namespace)
+                        # Keep per-commit status at DEBUG so the progress bar output
+                        # remains readable at default INFO log level.
+                        logger.debug("Stored note for %s", commit.hexsha[:8])
+                        processed += 1
+                    except Exception as error:
+                        logger.error(
+                            "Failed to process %s: %s",
+                            commit.hexsha[:8],
+                            error,
+                            exc_info=logger.isEnabledFor(logging.DEBUG),
+                        )
+                        click.echo(f"\nError processing {commit.hexsha[:8]}: {error}")
+                        failed += 1
+                    finally:
+                        overall_progress.update(1)
 
         click.echo("\nProcessing complete")
         click.echo(f"   Processed: {processed}")
@@ -615,42 +841,57 @@ def cli(
             "Done — processed=%d skipped=%d failed=%d", processed, skipped, failed
         )
 
-        _create_semver_tags_if_needed(
-            repo=repo,
-            commits=commits,
-            namespace=namespace,
-            create_semver_tags=create_semver_tags,
-            limit=limit,
-        )
-
-        logger.debug("Rendering changelog using namespace '%s'", namespace)
-        changelog_builder = ChangelogBuilder(namespace=namespace)
-        changelog = changelog_builder.build(
-            commits=commits,
-            get_note=repo.get_note,
-            tags_by_commit=repo.get_semantic_version_tags(),
-            generate_entry=ai_provider.generate_changelog_entry,
-            commit_url_for_hash=repo.get_commit_web_url,
-            get_diff=repo.get_commit_diff,
-        )
-        changelog_path = repo.resolve_output_path(changelog_file)
-        changelog_path.parent.mkdir(parents=True, exist_ok=True)
-        if changelog_path.exists():
-            existing_text = changelog_path.read_text(encoding="utf-8")
-            merged_text, appended_sections = _merge_missing_release_sections(
-                existing_text=existing_text,
-                generated_text=changelog,
+        if processed == 0 and skipped > 0 and failed == 0:
+            click.echo(
+                "No notes were updated in this run; continuing with changelog "
+                "finalization from existing notes"
             )
-            if appended_sections > 0:
-                changelog_path.write_text(merged_text, encoding="utf-8")
-                click.echo(
-                    f"Changelog updated with {appended_sections} changed release section(s): {changelog_path}"
+
+        click.echo("Finalizing release metadata and changelog...")
+
+        with click.progressbar(
+            length=3, label="Finalization", show_pos=True
+        ) as progress:
+            _create_semver_tags_if_needed(
+                repo=repo,
+                commits=commits,
+                namespace=namespace,
+                create_semver_tags=create_semver_tags,
+                limit=limit,
+            )
+            progress.update(1)
+
+            logger.debug("Rendering changelog using namespace '%s'", namespace)
+            changelog_builder = ChangelogBuilder(namespace=namespace)
+            changelog = changelog_builder.build(
+                commits=commits,
+                get_note=repo.get_note,
+                tags_by_commit=repo.get_semantic_version_tags(),
+                generate_entry=ai_provider.generate_changelog_entry,
+                commit_url_for_hash=repo.get_commit_web_url,
+                get_diff=repo.get_commit_diff,
+            )
+            progress.update(1)
+
+            changelog_path = repo.resolve_output_path(changelog_file)
+            changelog_path.parent.mkdir(parents=True, exist_ok=True)
+            if changelog_path.exists():
+                existing_text = changelog_path.read_text(encoding="utf-8")
+                merged_text, appended_sections = _merge_missing_release_sections(
+                    existing_text=existing_text,
+                    generated_text=changelog,
                 )
+                if appended_sections > 0:
+                    changelog_path.write_text(merged_text, encoding="utf-8")
+                    click.echo(
+                        f"Changelog updated with {appended_sections} changed release section(s): {changelog_path}"
+                    )
+                else:
+                    click.echo(f"Changelog already up-to-date: {changelog_path}")
             else:
-                click.echo(f"Changelog already up-to-date: {changelog_path}")
-        else:
-            changelog_path.write_text(changelog, encoding="utf-8")
-            click.echo(f"Changelog written to: {changelog_path}")
+                changelog_path.write_text(changelog, encoding="utf-8")
+                click.echo(f"Changelog written to: {changelog_path}")
+            progress.update(1)
 
         if processed > 0:
             click.echo(

@@ -132,7 +132,7 @@ def test_summarize_diff_raises_when_ollama_pull_fails(monkeypatch):
         return SimpleNamespace(
             returncode=1,
             stdout="",
-            stderr="pull access denied for llama3.1:8b-instruct-q4_K_M",
+            stderr="pull access denied for llama3.1:8b-instruct-q4_K_M",  # gitleaks:allow
         )
 
     monkeypatch.setattr(

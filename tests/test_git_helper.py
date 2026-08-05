@@ -95,6 +95,25 @@ def _make_repo(fake_git=None, tags=None, remote_url=None):
     return repo
 
 
+def _make_repo_with_head_commit(remote_url: str) -> GitRepository:
+    commit = SimpleNamespace(
+        hexsha="abc12345",
+        message="feat: add snapshot helper\n",
+        author=SimpleNamespace(name="Alice"),
+        committed_datetime=SimpleNamespace(isoformat=lambda: "2026-08-05T12:00:00"),
+    )
+    repo = _make_repo(remote_url=remote_url)
+    repo.repo = SimpleNamespace(
+        git=repo.repo.git,
+        iter_commits=repo.repo.iter_commits,
+        tags=repo.repo.tags,
+        remotes=repo.repo.remotes,
+        head=SimpleNamespace(commit=commit),
+        active_branch=SimpleNamespace(name="main"),
+    )
+    return repo
+
+
 def test_get_all_commits_honors_limit():
     repo = _make_repo()
 
@@ -335,21 +354,7 @@ def test_get_repository_web_url_returns_none_without_remote():
 
 
 def test_get_repository_info_returns_best_effort_snapshot():
-    commit = SimpleNamespace(
-        hexsha="abc12345",
-        message="feat: add snapshot helper\n",
-        author=SimpleNamespace(name="Alice"),
-        committed_datetime=SimpleNamespace(isoformat=lambda: "2026-08-05T12:00:00"),
-    )
-    repo = _make_repo(remote_url="git@host:org/repo.git")
-    repo.repo = SimpleNamespace(
-        git=repo.repo.git,
-        iter_commits=repo.repo.iter_commits,
-        tags=repo.repo.tags,
-        remotes=repo.repo.remotes,
-        head=SimpleNamespace(commit=commit),
-        active_branch=SimpleNamespace(name="main"),
-    )
+    repo = _make_repo_with_head_commit(remote_url="git@host:org/repo.git")
 
     info = repo.get_repository_info()
 
@@ -369,21 +374,7 @@ def test_get_repository_info_returns_best_effort_snapshot():
 
 
 def test_get_repository_info_toon_uses_toon_format_encode(monkeypatch):
-    commit = SimpleNamespace(
-        hexsha="abc12345",
-        message="feat: add snapshot helper\n",
-        author=SimpleNamespace(name="Alice"),
-        committed_datetime=SimpleNamespace(isoformat=lambda: "2026-08-05T12:00:00"),
-    )
-    repo = _make_repo(remote_url="git@host:org/repo.git")
-    repo.repo = SimpleNamespace(
-        git=repo.repo.git,
-        iter_commits=repo.repo.iter_commits,
-        tags=repo.repo.tags,
-        remotes=repo.repo.remotes,
-        head=SimpleNamespace(commit=commit),
-        active_branch=SimpleNamespace(name="main"),
-    )
+    repo = _make_repo_with_head_commit(remote_url="git@host:org/repo.git")
 
     toon_module = ModuleType("toon_format")
     calls: list[dict[str, object | None]] = []

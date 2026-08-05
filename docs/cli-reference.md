@@ -17,6 +17,9 @@ uv run ai-changelog /path/to/repository [options]
 - --workers: Maximum worker threads for AI summarization.
 - --retry-attempts: Max retry attempts for transient AI API failures. Default is 3.
 - --retry-backoff-seconds: Base retry delay in seconds. Default is 1.0.
+- --overall-progress-mode: Overall progress counting mode.
+  Use `commits` (default) to count each commit once,
+  or `work-units` to count summary generation and commit processing separately.
 - --log-level: Set log verbosity.
 - --changelog-file: Output path for changelog. Default is CHANGELOG.md.
 
@@ -40,6 +43,7 @@ CLI arguments and flags still take precedence over environment values.
 - --workers -> CHANGELOG_WORKERS
 - --retry-attempts -> CHANGELOG_RETRY_ATTEMPTS
 - --retry-backoff-seconds -> CHANGELOG_RETRY_BACKOFF_SECONDS
+- --overall-progress-mode -> CHANGELOG_OVERALL_PROGRESS_MODE
 - --log-level -> CHANGELOG_LOG_LEVEL
 - --changelog-file -> CHANGELOG_CHANGELOG_FILE
 - --litellm-headers-json -> CHANGELOG_LITELLM_HEADERS_JSON

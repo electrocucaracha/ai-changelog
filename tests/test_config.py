@@ -30,14 +30,23 @@ class TestConfig:
     def test_config_defaults(self):
         """Test default configuration values."""
         config = Config()
-        assert config.model == "ollama/llama3.1"
+        assert config.model == Config.get_default_model()
         assert config.namespace == "ai-changelog"
+        assert config.retry_attempts == 3
+        assert config.retry_backoff_seconds == 1.0
 
     def test_config_from_env(self):
         """Test configuration from environment."""
         config = Config.from_env()
         assert config.model is not None
         assert config.namespace is not None
+
+    def test_config_default_model_for_apple_silicon(self, monkeypatch):
+        """Test Apple Silicon default model resolver."""
+        monkeypatch.setattr("ai_changelog_msg.config.platform.system", lambda: "Darwin")
+        monkeypatch.setattr("ai_changelog_msg.config.platform.machine", lambda: "arm64")
+
+        assert Config.get_default_model() == "ollama/llama3.1:8b-instruct-q4_K_M"
 
     def test_config_validation(self):
         """Test configuration validation."""
@@ -46,6 +55,12 @@ class TestConfig:
 
         with pytest.raises(ValueError):
             Config(max_diff_size=-1)
+
+        with pytest.raises(ValueError):
+            Config(retry_attempts=0)
+
+        with pytest.raises(ValueError):
+            Config(retry_backoff_seconds=0)
 
     def test_config_from_env_reads_litellm_headers_json(self, monkeypatch):
         """Test optional LiteLLM header overrides from environment."""
@@ -68,4 +83,56 @@ class TestConfig:
         monkeypatch.setenv("CHANGELOG_LITELLM_HEADERS_JSON", "not-json")
 
         with pytest.raises(ValueError, match="must be valid JSON"):
+            Config.from_env()
+
+    def test_config_from_env_parses_headroom_flag(self, monkeypatch):
+        """Test optional Headroom toggle from environment."""
+        monkeypatch.setenv("CHANGELOG_ENABLE_HEADROOM", "true")
+
+        config = Config.from_env()
+
+        assert config.enable_headroom is True
+
+    def test_config_from_env_rejects_invalid_headroom_flag(self, monkeypatch):
+        """Test invalid Headroom toggle value in environment."""
+        monkeypatch.setenv("CHANGELOG_ENABLE_HEADROOM", "sometimes")
+
+        with pytest.raises(ValueError, match="CHANGELOG_ENABLE_HEADROOM"):
+            Config.from_env()
+
+    def test_config_from_env_enables_headroom_by_default(self, monkeypatch):
+        """Test Headroom default is enabled when env var is unset."""
+        monkeypatch.delenv("CHANGELOG_ENABLE_HEADROOM", raising=False)
+
+        config = Config.from_env()
+
+        assert config.enable_headroom is True
+
+    def test_config_from_env_allows_explicit_headroom_disable(self, monkeypatch):
+        """Test explicit disable value overrides default-enabled behavior."""
+        monkeypatch.setenv("CHANGELOG_ENABLE_HEADROOM", "off")
+
+        config = Config.from_env()
+
+        assert config.enable_headroom is False
+
+    def test_config_from_env_reads_retry_settings(self, monkeypatch):
+        """Test retry settings loaded from environment."""
+        monkeypatch.setenv("CHANGELOG_RETRY_ATTEMPTS", "5")
+        monkeypatch.setenv("CHANGELOG_RETRY_BACKOFF_SECONDS", "2.5")
+
+        config = Config.from_env()
+
+        assert config.retry_attempts == 5
+        assert config.retry_backoff_seconds == 2.5
+
+    def test_config_from_env_rejects_invalid_retry_settings(self, monkeypatch):
+        """Test invalid retry setting values from environment."""
+        monkeypatch.setenv("CHANGELOG_RETRY_ATTEMPTS", "0")
+        with pytest.raises(ValueError, match="CHANGELOG_RETRY_ATTEMPTS"):
+            Config.from_env()
+
+        monkeypatch.setenv("CHANGELOG_RETRY_ATTEMPTS", "3")
+        monkeypatch.setenv("CHANGELOG_RETRY_BACKOFF_SECONDS", "-1")
+        with pytest.raises(ValueError, match="CHANGELOG_RETRY_BACKOFF_SECONDS"):
             Config.from_env()

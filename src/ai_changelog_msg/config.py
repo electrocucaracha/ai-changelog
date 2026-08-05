@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+import platform
 from dataclasses import dataclass
 from typing import Any
 
@@ -44,8 +45,8 @@ class Config:
         Default values are sensible out of the box:
 
         >>> c = Config()
-        >>> c.model
-        'ollama/llama3.1'
+        >>> c.model == Config.get_default_model()
+        True
         >>> c.namespace
         'ai-changelog'
 
@@ -64,14 +65,17 @@ class Config:
         ValueError: Max diff size must be positive
     """
 
-    model: str = "ollama/llama3.1"
+    model: str = "auto"
     namespace: str = "ai-changelog"
     api_timeout: int = 60
     max_diff_size: int = 50000
     api_calls_timeout: int | None = 300
+    retry_attempts: int = 3
+    retry_backoff_seconds: float = 1.0
     litellm_api_base: str | None = None
     litellm_api_key: str | None = None
     litellm_extra_headers: dict[str, str] | None = None
+    enable_headroom: bool = False
 
     def __post_init__(self) -> None:
         """Validate field values after dataclass initialisation.
@@ -79,6 +83,9 @@ class Config:
         Raises:
             ValueError: When any field contains an invalid value.
         """
+        if self.model == "auto":
+            self.model = self.get_default_model()
+
         if not self.model:
             raise ValueError("Model name cannot be empty")
         if not self.namespace:
@@ -87,6 +94,10 @@ class Config:
             raise ValueError("Max diff size must be positive")
         if self.api_timeout <= 0:
             raise ValueError("API timeout must be positive")
+        if self.retry_attempts <= 0:
+            raise ValueError("Retry attempts must be positive")
+        if self.retry_backoff_seconds <= 0:
+            raise ValueError("Retry backoff seconds must be positive")
         if self.litellm_extra_headers is not None:
             if not isinstance(self.litellm_extra_headers, dict):
                 raise ValueError("LiteLLM extra headers must be a dictionary")
@@ -122,10 +133,10 @@ class Config:
 
             >>> import os
             >>> os.environ.pop("CHANGELOG_MODEL", None)  # ensure unset
-            >>> Config.from_env().model
-            'ollama/llama3.1'
+            >>> Config.from_env().model == Config.get_default_model()
+            True
         """
-        model = os.getenv("CHANGELOG_MODEL", "ollama/llama3.1")
+        model = os.getenv("CHANGELOG_MODEL", "auto")
         namespace = os.getenv("CHANGELOG_NAMESPACE", "ai-changelog")
         # Prefer LiteLLM-native provider environment variables (for example
         # OPENAI_API_KEY, ANTHROPIC_API_KEY, OPENAI_BASE_URL, AZURE_API_BASE)
@@ -141,10 +152,34 @@ class Config:
         return cls(
             model=overrides.get("model", model),
             namespace=overrides.get("namespace", namespace),
+            retry_attempts=overrides.get(
+                "retry_attempts",
+                cls._parse_positive_int(
+                    os.getenv("CHANGELOG_RETRY_ATTEMPTS"),
+                    variable_name="CHANGELOG_RETRY_ATTEMPTS",
+                    default=3,
+                ),
+            ),
+            retry_backoff_seconds=overrides.get(
+                "retry_backoff_seconds",
+                cls._parse_positive_float(
+                    os.getenv("CHANGELOG_RETRY_BACKOFF_SECONDS"),
+                    variable_name="CHANGELOG_RETRY_BACKOFF_SECONDS",
+                    default=1.0,
+                ),
+            ),
             litellm_api_base=overrides.get("litellm_api_base", litellm_api_base),
             litellm_api_key=overrides.get("litellm_api_key", litellm_api_key),
             litellm_extra_headers=overrides.get(
                 "litellm_extra_headers", litellm_extra_headers
+            ),
+            enable_headroom=overrides.get(
+                "enable_headroom",
+                cls._parse_optional_bool(
+                    os.getenv("CHANGELOG_ENABLE_HEADROOM"),
+                    variable_name="CHANGELOG_ENABLE_HEADROOM",
+                    default=True,
+                ),
             ),
         )
 
@@ -168,6 +203,90 @@ class Config:
                 raise TypeError("CHANGELOG_LITELLM_HEADERS_JSON values must be strings")
             headers[key] = value
         return headers
+
+    @staticmethod
+    def _parse_optional_bool(
+        raw: str | None,
+        variable_name: str,
+        default: bool = False,
+    ) -> bool:
+        """Parse a boolean-like environment variable.
+
+        Accepted truthy values: ``1``, ``true``, ``yes``, ``on``.
+        Accepted falsy values: ``0``, ``false``, ``no``, ``off``, and empty.
+
+        Args:
+            raw: Raw environment variable value or ``None``.
+            variable_name: Variable name used in error messages.
+
+        Returns:
+            Parsed boolean value.
+
+        Raises:
+            ValueError: If *raw* is not a supported boolean representation.
+        """
+        if raw is None:
+            return default
+        normalized = raw.strip().lower()
+        if normalized in {"", "0", "false", "no", "off"}:
+            return False
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        raise ValueError(
+            f"{variable_name} must be one of: 1, true, yes, on, 0, false, no, off"
+        )
+
+    @staticmethod
+    def _parse_positive_int(
+        raw: str | None,
+        variable_name: str,
+        default: int,
+    ) -> int:
+        """Parse a positive integer environment variable."""
+        if raw is None:
+            return default
+
+        try:
+            value = int(raw.strip())
+        except ValueError as error:
+            raise ValueError(f"{variable_name} must be a positive integer") from error
+
+        if value <= 0:
+            raise ValueError(f"{variable_name} must be a positive integer")
+        return value
+
+    @staticmethod
+    def _parse_positive_float(
+        raw: str | None,
+        variable_name: str,
+        default: float,
+    ) -> float:
+        """Parse a positive floating-point environment variable."""
+        if raw is None:
+            return default
+
+        try:
+            value = float(raw.strip())
+        except ValueError as error:
+            raise ValueError(f"{variable_name} must be a positive number") from error
+
+        if value <= 0:
+            raise ValueError(f"{variable_name} must be a positive number")
+        return value
+
+    @staticmethod
+    def get_default_model() -> str:
+        """Resolve the default model for the current runtime environment.
+
+        Apple Silicon Macs are tuned for local Ollama usage with the
+        quantized Llama 3.1 8B Instruct variant, which provides a better
+        latency-to-quality balance for this CLI workflow.
+        """
+        system = platform.system().lower()
+        machine = platform.machine().lower()
+        if system == "darwin" and machine == "arm64":
+            return "ollama/llama3.1:8b-instruct-q4_K_M"
+        return "ollama/llama3.1"
 
     def get_model(self) -> str:
         """Return the configured LiteLLM model identifier.

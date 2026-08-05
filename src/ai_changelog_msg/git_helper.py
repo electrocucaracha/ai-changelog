@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import re
 import subprocess
+from importlib import import_module
 from pathlib import Path
 
 from git import Commit, Repo
@@ -315,3 +316,55 @@ class GitRepository:
         if not base_url:
             return None
         return f"{base_url}/commit/{commit_hash}"
+
+    def get_repository_info(self) -> dict[str, object | None]:
+        """Return a best-effort snapshot of repository metadata.
+
+        The result is intentionally simple so it can be serialized to JSON,
+        TOON, or other text formats by a higher-level formatter.
+        """
+
+        branch_name: str | None = None
+        try:
+            branch_name = self.repo.active_branch.name
+        except Exception:  # noqa: BLE001
+            branch_name = None
+
+        head_commit: dict[str, object] | None = None
+        try:
+            commit = self.repo.head.commit
+            head_commit = {
+                "hash": commit.hexsha,
+                "message": commit.message.strip(),
+                "author": commit.author.name if commit.author else None,
+                "committed_at": commit.committed_datetime.isoformat(),
+            }
+        except Exception:  # noqa: BLE001
+            head_commit = None
+
+        return {
+            "path": str(self.repo_path),
+            "branch": branch_name,
+            "head_commit": head_commit,
+            "remote_url": getattr(
+                getattr(self.repo.remotes, "origin", None), "url", None
+            ),
+            "repository_web_url": self.get_repository_web_url(),
+            "semantic_version_tags": self.get_semantic_version_tags(),
+        }
+
+    def get_repository_info_toon(self) -> str:
+        """Return repository metadata encoded as TOON.
+
+        This uses the official :mod:`toon_format` Python package when it is
+        installed. The import is intentionally lazy so the rest of the CLI can
+        keep working without TOON support enabled.
+        """
+        try:
+            encode = import_module("toon_format").encode
+        except ImportError as error:
+            raise ImportError(
+                "TOON output requires the optional toon-python dependency"
+            ) from error
+
+        return encode(self.get_repository_info())

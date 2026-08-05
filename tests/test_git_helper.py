@@ -14,8 +14,9 @@
 # limitations under the License.
 
 import subprocess
+import sys
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 
 import pytest
 
@@ -331,3 +332,68 @@ def test_get_repository_web_url_returns_none_without_remote():
 
     assert repo.get_repository_web_url() is None
     assert repo.get_commit_web_url("abc123") is None
+
+
+def test_get_repository_info_returns_best_effort_snapshot():
+    commit = SimpleNamespace(
+        hexsha="abc12345",
+        message="feat: add snapshot helper\n",
+        author=SimpleNamespace(name="Alice"),
+        committed_datetime=SimpleNamespace(isoformat=lambda: "2026-08-05T12:00:00"),
+    )
+    repo = _make_repo(remote_url="git@host:org/repo.git")
+    repo.repo = SimpleNamespace(
+        git=repo.repo.git,
+        iter_commits=repo.repo.iter_commits,
+        tags=repo.repo.tags,
+        remotes=repo.repo.remotes,
+        head=SimpleNamespace(commit=commit),
+        active_branch=SimpleNamespace(name="main"),
+    )
+
+    info = repo.get_repository_info()
+
+    assert info == {
+        "path": "/tmp/repo",
+        "branch": "main",
+        "head_commit": {
+            "hash": "abc12345",
+            "message": "feat: add snapshot helper",
+            "author": "Alice",
+            "committed_at": "2026-08-05T12:00:00",
+        },
+        "remote_url": "git@host:org/repo.git",
+        "repository_web_url": "https://host/org/repo",
+        "semantic_version_tags": {},
+    }
+
+
+def test_get_repository_info_toon_uses_toon_format_encode(monkeypatch):
+    commit = SimpleNamespace(
+        hexsha="abc12345",
+        message="feat: add snapshot helper\n",
+        author=SimpleNamespace(name="Alice"),
+        committed_datetime=SimpleNamespace(isoformat=lambda: "2026-08-05T12:00:00"),
+    )
+    repo = _make_repo(remote_url="git@host:org/repo.git")
+    repo.repo = SimpleNamespace(
+        git=repo.repo.git,
+        iter_commits=repo.repo.iter_commits,
+        tags=repo.repo.tags,
+        remotes=repo.repo.remotes,
+        head=SimpleNamespace(commit=commit),
+        active_branch=SimpleNamespace(name="main"),
+    )
+
+    toon_module = ModuleType("toon_format")
+    calls: list[dict[str, object | None]] = []
+
+    def _encode(value):
+        calls.append(value)
+        return "name: Alice"
+
+    toon_module.encode = _encode  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "toon_format", toon_module)
+
+    assert repo.get_repository_info_toon() == "name: Alice"
+    assert calls == [repo.get_repository_info()]

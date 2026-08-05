@@ -25,10 +25,12 @@ classifiers = [
 
 dependencies = [
     "litellm>=1.84.0",
+    "headroom-ai",
     "gitpython",
     "python-dotenv>=1.2.2",
     "click",
     "pydantic",
+    "toon-format>=0.9.0b1",
 ]
 
 [project.optional-dependencies]

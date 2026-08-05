@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import shlex
 import sys
@@ -59,6 +60,9 @@ def _build_execution_command(
     litellm_api_base: str | None,
     litellm_api_key: str | None,
     litellm_headers_json: str | None,
+    workers: int | None = None,
+    retry_attempts: int | None = None,
+    retry_backoff_seconds: float | None = None,
 ) -> str:  # jscpd:ignore-end
     """Build a shell-safe command summary of the current CLI execution.
 
@@ -81,6 +85,12 @@ def _build_execution_command(
         args.append("--create-semver-tags")
     if limit is not None:
         args.extend(["--limit", str(limit)])
+    if workers is not None:
+        args.extend(["--workers", str(workers)])
+    if retry_attempts is not None:
+        args.extend(["--retry-attempts", str(retry_attempts)])
+    if retry_backoff_seconds is not None:
+        args.extend(["--retry-backoff-seconds", str(retry_backoff_seconds)])
 
     args.extend(["--log-level", log_level, "--changelog-file", changelog_file])
 
@@ -92,6 +102,27 @@ def _build_execution_command(
         args.extend(["--litellm-headers-json", "$CHANGELOG_LITELLM_HEADERS_JSON"])
 
     return " ".join(shlex.quote(part) for part in args)
+
+
+def _resolve_worker_count(requested_workers: int | None, item_count: int) -> int:
+    """Resolve worker count using request, CPU availability, and item count.
+
+    Args:
+        requested_workers: Explicit worker override from CLI, or ``None`` to
+            auto-size from ``os.cpu_count()``.
+        item_count: Number of items that could be processed.
+
+    Returns:
+        A positive worker count bounded by ``item_count``.
+    """
+    if item_count <= 0:
+        return 1
+
+    if requested_workers is None:
+        cpu_count = os.cpu_count() or 1
+        return max(1, min(cpu_count, item_count))
+
+    return max(1, min(requested_workers, item_count))
 
 
 def _configure_logging(log_level: str) -> None:
@@ -255,27 +286,36 @@ def _extract_release_sections(changelog_text: str) -> list[tuple[str, str]]:
 def _merge_missing_release_sections(
     existing_text: str, generated_text: str
 ) -> tuple[str, int]:
-    """Append only release sections missing from *existing_text*.
+    """Return regenerated changelog text when release sections differ.
 
-    Existing section content is never modified; only absent sections from the
-    newly generated changelog are appended to the end of the file.
+    Existing release headings are treated as stable identities, but their
+    content must still be refreshed when regenerated output changes. This keeps
+    reruns idempotent while allowing stale or previously malformed entries to
+    be corrected in place.
 
     Returns:
-        Tuple of merged text and number of appended sections.
+        Tuple of output text and number of release sections that changed.
     """
-    existing_headings = set(RELEASE_SECTION_HEADING_RE.findall(existing_text))
-    missing_blocks = [
-        block
-        for heading, block in _extract_release_sections(generated_text)
-        if heading not in existing_headings
+    existing_sections = dict(_extract_release_sections(existing_text))
+    generated_sections = dict(_extract_release_sections(generated_text))
+
+    changed_sections = [
+        heading
+        for heading, block in generated_sections.items()
+        if existing_sections.get(heading) != block
     ]
-    if not missing_blocks:
+    removed_sections = [
+        heading for heading in existing_sections if heading not in generated_sections
+    ]
+
+    if (
+        not changed_sections
+        and not removed_sections
+        and existing_text == generated_text
+    ):
         return existing_text, 0
 
-    merged_text = (
-        existing_text.rstrip("\n") + "\n\n" + "\n\n".join(missing_blocks) + "\n"
-    )
-    return merged_text, len(missing_blocks)
+    return generated_text, len(changed_sections) + len(removed_sections)
 
 
 @click.command()
@@ -318,6 +358,27 @@ def _merge_missing_release_sections(
     default=None,
     envvar="CHANGELOG_LIMIT",
     help="Process only the last N commits",
+)
+@click.option(
+    "--workers",
+    type=click.IntRange(min=1),
+    default=None,
+    envvar="CHANGELOG_WORKERS",
+    help="Optional worker count hint for future parallel processing.",
+)
+@click.option(
+    "--retry-attempts",
+    type=click.IntRange(min=1),
+    default=None,
+    envvar="CHANGELOG_RETRY_ATTEMPTS",
+    help="Max retry attempts for transient model/API failures.",
+)
+@click.option(
+    "--retry-backoff-seconds",
+    type=click.FloatRange(min=0.001),
+    default=None,
+    envvar="CHANGELOG_RETRY_BACKOFF_SECONDS",
+    help="Base backoff delay in seconds between retry attempts.",
 )
 @click.option(
     "--log-level",
@@ -368,6 +429,9 @@ def cli(
     clear_all: bool,
     create_semver_tags: bool,
     limit: int | None,
+    workers: int | None,
+    retry_attempts: int | None,
+    retry_backoff_seconds: float | None,
     log_level: str,
     changelog_file: str,
     litellm_api_base: str | None,
@@ -405,13 +469,18 @@ def cli(
         logger.debug(
             "Initialising configuration: model=%s namespace=%s", model, namespace
         )
-        config = Config(
-            model=model,
-            namespace=namespace,
-            litellm_api_base=litellm_api_base,
-            litellm_api_key=litellm_api_key,
-            litellm_extra_headers=litellm_extra_headers,
-        )
+        config_overrides: dict[str, Any] = {
+            "model": model,
+            "namespace": namespace,
+            "litellm_api_base": litellm_api_base,
+            "litellm_api_key": litellm_api_key,
+            "litellm_extra_headers": litellm_extra_headers,
+        }
+        if retry_attempts is not None:
+            config_overrides["retry_attempts"] = retry_attempts
+        if retry_backoff_seconds is not None:
+            config_overrides["retry_backoff_seconds"] = retry_backoff_seconds
+        config = Config.from_env(**config_overrides)
 
         logger.debug("Opening repository at %s", repo_path)
         repo = GitRepository(repo_path)
@@ -431,6 +500,9 @@ def cli(
                 litellm_api_base=litellm_api_base,
                 litellm_api_key=litellm_api_key,
                 litellm_headers_json=litellm_headers_json,
+                workers=workers,
+                retry_attempts=retry_attempts,
+                retry_backoff_seconds=retry_backoff_seconds,
             )
         )
 
@@ -452,6 +524,13 @@ def cli(
             logger.warning("No commits found in repository")
             click.echo("No commits found in repository")
             return
+
+        effective_workers = _resolve_worker_count(workers, total_commits)
+        logger.debug(
+            "Resolved worker count: requested=%s effective=%s",
+            workers,
+            effective_workers,
+        )
 
         click.echo(f"Found {total_commits} commits to process")
 
@@ -565,7 +644,7 @@ def cli(
             if appended_sections > 0:
                 changelog_path.write_text(merged_text, encoding="utf-8")
                 click.echo(
-                    f"Changelog updated with {appended_sections} missing release section(s): {changelog_path}"
+                    f"Changelog updated with {appended_sections} changed release section(s): {changelog_path}"
                 )
             else:
                 click.echo(f"Changelog already up-to-date: {changelog_path}")

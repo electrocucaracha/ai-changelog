@@ -128,6 +128,51 @@ def test_cli_reads_options_from_environment_variables(tmp_path, monkeypatch):
     assert "--litellm-headers-json '$CHANGELOG_LITELLM_HEADERS_JSON'" in result.output
 
 
+def test_cli_includes_workers_in_execution_command(tmp_path, monkeypatch):
+    repo = DummyRepo(str(tmp_path))
+    monkeypatch.setattr(main, "GitRepository", lambda repo_path: repo)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        main.cli,
+        [str(tmp_path), "--clear-all", "--workers", "7"],
+    )
+
+    assert result.exit_code == 0
+    assert "--workers 7" in result.output
+
+
+def test_cli_includes_retry_flags_in_execution_command(tmp_path, monkeypatch):
+    repo = DummyRepo(str(tmp_path))
+    monkeypatch.setattr(main, "GitRepository", lambda repo_path: repo)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        main.cli,
+        [
+            str(tmp_path),
+            "--clear-all",
+            "--retry-attempts",
+            "5",
+            "--retry-backoff-seconds",
+            "2.5",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "--retry-attempts 5" in result.output
+    assert "--retry-backoff-seconds 2.5" in result.output
+
+
+def test_resolve_worker_count_auto_and_override(monkeypatch):
+    monkeypatch.setattr(main.os, "cpu_count", lambda: 12)
+
+    assert main._resolve_worker_count(None, 2) == 2
+    assert main._resolve_worker_count(None, 20) == 12
+    assert main._resolve_worker_count(5, 20) == 5
+    assert main._resolve_worker_count(50, 3) == 3
+
+
 def test_create_semver_tags_if_needed_creates_tags_when_none_exist():
     repo = DummyTagRepo(
         tags_by_commit={},
@@ -199,13 +244,13 @@ def test_create_semver_tags_if_needed_rejects_limit():
         )
 
 
-def test_merge_missing_release_sections_appends_only_new_sections():
+def test_merge_missing_release_sections_replaces_changed_sections():
     existing = (
         "# Changelog\n\n"
         "All notable changes to this project will be documented in this file.\n\n"
         "## [Unreleased]\n\n"
         "### Changed\n"
-        "- Existing entry\n\n"
+        "- Old entry\n\n"
         "## [1.0.0] - 2026-01-01\n\n"
         "### Added\n"
         "- Initial release\n"
@@ -215,7 +260,7 @@ def test_merge_missing_release_sections_appends_only_new_sections():
         "All notable changes to this project will be documented in this file.\n\n"
         "## [Unreleased]\n\n"
         "### Changed\n"
-        "- Existing entry\n\n"
+        "- Refreshed entry\n\n"
         "## [1.1.0] - 2026-02-01\n\n"
         "### Added\n"
         "- New feature\n\n"
@@ -226,8 +271,10 @@ def test_merge_missing_release_sections_appends_only_new_sections():
 
     merged, added = main._merge_missing_release_sections(existing, generated)
 
-    assert added == 1
-    assert existing in merged
+    assert added == 2
+    assert merged == generated
+    assert "- Old entry" not in merged
+    assert "- Refreshed entry" in merged
     assert "## [1.1.0] - 2026-02-01" in merged
 
 

@@ -244,3 +244,37 @@ def test_build_changelog_prefers_note_category_metadata():
 
     assert "### Removed" in changelog
     assert "Removed deprecated parser mode. (99999999)" in changelog
+
+
+def test_build_changelog_diversifies_repeated_leading_power_verbs():
+    builder = ChangelogBuilder(namespace="ai-changelog")
+    commits = [
+        make_commit(
+            "aaaa0001",
+            "docs: first note",
+            datetime(2026, 3, 8, tzinfo=UTC),
+        ),
+        make_commit(
+            "bbbb0002",
+            "docs: second note",
+            datetime(2026, 3, 9, tzinfo=UTC),
+        ),
+    ]
+    notes = {
+        "aaaa0001": "Category: Fixed\n\nResolved timeout handling in the parser.",
+        "bbbb0002": (
+            "Category: Fixed\n\nResolved fallback behavior when retries are exhausted."
+        ),
+    }
+
+    changelog = builder.build(
+        commits=commits,
+        get_note=lambda commit_hash, namespace: notes.get(commit_hash),
+        tags_by_commit={},
+    )
+
+    assert "Resolved timeout handling in the parser. (aaaa0001)" in changelog
+    assert (
+        "Corrected fallback behavior when retries are exhausted. (bbbb0002)"
+        in changelog
+    )

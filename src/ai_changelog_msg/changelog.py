@@ -31,6 +31,44 @@ CATEGORY_ORDER = ("Added", "Changed", "Fixed", "Removed")
 NOTE_CATEGORY_RE = re.compile(
     r"^\s*Category\s*:\s*(Added|Changed|Fixed|Removed)\s*$", re.IGNORECASE
 )
+LEADING_WORD_RE = re.compile(r"^(?P<word>[A-Za-z][A-Za-z'-]*)(?P<rest>\b.*)$")
+BREAKING_PREFIX_RE = re.compile(r"^(?P<prefix>BREAKING:\s+)(?P<rest>.*)$")
+
+CATEGORY_POWER_VERBS: dict[str, tuple[str, ...]] = {
+    "Added": (
+        "Enabled",
+        "Introduced",
+        "Unlocked",
+        "Delivered",
+        "Expanded",
+    ),
+    "Changed": (
+        "Refined",
+        "Optimized",
+        "Improved",
+        "Modernized",
+        "Updated",
+        "Simplified",
+        "Hardened",
+    ),
+    "Fixed": (
+        "Resolved",
+        "Corrected",
+        "Repaired",
+        "Addressed",
+        "Eliminated",
+        "Stabilized",
+    ),
+    "Removed": (
+        "Removed",
+        "Retired",
+        "Eliminated",
+        "Dropped",
+    ),
+}
+POWER_VERB_SET = {
+    verb.lower() for verbs in CATEGORY_POWER_VERBS.values() for verb in verbs
+}
 
 
 @dataclass(frozen=True, order=True)
@@ -377,14 +415,18 @@ class ChangelogBuilder:
                 if not entries:
                     continue
                 parts.append(f"### {category}")
+                seen_leading_verbs: set[str] = set()
                 for entry in entries:
                     short_hash = entry.commit_hash[:8]
+                    summary = self._diversify_leading_verb(
+                        entry.summary,
+                        category,
+                        seen_leading_verbs,
+                    )
                     if entry.commit_url:
-                        parts.append(
-                            f"- {entry.summary} [{short_hash}]({entry.commit_url})"
-                        )
+                        parts.append(f"- {summary} [{short_hash}]({entry.commit_url})")
                     else:
-                        parts.append(f"- {entry.summary} ({short_hash})")
+                        parts.append(f"- {summary} ({short_hash})")
                 parts.append("")
             if parts[-1] == "":
                 parts.pop()
@@ -406,6 +448,57 @@ class ChangelogBuilder:
         for item in items:
             grouped.setdefault(item.category, []).append(item)
         return {category: entries for category, entries in grouped.items() if entries}
+
+    def _diversify_leading_verb(
+        self,
+        summary: str,
+        category: str,
+        seen_leading_verbs: set[str],
+    ) -> str:
+        """Reduce repeated leading power verbs within a category block.
+
+        Keeps the original sentence when no safe alternative is available.
+        """
+        text = summary.strip()
+        if not text:
+            return summary
+
+        prefix = ""
+        body = text
+        breaking_match = BREAKING_PREFIX_RE.match(text)
+        if breaking_match is not None:
+            prefix = breaking_match.group("prefix")
+            body = breaking_match.group("rest")
+
+        word_match = LEADING_WORD_RE.match(body)
+        if word_match is None:
+            return summary
+
+        leading_word = word_match.group("word")
+        normalized = leading_word.lower()
+        rest = word_match.group("rest")
+
+        if normalized not in POWER_VERB_SET:
+            return summary
+
+        if normalized not in seen_leading_verbs:
+            seen_leading_verbs.add(normalized)
+            return summary
+
+        alternatives = CATEGORY_POWER_VERBS.get(category, ())
+        for alternative in alternatives:
+            candidate = alternative.lower()
+            if candidate in seen_leading_verbs:
+                continue
+            replacement = (
+                alternative.upper()
+                if leading_word.isupper()
+                else alternative.lower() if leading_word.islower() else alternative
+            )
+            seen_leading_verbs.add(candidate)
+            return f"{prefix}{replacement}{rest}"
+
+        return summary
 
 
 def parse_semantic_version(tag_name: str) -> SemanticVersion | None:

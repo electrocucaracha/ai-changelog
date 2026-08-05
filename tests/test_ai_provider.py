@@ -17,6 +17,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from ai_changelog_msg import ai_provider
 from ai_changelog_msg.ai_provider import AIProvider
 from ai_changelog_msg.config import Config
 
@@ -49,7 +50,10 @@ def test_summarize_diff_truncates_and_returns_trimmed_content(monkeypatch):
 
 
 def test_summarize_diff_raises_runtime_error_on_api_failure(monkeypatch):
+    calls = {"count": 0}
+
     def fake_completion(**kwargs):
+        calls["count"] += 1
         raise ValueError("boom")
 
     monkeypatch.setattr(
@@ -60,6 +64,86 @@ def test_summarize_diff_raises_runtime_error_on_api_failure(monkeypatch):
 
     with pytest.raises(RuntimeError, match="AI API call failed: boom"):
         provider.summarize_diff("fix: issue", "+change")
+    assert calls["count"] == 1
+
+
+def test_summarize_diff_retries_timeout_and_succeeds(monkeypatch):
+    calls = {"count": 0}
+    observed_delays = []
+
+    def fake_completion(**kwargs):
+        calls["count"] += 1
+        if calls["count"] < 3:
+            raise ValueError(
+                "litellm.APIConnectionError: OllamaException - litellm.Timeout: "
+                "Connection timed out after 600.0 seconds."
+            )
+        return _make_response("Recovered after retry.")
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
+    )
+
+    def _record_delay(delay: float) -> None:
+        observed_delays.append(delay)
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.time.sleep",
+        _record_delay,
+    )
+
+    provider = AIProvider(Config())
+    summary = provider.summarize_diff("feat: reduce timeout flakiness", "+change")
+
+    assert summary == "Recovered after retry."
+    assert calls["count"] == 3
+    assert observed_delays == [1.0, 2.0]
+
+
+def test_summarize_diff_pulls_missing_ollama_model_then_retries(monkeypatch):
+    calls = {"count": 0}
+
+    def fake_completion(**kwargs):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise ValueError("model 'llama3.1:8b-instruct-q4_K_M' not found")
+        return _make_response("Recovered after pull.")
+
+    def fake_run(*args, **kwargs):
+        return SimpleNamespace(returncode=0, stdout="pulled", stderr="")
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
+    )
+    monkeypatch.setattr("ai_changelog_msg.ai_provider.subprocess.run", fake_run)
+
+    provider = AIProvider(Config(model="ollama/llama3.1:8b-instruct-q4_K_M"))
+    summary = provider.summarize_diff("feat: improve defaults", "+change")
+
+    assert summary == "Recovered after pull."
+    assert calls["count"] == 2
+
+
+def test_summarize_diff_raises_when_ollama_pull_fails(monkeypatch):
+    def fake_completion(**kwargs):
+        raise ValueError("model 'llama3.1:8b-instruct-q4_K_M' not found")
+
+    def fake_run(*args, **kwargs):
+        return SimpleNamespace(
+            returncode=1,
+            stdout="",
+            stderr="pull access denied for llama3.1:8b-instruct-q4_K_M",
+        )
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
+    )
+    monkeypatch.setattr("ai_changelog_msg.ai_provider.subprocess.run", fake_run)
+
+    provider = AIProvider(Config(model="ollama/llama3.1:8b-instruct-q4_K_M"))
+
+    with pytest.raises(RuntimeError, match="Failed to pull Ollama model"):
+        provider.summarize_diff("feat: improve defaults", "+change")
 
 
 def test_generate_changelog_entry_returns_ai_content(monkeypatch):
@@ -80,6 +164,52 @@ def test_generate_changelog_entry_returns_ai_content(monkeypatch):
     )
 
     assert result == "Changed the CLI workflow."
+
+
+def test_generate_changelog_entry_rejects_prompt_leak_and_falls_back(monkeypatch):
+    def fake_completion(**kwargs):
+        return _make_response(
+            "### System: You normalize engineering summaries into one uniform "
+            "Keep a Changelog entry sentence written for a technical audience."
+        )
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
+    )
+
+    provider = AIProvider(Config())
+
+    result = provider.generate_changelog_entry(
+        "chore: adjust workflow",
+        "Refined workflow behavior for maintainers.",
+        "Changed",
+        False,
+    )
+
+    assert result == "Refined workflow behavior for maintainers."
+
+
+def test_generate_changelog_entry_returns_first_valid_sentence(monkeypatch):
+    def fake_completion(**kwargs):
+        return _make_response(
+            "- Streamlined dependency updates for operators. "
+            "Additional implementation details are intentionally omitted."
+        )
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
+    )
+
+    provider = AIProvider(Config())
+
+    result = provider.generate_changelog_entry(
+        "chore: adjust dependency workflow",
+        "Adjusted dependency workflow.",
+        "Changed",
+        False,
+    )
+
+    assert result == "Streamlined dependency updates for operators."
 
 
 def test_generate_changelog_entry_falls_back_to_note_on_failure(monkeypatch):
@@ -176,3 +306,31 @@ def test_build_prompt_includes_summarization_best_practices():
     assert "Do not output headers or lead-ins" in prompt
     assert "Here is a summary" in prompt
     assert "Optional additional context" in prompt
+
+
+def test_init_enables_headroom_callback_once(monkeypatch):
+    class FakeHeadroomCallback:
+        pass
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider._HeadroomCallback",
+        FakeHeadroomCallback,
+    )
+    monkeypatch.setattr("ai_changelog_msg.ai_provider.litellm.callbacks", [])
+
+    AIProvider(Config(enable_headroom=True))
+    AIProvider(Config(enable_headroom=True))
+
+    callbacks = [
+        callback
+        for callback in ai_provider.litellm.callbacks
+        if callback.__class__.__name__ == "FakeHeadroomCallback"
+    ]
+    assert len(callbacks) == 1
+
+
+def test_init_raises_when_headroom_enabled_but_not_installed(monkeypatch):
+    monkeypatch.setattr("ai_changelog_msg.ai_provider._HeadroomCallback", None)
+
+    with pytest.raises(RuntimeError, match="Headroom is enabled but not installed"):
+        AIProvider(Config(enable_headroom=True))

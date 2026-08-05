@@ -20,8 +20,18 @@ from __future__ import annotations
 import logging
 import os
 import re
+import subprocess
+import time
+from typing import Any
 
 import litellm
+
+try:
+    from headroom.integrations.litellm_callback import (
+        HeadroomCallback as _HeadroomCallback,
+    )
+except ImportError:  # pragma: no cover - optional dependency
+    _HeadroomCallback = None
 
 from ai_changelog_msg.config import Config
 
@@ -33,6 +43,43 @@ PR_AUTHOR_RE = re.compile(
 )
 APPROVER_RE = re.compile(
     r"^\s*(?:Approved-by|Reviewed-by|Acked-by)\s*:\s*(?P<identity>.+?)\s*$",
+    re.IGNORECASE,
+)
+PROMPT_LEAK_RE = re.compile(
+    r"(?:"
+    r"###\s*(?:System|User|Assistant|Output|Solution|Summary|Explanation|Notes?)\b"
+    r"|Rewrite\s+the\s+summary\s+above"
+    r"|Category\s*:\s*(?:Added|Changed|Fixed|Removed)"
+    r"|Original\s+Commit\s+Message"
+    r"|Existing\s+Summary"
+    r"|Keep\s+a\s+Changelog\s+entry\s+sentence"
+    r"|```"
+    r")",
+    re.IGNORECASE,
+)
+LEADING_LIST_MARKER_RE = re.compile(r"^(?:[-*+]|\d+[.)])\s+")
+LEADING_QUOTE_RE = re.compile(r'^["\']+|["\']+$')
+OLLAMA_MODEL_NOT_FOUND_RE = re.compile(
+    r"(?:model\s+['\"]?.+?['\"]?\s+not\s+found|pull\s+the\s+model\s+first)",
+    re.IGNORECASE,
+)
+RETRYABLE_LLM_ERROR_RE = re.compile(
+    r"(?:"
+    r"timeout"
+    r"|timed\s+out"
+    r"|apiconnectionerror"
+    r"|connection\s+error"
+    r"|connection\s+refused"
+    r"|temporarily\s+unavailable"
+    r"|service\s+unavailable"
+    r"|rate\s+limit"
+    r"|too\s+many\s+requests"
+    r"|\b429\b"
+    r"|\b500\b"
+    r"|\b502\b"
+    r"|\b503\b"
+    r"|\b504\b"
+    r")",
     re.IGNORECASE,
 )
 
@@ -75,13 +122,154 @@ class AIProvider:
             litellm.suppress_debug_info = True
         logging.getLogger("LiteLLM").setLevel(logging.WARNING)
         logging.getLogger("litellm").setLevel(logging.WARNING)
-        litellm.num_retries = 3
+        self._enable_headroom_compression_if_requested()
+        # Keep retries in application code so this tool does not depend on
+        # optional LiteLLM tenacity extras at runtime.
+        litellm.num_retries = 0
         litellm.timeout = config.api_timeout
+        self._max_completion_attempts = config.retry_attempts
+        self._base_retry_delay_seconds = config.retry_backoff_seconds
         logger.debug(
-            "AIProvider initialised: model=%s timeout=%s",
+            "AIProvider initialised: model=%s timeout=%s retries=%s backoff=%.2fs",
             self.model,
             config.api_timeout,
+            self._max_completion_attempts,
+            self._base_retry_delay_seconds,
         )
+
+    def _enable_headroom_compression_if_requested(self) -> None:
+        """Enable Headroom token compression for LiteLLM requests.
+
+        When ``Config.enable_headroom`` is true, this method registers
+        :class:`headroom.integrations.litellm_callback.HeadroomCallback`
+        exactly once in ``litellm.callbacks``.
+
+        Raises:
+            RuntimeError: If Headroom was requested but is not installed.
+        """
+        if not self.config.enable_headroom:
+            return
+
+        if _HeadroomCallback is None:
+            raise RuntimeError(
+                "Headroom is enabled but not installed. Install with: "
+                "pip install headroom-ai"
+            )
+
+        callbacks: Any = getattr(litellm, "callbacks", None)
+        if callbacks is None:
+            callbacks = []
+            litellm.callbacks = callbacks
+
+        if not isinstance(callbacks, list):
+            callbacks = list(callbacks)
+            litellm.callbacks = callbacks
+
+        if any(isinstance(callback, _HeadroomCallback) for callback in callbacks):
+            return
+
+        callbacks.append(_HeadroomCallback())
+        logger.info("Headroom compression enabled for LiteLLM requests")
+
+    def _completion_with_ollama_auto_pull(
+        self,
+        *,
+        messages: list[dict[str, str]],
+        temperature: float,
+        max_tokens: int,
+    ) -> Any:
+        """Call LiteLLM and auto-pull missing Ollama models when needed."""
+        try:
+            return litellm.completion(
+                model=self.model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                **self._litellm_kwargs,
+            )
+        except Exception as error:
+            if not self._should_pull_missing_ollama_model(error):
+                raise
+
+            self._pull_ollama_model()
+            return litellm.completion(
+                model=self.model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                **self._litellm_kwargs,
+            )
+
+    def _is_retryable_completion_error(self, error: Exception) -> bool:
+        """Return ``True`` when *error* should trigger a retry."""
+        return bool(RETRYABLE_LLM_ERROR_RE.search(str(error)))
+
+    def _completion_with_retry(
+        self,
+        *,
+        messages: list[dict[str, str]],
+        temperature: float,
+        max_tokens: int,
+    ) -> Any:
+        """Call the model with bounded retries for transient failures."""
+        for attempt in range(1, self._max_completion_attempts + 1):
+            try:
+                return self._completion_with_ollama_auto_pull(
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+            except Exception as error:
+                if (
+                    not self._is_retryable_completion_error(error)
+                    or attempt >= self._max_completion_attempts
+                ):
+                    raise
+
+                delay_seconds = self._base_retry_delay_seconds * (2 ** (attempt - 1))
+                logger.warning(
+                    "Transient AI API error on attempt %d/%d: %s. Retrying in %.1fs",
+                    attempt,
+                    self._max_completion_attempts,
+                    error,
+                    delay_seconds,
+                )
+                time.sleep(delay_seconds)
+
+        raise RuntimeError("Unreachable retry state while calling AI provider")
+
+    def _should_pull_missing_ollama_model(self, error: Exception) -> bool:
+        """Return ``True`` when *error* indicates a missing Ollama model."""
+        if not self.model.startswith("ollama/"):
+            return False
+        return bool(OLLAMA_MODEL_NOT_FOUND_RE.search(str(error)))
+
+    def _pull_ollama_model(self) -> None:
+        """Pull the configured Ollama model through the local Ollama CLI.
+
+        Raises:
+            RuntimeError: If pulling fails or the Ollama CLI is unavailable.
+        """
+        model_name = self.model.removeprefix("ollama/")
+        logger.info("Ollama model '%s' not available locally; pulling", model_name)
+        try:
+            completed = subprocess.run(
+                ["ollama", "pull", model_name],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except OSError as error:
+            raise RuntimeError(
+                "Ollama CLI is not available; install Ollama and ensure 'ollama' is "
+                "in PATH"
+            ) from error
+
+        if completed.returncode != 0:
+            stderr = (completed.stderr or "").strip()
+            stdout = (completed.stdout or "").strip()
+            details = stderr or stdout or "unknown error"
+            raise RuntimeError(f"Failed to pull Ollama model '{model_name}': {details}")
 
     def summarize_diff(
         self,
@@ -138,8 +326,7 @@ class AIProvider:
         )
 
         try:
-            response = litellm.completion(
-                model=self.model,
+            response = self._completion_with_retry(
                 messages=[
                     {
                         "role": "system",
@@ -169,7 +356,6 @@ class AIProvider:
                 ],
                 temperature=0.3,
                 max_tokens=500,
-                **self._litellm_kwargs,
             )
             logger.debug("Response received from model '%s'", self.model)
         except Exception as error:
@@ -198,6 +384,7 @@ class AIProvider:
             A single changelog-ready sentence, or the original *note* if the
             AI call fails or returns no content.
         """
+        fallback_entry = note.strip() or commit_message.strip()
         prompt = (
             f"Category: {category}\n"
             f"Breaking Change: {'yes' if is_breaking else 'no'}\n"
@@ -209,16 +396,16 @@ class AIProvider:
             "category intent, and begin with a strong action verb instead of repeating the "
             "category label word. If the change is purely internal with no observable effect, "
             "state that clearly in one sentence. Prefer precise high-impact verbs such as "
-            "accelerated, maximized, spearheaded, streamlined, hardened, eliminated, "
+            "enabled, introduced, optimized, modernized, hardened, resolved, "
             "stabilized, or simplified when they fit. "
+            "Avoid repeating the same opening verb as nearby entries when a natural alternative exists. "
             "Do not start with Added, Changed, Deprecated, Removed, Fixed, or Security. "
             "Do not use markdown, bullets, commit hashes, file paths, "
             "or code identifiers."
         )
 
         try:
-            response = litellm.completion(
-                model=self.model,
+            response = self._completion_with_retry(
                 messages=[
                     {
                         "role": "system",
@@ -229,8 +416,9 @@ class AIProvider:
                             "Start with a strong action verb that matches the provided category intent, "
                             "but do not start with literal labels Added, Changed, Deprecated, Removed, "
                             "Fixed, or Security. Prefer specific high-impact verbs such as "
-                            "accelerated, maximized, spearheaded, streamlined, hardened, eliminated, "
-                            "stabilized, or simplified when accurate. Describe the observable impact "
+                            "enabled, introduced, optimized, modernized, hardened, resolved, "
+                            "stabilized, or simplified when accurate. Avoid repeating the same opening "
+                            "verb in nearby entries when a natural alternative exists. Describe the observable impact "
                             "for developers or operators; "
                             "never describe internal code mechanics. State breaking behavior, API "
                             "contract changes, or migration requirements explicitly. Do not include "
@@ -240,16 +428,64 @@ class AIProvider:
                     },
                     {"role": "user", "content": prompt},
                 ],
-                temperature=0.2,
+                temperature=0.35,
                 max_tokens=120,
-                **self._litellm_kwargs,
             )
         except Exception as error:  # noqa: BLE001
             logger.warning("Falling back to note text for changelog entry: %s", error)
-            return note.strip() or commit_message.strip()
+            return fallback_entry
 
         content = response.choices[0].message.content if response.choices else None
-        return content.strip() if content else (note.strip() or commit_message.strip())
+        sanitized_content = self._sanitize_changelog_entry(content)
+        if sanitized_content is None:
+            logger.warning(
+                "Discarding invalid changelog entry from model; falling back to note text"
+            )
+            return fallback_entry
+        return sanitized_content
+
+    def _sanitize_changelog_entry(self, content: str | None) -> str | None:
+        """Normalize a model-generated changelog sentence.
+
+        Args:
+            content: Raw model output for changelog entry generation.
+
+        Returns:
+            A single clean sentence when the output is valid, otherwise
+            ``None`` so callers can use a deterministic fallback.
+        """
+        if content is None:
+            return None
+
+        lines: list[str] = []
+        for raw_line in content.splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+            line = LEADING_LIST_MARKER_RE.sub("", line)
+            lines.append(line)
+
+        if not lines:
+            return None
+
+        merged = " ".join(lines)
+        merged = LEADING_QUOTE_RE.sub("", merged).strip()
+        if not merged or PROMPT_LEAK_RE.search(merged):
+            return None
+
+        sentence = re.split(r"(?<=[.!?])\s+", merged, maxsplit=1)[0].strip()
+        if not sentence:
+            return None
+
+        # Reject structured labels that indicate prompt leakage instead of a summary.
+        if re.match(
+            r"^(?:System|User|Assistant|Output|Solution|Summary|Explanation|Notes?|Category)\s*:",
+            sentence,
+            flags=re.IGNORECASE,
+        ):
+            return None
+
+        return sentence
 
     def _build_prompt(
         self,

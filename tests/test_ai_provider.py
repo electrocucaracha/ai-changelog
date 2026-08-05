@@ -127,3 +127,52 @@ def test_summarize_diff_passes_litellm_gateway_kwargs(monkeypatch):
     assert captured["api_base"] == "https://gateway.example"
     assert captured["api_key"] == "token"
     assert captured["extra_headers"] == {"X-Org": "platform"}
+
+
+def test_summarize_diff_includes_pr_author_and_approver_when_present(monkeypatch):
+    captured = {}
+
+    def fake_completion(**kwargs):
+        captured.update(kwargs)
+        return _make_response("Streamlined release note quality.")
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
+    )
+
+    provider = AIProvider(Config())
+
+    commit_message = (
+        "Merge pull request #42 from octocat/feature\n\n"
+        "feat: improve changelog context\n\n"
+        "Reviewed-by: Jane Reviewer <jane@example.com>\n"
+        "Approved-by: John Approver <john@example.com>"
+    )
+    provider.summarize_diff(commit_message, "+new behavior", "Alice")
+
+    prompt = captured["messages"][1]["content"]
+    assert "Author: Alice" in prompt
+    assert "PR Author: octocat" in prompt
+    assert "Approver: Jane Reviewer, John Approver" in prompt
+
+
+def test_build_prompt_includes_summarization_best_practices():
+    provider = AIProvider(Config())
+
+    prompt = provider._build_prompt(
+        "feat: improve release note quality",
+        "+ meaningful user-facing behavior change",
+        "Alice",
+    )
+
+    assert "Summarization checklist:" in prompt
+    assert "Identify the core thesis of the change." in prompt
+    assert "Write in your own words with an objective tone." in prompt
+    assert "Preserve critical details first" in prompt
+    assert "breaking or migration requirements" in prompt
+    assert "API or CLI" in prompt
+    assert "security impact" in prompt
+    assert "target 80 words unless critical details require slightly more" in prompt
+    assert "Do not output headers or lead-ins" in prompt
+    assert "Here is a summary" in prompt
+    assert "Optional additional context" in prompt

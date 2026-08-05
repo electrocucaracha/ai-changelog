@@ -19,12 +19,22 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 
 import litellm
 
 from ai_changelog_msg.config import Config
 
 logger = logging.getLogger(__name__)
+
+PR_AUTHOR_RE = re.compile(
+    r"^Merge pull request\s+#\d+\s+from\s+(?P<author>[A-Za-z0-9_.-]+?)/",
+    re.IGNORECASE,
+)
+APPROVER_RE = re.compile(
+    r"^\s*(?:Approved-by|Reviewed-by|Acked-by)\s*:\s*(?P<identity>.+?)\s*$",
+    re.IGNORECASE,
+)
 
 
 class AIProvider:
@@ -134,24 +144,25 @@ class AIProvider:
                     {
                         "role": "system",
                         "content": (
-                            "You write human-readable release notes for a Keep a Changelog style "
-                            "CHANGELOG.md. Entries must communicate user- or maintainer-facing impact, "
-                            "not low-level implementation details. Output plain text only — no markdown, "
-                            "headings, bullets, numbered lists, code fences, or emphasis markers. "
-                            "Return one mandatory paragraph and one optional paragraph. "
-                            "Paragraph 1 (required): exactly one sentence that starts with a strong "
-                            "action verb and states what changed and why it matters to the user, "
-                            "ending with a period. Match Keep a Changelog category intent without "
-                            "starting with literal labels like Added, Changed, Deprecated, Removed, "
-                            "Fixed, or Security. Prefer specific high-impact verbs such as "
-                            "accelerated, maximized, spearheaded, streamlined, hardened, eliminated, "
-                            "stabilized, or simplified when they are accurate. "
-                            "Paragraph 2 (optional): 1–2 sentences covering scope, motivation, or "
-                            "impact that is genuinely useful to a technical user; include it only when "
-                            "it adds meaningful context. Always flag breaking changes, API or CLI "
+                            "You write concise git-note summaries for a Keep a Changelog style "
+                            "workflow. First identify the core thesis of the change and only the most "
+                            "important supporting impacts. Ignore minor refactors, repetitive examples, "
+                            "and low-level implementation trivia. Keep the summary objective and grounded "
+                            "in the commit content; do not add personal opinions or outside analysis. "
+                            "Output plain text only with exactly one paragraph of 2 to 4 sentences and "
+                            "typically at most 80 words. Never drop critical information to satisfy length. "
+                            "Preserve this priority order when condensing: (1) breaking behavior or migration "
+                            "requirements, (2) API or CLI contract changes, (3) security impact, (4) config "
+                            "schema changes, (5) primary user or maintainer outcome. The first sentence "
+                            "must state what changed and why it "
+                            "matters to users or maintainers. Use your own words and avoid direct "
+                            "copying from the commit message or diff. Do not include headings, lead-ins, "
+                            "labels, markdown, bullets, numbered lists, code fences, or quote marks. "
+                            "Never write phrases such as 'Here is a summary of the changes' or "
+                            "'Optional additional context'. Always mention breaking behavior, API or CLI "
                             "changes, config schema changes, migration steps, and security impact when "
-                            "present. Never mention file paths, variable names, line numbers, or "
-                            "commit metadata. Keep tone precise, direct, and consistent."
+                            "present. Never mention file paths, variable names, line numbers, commit "
+                            "hashes, or reviewer metadata."
                         ),
                     },
                     {"role": "user", "content": prompt},
@@ -248,8 +259,9 @@ class AIProvider:
     ) -> str:
         """Assemble the user-facing prompt sent to the AI model.
 
-        The prompt is composed of an optional author line, the original
-        commit message, the diff fenced in a code block, and a fixed
+        The prompt is composed of optional identity lines (commit author and,
+        when discoverable from commit metadata, PR author and approver), the
+        original commit message, the diff fenced in a code block, and a fixed
         instruction sentence.
 
         Args:
@@ -276,13 +288,70 @@ class AIProvider:
             >>> result.startswith("Author: Alice")
             True
         """
+        pr_author, approver = self._extract_review_metadata(commit_message)
         prompt_parts = []
         if author:
             prompt_parts.append(f"Author: {author}\n")
+        if pr_author:
+            prompt_parts.append(f"PR Author: {pr_author}\n")
+        if approver:
+            prompt_parts.append(f"Approver: {approver}\n")
         prompt_parts.append(f"Original Commit Message:\n{commit_message}\n")
         prompt_parts.append(f"Diff:\n```\n{diff}\n```\n")
         prompt_parts.append(
-            "Summarize what changed for users or maintainers and why it matters. "
-            "Focus on observable behavior and impact, not line-by-line code mechanics."
+            "Summarization checklist: "
+            "(1) Identify the core thesis of the change. "
+            "(2) Keep only major supporting points and ignore minor edits. "
+            "(3) Write in your own words with an objective tone. "
+            "(4) Preserve critical details first: breaking or migration requirements, API or CLI "
+            "changes, security impact, config schema changes, then the primary user outcome. "
+            "(5) Output exactly one paragraph of 2 to 4 sentences and target 80 words unless "
+            "critical details require slightly more. "
+            "(6) Start with what changed and why it matters. "
+            "(7) Do not output headers or lead-ins such as 'Here is a summary' or "
+            "'Optional additional context'."
         )
         return "\n".join(prompt_parts)
+
+    def _extract_review_metadata(
+        self, commit_message: str
+    ) -> tuple[str | None, str | None]:
+        """Extract PR author and approver identities from a commit message.
+
+        This helper supports common merge-commit and trailer formats produced by
+        GitHub and related review workflows.
+
+        Args:
+            commit_message: Full commit message text.
+
+        Returns:
+            A tuple of ``(pr_author, approver)`` where each value may be
+            ``None`` when not present.
+        """
+        pr_author: str | None = None
+        approvers: list[str] = []
+
+        for line in commit_message.splitlines():
+            if pr_author is None:
+                pr_match = PR_AUTHOR_RE.match(line.strip())
+                if pr_match:
+                    candidate = pr_match.group("author").strip()
+                    pr_author = candidate or None
+
+            approver_match = APPROVER_RE.match(line)
+            if not approver_match:
+                continue
+            identity = self._clean_identity(approver_match.group("identity"))
+            if identity and identity not in approvers:
+                approvers.append(identity)
+
+        approver = ", ".join(approvers) if approvers else None
+        return pr_author, approver
+
+    def _clean_identity(self, identity: str) -> str:
+        """Normalize identity values captured from commit trailers."""
+        value = identity.strip()
+        angle_index = value.find("<")
+        if angle_index > 0:
+            value = value[:angle_index].strip()
+        return value

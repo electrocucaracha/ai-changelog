@@ -510,7 +510,7 @@ def cli(
                     summary = ai_provider.summarize_diff(
                         commit_message=_commit_message_str(commit.message),
                         diff=diff,
-                        author=commit.author.name if commit.author else "Unknown",
+                        author=commit.author.name if commit.author else None,
                     )
                     note_payload = format_note(category=category, summary=summary)
                     repo.set_note(commit.hexsha, note_payload, namespace)

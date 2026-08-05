@@ -23,9 +23,11 @@ source = { editable = "." }
 dependencies = [
     { name = "click" },
     { name = "gitpython" },
+    { name = "headroom-ai" },
     { name = "litellm" },
     { name = "pydantic" },
     { name = "python-dotenv" },
+    { name = "toon-format" },
 ]
 
 [package.optional-dependencies]
@@ -45,6 +47,7 @@ requires-dist = [
     { name = "click" },
     { name = "deepeval", marker = "extra == 'eval'" },
     { name = "gitpython" },
+    { name = "headroom-ai" },
     { name = "litellm", specifier = ">=1.84.0" },
     { name = "mutmut", marker = "extra == 'test'" },
     { name = "ollama", marker = "extra == 'eval'" },
@@ -53,6 +56,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'test'" },
     { name = "pytest-mock", marker = "extra == 'test'" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
+    { name = "toon-format", specifier = ">=0.9.0b1" },
 ]
 provides-extras = ["test", "eval"]
 
@@ -207,6 +211,21 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/61/cc/a381afa6efea9f496eff839d4a6a1aed3bfafc7b3ab4b0d1b243a12573dd/anyio-4.14.2.tar.gz", hash = "sha256:cfa139f3ed1a23ee8f88a145ddb5ac7605b8bbfd8592baacd7ce3d8bb4313c7f", size = 260176 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/da/35/f2287558c17e29fafc8ef3daf819bb9834061cfa43bff8014f7df7f63bdc/anyio-4.14.2-py3-none-any.whl", hash = "sha256:9f505dda5ac9f0c8309b5e8bd445a8c2bf7246f3ce950121e45ea15bc41d1494", size = 125813 },
+]
+
+[[package]]
+name = "ast-grep-cli"
+version = "0.45.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e2/c3/a4f4dba7f601d096e69539a3e569346ab05a5d0f3177fa971526b410a012/ast_grep_cli-0.45.0.tar.gz", hash = "sha256:d07bfe87c09697e5011b2ce065f61cbc165ca5b0c0a567000f4ce9e62f2fde32", size = 279290 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9c/20/abe4ec0cd4f7e1b32c495fc0e4a37243c26c09a1d22959d20311c6894644/ast_grep_cli-0.45.0-py3-none-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:2fa9b424b0cf82770154cfdfd9aafe1eacd4598073e63c8482962df008c99b41", size = 16018089 },
+    { url = "https://files.pythonhosted.org/packages/16/a8/1273fd3a4f7a30d45fbcb0ff051be24e7ee31bfacbd0bb48ea7a8a9b46ef/ast_grep_cli-0.45.0-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:a39b1674c8686bf21e252da59d82ec8d5fea543f5c934734f596ddf1c0552961", size = 8006267 },
+    { url = "https://files.pythonhosted.org/packages/7f/da/e6db92897e2f2ffca80604d422f2cd837f7375be5adfb90add30fa94244d/ast_grep_cli-0.45.0-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:99c908930e181bcdf4d0e9b8bb4b3e52ee6403f59ff6fc16ba8054bcff90dda2", size = 7865207 },
+    { url = "https://files.pythonhosted.org/packages/58/ca/c6140ca63d6a117d83296d46c3052facf893bde899d8f734ee08b9e8864e/ast_grep_cli-0.45.0-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:a1e9e83e15e7f2290e51770b0629618b68b3fb628396f86648d99015782b7374", size = 8161265 },
+    { url = "https://files.pythonhosted.org/packages/7f/57/9073558b1cdf5c735d59695b364f2c8fa03235ee089929a69cad123e7e3c/ast_grep_cli-0.45.0-py3-none-win32.whl", hash = "sha256:609e77bfb4a61c047d23c081b5bf862b1e05c9d06e7d26b8e4df4879d508c973", size = 15197816 },
+    { url = "https://files.pythonhosted.org/packages/45/f7/03d920cb9c1e850b55b60732ae0b9d9080218b4a5620d1499a77e613446a/ast_grep_cli-0.45.0-py3-none-win_amd64.whl", hash = "sha256:63026862481b2f480792498c8c1bad13f09fccd8fa34ae9913c5743eb3165150", size = 16175179 },
+    { url = "https://files.pythonhosted.org/packages/64/28/dde9d9c2435faf43b596cc22a6a39ae9a0f952560ab6917abb201d5d15bb/ast_grep_cli-0.45.0-py3-none-win_arm64.whl", hash = "sha256:5c3aea8e2a06938350f342f0c5be4399a4fe05e12ba80a5c037313e28bc18b00", size = 15554486 },
 ]
 
 [[package]]
@@ -665,6 +684,30 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/01/ee/02a2c011bdab74c6fb3c75474d40b3052059d95df7e73351460c8588d963/h11-0.16.0.tar.gz", hash = "sha256:4e35b956cf45792e4caa5885e69fba00bdbc6ffafbfa020300e549b208ee5ff1", size = 101250 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl", hash = "sha256:63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86", size = 37515 },
+]
+
+[[package]]
+name = "headroom-ai"
+version = "0.34.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "ast-grep-cli" },
+    { name = "click" },
+    { name = "litellm", marker = "python_full_version < '3.14'" },
+    { name = "opentelemetry-api" },
+    { name = "pydantic" },
+    { name = "pyyaml" },
+    { name = "rich" },
+    { name = "tiktoken" },
+    { name = "tomlkit" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/27/a5/510d1313819bf40bc73b124be46f423295aa6063301dda4999c22266e7c9/headroom_ai-0.34.0.tar.gz", hash = "sha256:188e81eb1b9497e8518fe491a9fcd79f2e15f5e20f8c5053d63ae09cd63c49fb", size = 2635618 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/80/c2/18127c595f1098cc65ef8aa40dbb6ae2c33656928fc1f6469022d9a2f8db/headroom_ai-0.34.0-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:ab190aee94cbd9757413ac06cb15972a38baeff2d1283112b71de4ba685fe381", size = 13417731 },
+    { url = "https://files.pythonhosted.org/packages/82/f8/d9416f0fd07cf1da050853fd84ab0b85261c94f0bb40e6ed0a3d214a74ca/headroom_ai-0.34.0-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:381391ab816daf0894a40fd6523f54abf55c30a57273879c2f6e6b501ab997c3", size = 13405625 },
+    { url = "https://files.pythonhosted.org/packages/9e/f7/fc978da714ba3b1693bfa779c251312a6ca8e3fcd093b81913662e96b673/headroom_ai-0.34.0-cp310-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:8d1763844dcd6d1736dddb6acbc754fd736652580a673b44f6beb1167648cbdc", size = 13431021 },
+    { url = "https://files.pythonhosted.org/packages/93/09/2b5a3470207cb4c8d75bf737d0bc8e59c5ab80b3c28f5d46b2aaa97913df/headroom_ai-0.34.0-cp310-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:061d974b4f4e95b8fc9611fc4d059331e43fd2bd4737243bbed5fcb3af82775f", size = 13566945 },
+    { url = "https://files.pythonhosted.org/packages/9a/59/19b97ea93e684d2676a9d7772f5615f27ef333c90cfd6851901f78f22677/headroom_ai-0.34.0-cp310-abi3-win_amd64.whl", hash = "sha256:2adbb309bfe34a6685c832a59eea32db0f4a837c01439f9b99051039ca81bf22", size = 13513079 },
 ]
 
 [[package]]
@@ -1290,7 +1333,7 @@ wheels = [
 
 [[package]]
 name = "posthog"
-version = "7.37.3"
+version = "7.38.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "backoff" },
@@ -1298,9 +1341,9 @@ dependencies = [
     { name = "requests" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d8/1e/6eff652f67d573ed854f881b608b24d716d955c6c22687ceed09262a58fa/posthog-7.37.3.tar.gz", hash = "sha256:fbe42b7150b9c90d745dadf4b3892d87739f8e5c850836c9ddf8c24319a5e3b7", size = 403822 }
+sdist = { url = "https://files.pythonhosted.org/packages/5e/4a/85eb89b53601e535576946574d6fd47adfd0b60d7041ec2050943847d09b/posthog-7.38.0.tar.gz", hash = "sha256:af2d221cd43421d0aefe563e9c688a73b568f6675466e5e4c7e085ce8aa34e43", size = 408748 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/36/56/2557ee72be602447a828cc074e4889bdbbfbb4a8b38c00509baf94910129/posthog-7.37.3-py3-none-any.whl", hash = "sha256:4dc24cad73cf351485b3d475e59f4bd49cbb2d8757407360e6d80aa1703d925a", size = 477754 },
+    { url = "https://files.pythonhosted.org/packages/a9/b8/a868543762a60af7fc82b1368bd192d5763a1c351a8b6aedb61320394374/posthog-7.38.0-py3-none-any.whl", hash = "sha256:5d767fcc72dad6adf5c18eac85b499010e11a49342ce898a94b6989b5d0405c1", size = 482750 },
 ]
 
 [[package]]
@@ -2151,6 +2194,24 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/6a/dd/631b21433c771b1382535326f0eca80b9c9cee2e64961dd993bc9ac4669e/tokenizers-0.23.1-cp310-abi3-win32.whl", hash = "sha256:93120a930b919416da7cd10a2f606ac9919cc69cacae7980fa2140e277660948", size = 2536263 },
     { url = "https://files.pythonhosted.org/packages/97/c9/2553f72aaf65a2797d4229e37fa7fbe38ffbf3e32912d31bdd78b3323e59/tokenizers-0.23.1-cp310-abi3-win_amd64.whl", hash = "sha256:e7bfaf995c1bdbbd21d13539decb6650967013759318627d85daeb7881af16b7", size = 2798223 },
     { url = "https://files.pythonhosted.org/packages/cd/2b/2be299bab55fc595e3d38567edb1a87f86e594842968fa9515a07bdcf422/tokenizers-0.23.1-cp310-abi3-win_arm64.whl", hash = "sha256:a26197957d8e4425dfba746315f3c425ea00cfa8367c5fbc4ec73447893dcea9", size = 2664127 },
+]
+
+[[package]]
+name = "tomlkit"
+version = "0.15.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/94/96/e07752635b98536177fa1f37671c8f3cdde2e724c6bcf6034b2cfb571565/tomlkit-0.15.1.tar.gz", hash = "sha256:e25bbf38843005246210a12982776f27f99cb9be67160e14434d0c0d21ee1e97", size = 180129 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/13/bc/8c13eb66537dce1d2bd3a57132902f38d0e7f5bb46fa9f4daed9fe9d76ee/tomlkit-0.15.1-py3-none-any.whl", hash = "sha256:177a05aece5a8ca5266fd3c448abb47b8d352f09d477d3ca8332db4d89b24304", size = 49449 },
+]
+
+[[package]]
+name = "toon-format"
+version = "0.9.0b1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/fa/15/d23d6d3e36aa4ec96dd5692bc7715fe17015b669e8f0d1c5c7fa906a3ceb/toon_format-0.9.0b1.tar.gz", hash = "sha256:8f391dd6ad9677c78366bd8eb6762d064a2183f67b9b7da1f348fdb6ee8738e7", size = 87398 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/63/f3/27ab1d982bb81bf9ac5be70b4c774996eb8562b93c77e93c253c22be951f/toon_format-0.9.0b1-py3-none-any.whl", hash = "sha256:efeee919501f91137f017f7bed34789c067f76178111aa872a49bc8653dce3be", size = 36173 },
 ]
 
 [[package]]

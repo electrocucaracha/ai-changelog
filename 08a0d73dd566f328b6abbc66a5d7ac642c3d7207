@@ -1,0 +1,3 @@
+Category: Changed
+
+The scheduled dependency update workflow has been improved for clarity and maintainability. A concurrency group has been added to prevent overlapping runs, and explicit step names have been included for better readability in the Actions UI. The default GitHub token fallback has also been removed to ensure only the intended Personal Access Token is used for repository access, reducing the risk of concurrent updates.

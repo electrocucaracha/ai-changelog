@@ -1,0 +1,3 @@
+Category: Removed
+
+The lint process now relies solely on black, ruff, and isort for code formatting, removing the redundant checks and potential conflicts caused by maintaining both black and pyink. This change simplifies maintenance and reduces execution time, with no functional changes to code formatting expected. The dependencies in pyproject.toml have been updated accordingly, removing pyink from the list of required tools.

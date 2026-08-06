@@ -1,0 +1,3 @@
+Category: Changed
+
+Documentation style was improved for consistency across the project. Typos were corrected, including "over-engineering" to "overengineering", and phrasing was standardized, such as changing "a blank line" to "an empty line". Additionally, references to Git were capitalized consistently with standard usage. These changes enhance clarity in documentation.

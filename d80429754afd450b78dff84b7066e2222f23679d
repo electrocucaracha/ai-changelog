@@ -1,0 +1,3 @@
+Category: Changed
+
+Action version comments in GitHub workflows have been standardized to include the "v" prefix, matching upstream project tag formats. This change does not introduce functional changes but ensures consistent and visually clear version alignment. The update affects various workflow files, including build, docs, linter, and update scripts, with no breaking behavior or migration requirements.

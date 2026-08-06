@@ -1,0 +1,3 @@
+Category: Added
+
+Internal LiteLLM gateway routing support has been added, allowing users to route requests through an internal gateway by configuring environment variables or CLI options for API base, key, and extra headers. The Config class now parses and validates these settings from the environment, and AIProvider passes them to LiteLLM. Updated documentation in README.md covers the new options. Tests cover configuration parsing, error handling, and gateway argument propagation.

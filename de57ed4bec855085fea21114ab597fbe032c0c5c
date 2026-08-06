@@ -1,0 +1,3 @@
+Category: Added
+
+Contributors guidelines were added for Markdown writing standards and Python development practices to clarify expectations, improve maintainability, and ensure consistency in formatting and code style. The new guidelines cover semantic line breaks, readable source structure, project-specific code style, typing requirements, docstring conventions, and best practices for Python development.

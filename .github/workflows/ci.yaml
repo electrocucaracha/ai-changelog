@@ -1,0 +1,70 @@
+# SPDX-license-identifier: Apache-2.0
+##############################################################################
+# Copyright (c) 2026
+# All rights reserved. This program and the accompanying materials
+# are made available under the terms of the Apache License, Version 2.0
+# which accompanies this distribution, and is available at
+# http://www.apache.org/licenses/LICENSE-2.0
+##############################################################################
+name: Continuous Integration
+# yamllint disable-line rule:truthy
+on:
+  push:
+  pull_request:
+permissions: read-all
+jobs:
+  unit-tests:
+    name: Run unit tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Python environment
+        uses: ./.github/actions/setup-python-env
+      - name: Run unit tests
+        run: uvx tox -e py312
+  # jscpd:ignore-start
+  mutation-tests:
+    name: Run mutation tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Python environment
+        uses: ./.github/actions/setup-python-env
+      - name: Run mutation tests (Makefile target)
+        run: make mutation
+      - name: Enforce no surviving mutations
+        env:
+          PYTHONPATH: src
+        run: |-
+          STATS="$(uv run mutmut export-cicd-stats)"
+          echo "$STATS"
+          python - <<'PY' "$STATS"
+          import json
+          import sys
+
+          raw_stats = sys.argv[1].strip()
+          if not raw_stats:
+              print("mutmut did not return CI stats")
+              raise SystemExit(1)
+
+          stats = json.loads(raw_stats)
+          survived = int(stats.get("survived", 0))
+          suspicious = int(stats.get("suspicious", 0))
+
+          if survived or suspicious:
+              print(
+                  f"Mutation test gate failed: survived={survived}, suspicious={suspicious}"
+              )
+              raise SystemExit(1)
+
+          print("Mutation test gate passed")
+          PY
+        # jscpd:ignore-end

@@ -1,0 +1,3 @@
+Category: Changed
+
+GitHub Actions workflows were standardized across lint, spellcheck, and update workflows by pinning versions of dependent actions to ensure consistent behavior while preserving repository-specific settings. This change affects the execution of these workflows, but no breaking changes are introduced. The pinned action versions are: setup-go 6.4.0, super-linter 8.6.0, and ai-inference 2.0.8.

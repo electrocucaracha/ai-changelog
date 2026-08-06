@@ -1,0 +1,3 @@
+Category: Added
+
+YAML linting configuration has been added to enforce consistent style checks, but with relaxed rules to accommodate common patterns in project configuration files. The document-start and line-length rules are now disabled by default. This change ensures that unnecessary warnings are minimized while still maintaining a consistent coding standard.

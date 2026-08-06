@@ -1,4 +1,3 @@
 title: AI Changelog Generator
-description: AI-powered changelog generation from Git commit history
-theme: minima
-markdown: kramdown
+remote_theme: just-the-docs/just-the-docs
+enable_copy_code_button: true

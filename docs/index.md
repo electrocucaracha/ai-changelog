@@ -41,21 +41,28 @@ Run from your checkout:
 uv run ai-changelog /path/to/repository
 ```
 
+The quickstart guide also includes two operational workflows:
+
+- Bootstrap from an existing repository using uvx.
+- Update an existing repository with Git notes fetch and push sync.
+
+See [tutorials/quickstart.md](tutorials/quickstart.md) for full command sequences.
+
 ## Configuration highlights
 
 - Every CLI option supports an environment-variable equivalent.
-- Full flag-to-environment mapping: [cli-reference.md](cli-reference.md#environment-variables)
+- Full flag-to-environment mapping: [references/cli-reference.md](references/cli-reference.md#environment-variables)
 - Optional LiteLLM provider and gateway configuration via native LiteLLM env vars,
   such as OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY, XAI_API_KEY,
   OPENAI_BASE_URL, and AZURE_API_BASE.
 - Optional per-request custom headers via CHANGELOG_LITELLM_HEADERS_JSON.
 
-## Docs map
+## Docs by type
 
-- Quickstart: [quickstart.md](quickstart.md)
-- Command options: [cli-reference.md](cli-reference.md)
-- Changelog flow details: [how-it-works.md](how-it-works.md)
-- GitHub Actions release setup: [github-actions-release.md](github-actions-release.md)
+- Tutorials: [tutorials/index.md](tutorials/index.md)
+- How-to guides: [how-to-guides/index.md](how-to-guides/index.md)
+- References: [references/index.md](references/index.md)
+- Explanations: [explanations/index.md](explanations/index.md)
 
 For GitHub Copilot via LiteLLM,
 see the Quickstart section "Run with GitHub Copilot provider (LiteLLM)".

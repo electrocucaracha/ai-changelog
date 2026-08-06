@@ -12,7 +12,7 @@ auditable release flow from your repository UI.
 The workflow at .github/workflows/release.yml performs these steps:
 
 1. Checks out the repository with full history.
-1. Fetches and later pushes refs/notes/\* so AI summaries persist.
+1. Fetches and later pushes refs/notes/ai-changelog so AI summaries persist.
 1. Runs ai-changelog to regenerate CHANGELOG.md.
 1. Commits and pushes CHANGELOG.md to master.
 1. Creates and pushes a release tag.
@@ -49,7 +49,7 @@ jobs:
                     fetch-depth: 0
                     token: ${{ secrets.WORKFLOW_TOKEN }}
 
-            - run: git fetch origin "refs/notes/*:refs/notes/*" || true
+            - run: git fetch origin refs/notes/ai-changelog:refs/notes/ai-changelog || true
 
             - uses: astral-sh/setup-uv@v9
 
@@ -72,7 +72,7 @@ jobs:
                     tags: true
 
             - name: Push notes and tags
-                run: git push origin "refs/notes/*" || true
+                run: git push origin refs/notes/ai-changelog || true
 
             - name: Resolve latest semantic tag
                 id: release_tag
@@ -96,7 +96,7 @@ ai-changelog creates semantic tags automatically with --create-semver-tags,
 and the workflow publishes a release for the latest generated semantic tag.
 
 The sample uses a GitHub push action for branch updates,
-then explicitly pushes notes in a separate step.
+then explicitly pushes the ai-changelog notes ref in a separate step.
 
 For readability,
 the sample keeps only one provider credential.

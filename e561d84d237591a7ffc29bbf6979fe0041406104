@@ -1,0 +1,3 @@
+Category: Added
+
+This change updates the AI provider's summarization logic to include PR author and approver identities when present in the commit message, supporting common GitHub merge and trailer formats. The prompt-building logic was updated to add these fields, and the summarization instructions were rewritten for greater clarity and to enforce a single objective paragraph with prioritized content. Tests were added to verify metadata extraction and prompt content.

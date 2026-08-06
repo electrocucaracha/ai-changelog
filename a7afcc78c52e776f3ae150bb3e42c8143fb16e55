@@ -1,0 +1,3 @@
+Category: Changed
+
+Python dependencies were updated in the project's `uv.lock` file, changing the required Python version from 3.9 to 3.12. This change affects the project's compatibility with different Python versions and may require migration steps for users running older Python versions. The update also includes changes to several other packages, including aiohttp, which has been updated to version 3.14.3.

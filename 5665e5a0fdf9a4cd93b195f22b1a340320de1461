@@ -1,0 +1,3 @@
+Category: Added
+
+AIProvider now includes robust retry logic for transient API failures, automatically pulls missing Ollama models when needed, and sanitizes model output to ensure clean changelog entries. This improves reliability and reduces manual intervention by eliminating dependence on LiteLLM's optional tenacity extras. Additionally, the AI provider now enables Headroom token compression for LiteLLM requests if configured to do so.

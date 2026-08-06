@@ -1,0 +1,3 @@
+Category: Added
+
+Repository metadata can now be serialized into JSON-like formats, including TOON, using the `get_repository_info` method, which returns a best-effort snapshot of repository data. This includes branch name, head commit hash and message, remote URL, and tags. The optional `toon_format` package is used to encode this metadata as TOON in the `get_repository_info_toon` method.

@@ -1,0 +1,3 @@
+Category: Added
+
+The super-linter configuration has been updated to set DEFAULT_BRANCH explicitly, specifically setting it to "main" to match the repository's default branch and prevent unexpected linter configuration issues. This change addresses a requirement from the super-linter to avoid warnings and ensure correct branch-based linting behavior. The Makefile has been modified accordingly with the addition of an environment variable for DEFAULT_BRANCH.

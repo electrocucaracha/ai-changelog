@@ -1,0 +1,3 @@
+Category: Added
+
+A GitHub Actions workflow was added for continuous integration, running unit tests using tox on Python 3.12 and enforcing mutation testing via a Makefile target to prevent undetected regressions and ensure strong test coverage. This change introduces no breaking behavior but requires migration to use the new workflow for CI. The workflow uses a reusable Python environment setup action.

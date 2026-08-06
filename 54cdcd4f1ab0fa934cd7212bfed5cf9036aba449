@@ -1,0 +1,3 @@
+Category: Changed
+
+YAML lists in janitor agent documentation were reformatted for improved readability, and missing newlines at the end of code blocks in markdown instructions files were added to ensure proper rendering. This change does not affect agent behavior or instruction content but improves documentation consistency with YAML standards. The updates are cosmetic and do not introduce any breaking changes or security concerns.

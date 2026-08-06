@@ -1,0 +1,3 @@
+Category: Changed
+
+The codebase has undergone significant changes, including the replacement of subprocess calls with GitPython for git notes and tags, stricter changelog merging logic that prevents accidental backfilling of old tags, and improved error handling. Additionally, Ollama model pulling now uses the HTTP API instead of the CLI, and tests have been updated to reflect these changes. Breaking behavior includes the removal of direct subprocess calls for git operations and stricter changelog merging rules.

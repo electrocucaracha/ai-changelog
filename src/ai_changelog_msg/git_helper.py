@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import logging
 import re
-import subprocess
 from importlib import import_module
 from pathlib import Path
 
 from git import Commit, Repo
+from git.exc import GitCommandError
 
 logger = logging.getLogger(__name__)
 
@@ -16,9 +16,8 @@ logger = logging.getLogger(__name__)
 class GitRepository:
     """Wrapper around a local git repository for reading commits and git notes.
 
-    Uses :mod:`gitpython` for repository introspection and the ``git``
-    subprocess for writing notes, working around GitPython's inconsistent
-    notes support.
+    Uses :mod:`gitpython` for repository introspection and git note/tag
+    operations.
 
     Args:
         repo_path: Filesystem path to the root of a git repository.  The
@@ -127,17 +126,13 @@ class GitRepository:
             namespace: The ``--ref`` namespace to write into.
 
         Raises:
-            RuntimeError: If the ``git notes`` subprocess exits non-zero.
+            RuntimeError: If setting the git note fails.
         """
         logger.debug(
             "Writing git note for %s in namespace '%s'", commit_hash[:8], namespace
         )
         try:
-            cmd = [
-                "git",
-                "-C",
-                str(self.repo_path),
-                "notes",
+            self.repo.git.notes(
                 "--ref",
                 namespace,
                 "add",
@@ -145,12 +140,12 @@ class GitRepository:
                 content,
                 "-f",
                 commit_hash,
-            ]
-            subprocess.run(cmd, check=True, capture_output=True, text=True)
+            )
             logger.debug("Note saved for %s", commit_hash[:8])
-        except subprocess.CalledProcessError as error:
+        except GitCommandError as error:
             raise RuntimeError(
-                f"Failed to set git note for {commit_hash}: {error.stderr}"
+                f"Failed to set git note for {commit_hash}: "
+                f"{getattr(error, 'stderr', str(error))}"
             ) from error
 
     def clear_notes(self, namespace: str) -> bool:
@@ -168,35 +163,17 @@ class GitRepository:
         """
         ref_name = f"refs/notes/{namespace}"
         try:
-            ref_check = subprocess.run(
-                [
-                    "git",
-                    "-C",
-                    str(self.repo_path),
-                    "show-ref",
-                    "--verify",
-                    "--quiet",
-                    ref_name,
-                ],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            if ref_check.returncode != 0:
+            if not any(getattr(ref, "path", "") == ref_name for ref in self.repo.refs):
                 logger.debug("Notes namespace '%s' does not exist", namespace)
                 return False
 
-            subprocess.run(
-                ["git", "-C", str(self.repo_path), "update-ref", "-d", ref_name],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
+            self.repo.git.update_ref("-d", ref_name)
             logger.info("Deleted git notes namespace '%s'", namespace)
             return True
-        except subprocess.CalledProcessError as error:
+        except GitCommandError as error:
             raise RuntimeError(
-                f"Failed to clear git notes namespace {namespace}: {error.stderr}"
+                f"Failed to clear git notes namespace {namespace}: "
+                f"{getattr(error, 'stderr', str(error))}"
             ) from error
 
     def has_commits(self) -> bool:
@@ -240,22 +217,17 @@ class GitRepository:
             RuntimeError: If creating the tag fails.
         """
         try:
-            existing = self.repo.git.tag("--list", tag_name).strip()
-            if existing:
+            if any(tag.name == tag_name for tag in self.repo.tags):
                 logger.debug("Tag '%s' already exists; skipping", tag_name)
                 return False
 
-            subprocess.run(
-                ["git", "-C", str(self.repo_path), "tag", tag_name, commit_hash],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
+            self.repo.create_tag(tag_name, ref=commit_hash)
             logger.info("Created tag '%s' at %s", tag_name, commit_hash[:8])
             return True
-        except subprocess.CalledProcessError as error:
+        except GitCommandError as error:
             raise RuntimeError(
-                f"Failed to create tag {tag_name}: {error.stderr}"
+                f"Failed to create tag {tag_name}: "
+                f"{getattr(error, 'stderr', str(error))}"
             ) from error
 
     def resolve_output_path(self, file_path: str) -> Path:

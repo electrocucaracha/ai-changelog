@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from io import BytesIO
 from types import SimpleNamespace
 
 import pytest
@@ -109,13 +110,25 @@ def test_summarize_diff_pulls_missing_ollama_model_then_retries(monkeypatch):
             raise ValueError("model 'llama3.1:8b-instruct-q4_K_M' not found")
         return _make_response("Recovered after pull.")
 
-    def fake_run(*args, **kwargs):
-        return SimpleNamespace(returncode=0, stdout="pulled", stderr="")
+    class _Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return b'{"status":"success"}'
+
+    def fake_urlopen(*args, **kwargs):
+        return _Response()
 
     monkeypatch.setattr(
         "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
     )
-    monkeypatch.setattr("ai_changelog_msg.ai_provider.subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.urllib_request.urlopen", fake_urlopen
+    )
 
     provider = AIProvider(Config(model="ollama/llama3.1:8b-instruct-q4_K_M"))
     summary = provider.summarize_diff("feat: improve defaults", "+change")
@@ -128,17 +141,23 @@ def test_summarize_diff_raises_when_ollama_pull_fails(monkeypatch):
     def fake_completion(**kwargs):
         raise ValueError("model 'llama3.1:8b-instruct-q4_K_M' not found")
 
-    def fake_run(*args, **kwargs):
-        return SimpleNamespace(
-            returncode=1,
-            stdout="",
-            stderr="pull access denied for llama3.1:8b-instruct-q4_K_M",  # gitleaks:allow
+    def fake_urlopen(*args, **kwargs):
+        raise ai_provider.urllib_error.HTTPError(
+            url="http://localhost:11434/api/pull",
+            code=500,
+            msg="Internal Server Error",
+            hdrs=None,
+            fp=BytesIO(
+                b"pull access denied for llama3.1:8b-instruct-q4_K_M"  # gitleaks:allow
+            ),
         )
 
     monkeypatch.setattr(
         "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
     )
-    monkeypatch.setattr("ai_changelog_msg.ai_provider.subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.urllib_request.urlopen", fake_urlopen
+    )
 
     provider = AIProvider(Config(model="ollama/llama3.1:8b-instruct-q4_K_M"))
 

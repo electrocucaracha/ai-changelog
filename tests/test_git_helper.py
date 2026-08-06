@@ -13,51 +13,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import subprocess
 import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
 import pytest
+from git.exc import GitCommandError
 
 from ai_changelog_msg.git_helper import GitRepository
 
 
-def _make_subprocess_recorder() -> tuple[list, object]:
-    """Return (calls, _run) where _run records positional subprocess.run args."""
-    calls: list = []
-
-    def _run(cmd, check, capture_output, text):
-        calls.append(
-            {
-                "cmd": cmd,
-                "check": check,
-                "capture_output": capture_output,
-                "text": text,
-            }
-        )
-        return SimpleNamespace(returncode=0)
-
-    return calls, _run
-
-
-def _assert_single_subprocess_call(calls: list, expected_cmd: list[str]) -> None:
-    """Assert a single successful subprocess.run call with the expected args."""
-    assert len(calls) == 1
-    assert calls[0]["check"] is True
-    assert calls[0]["capture_output"] is True
-    assert calls[0]["text"] is True
-    assert calls[0]["cmd"] == expected_cmd
-
-
 class _FakeGit:
     def __init__(
-        self, *, diff_result=None, show_result=None, note_result=None, tag_result=""
+        self,
+        *,
+        diff_result=None,
+        show_result=None,
+        note_result=None,
+        update_ref_result=None,
     ):
         self.diff_result = diff_result
         self.show_result = show_result
         self.note_result = note_result
-        self.tag_result = tag_result
+        self.update_ref_result = update_ref_result
+        self.notes_calls: list[tuple] = []
+        self.update_ref_calls: list[tuple] = []
 
     def diff(self, parent_hash, commit_hash):
         if isinstance(self.diff_result, Exception):
@@ -70,21 +50,27 @@ class _FakeGit:
         return self.show_result
 
     def notes(self, *args):
+        self.notes_calls.append(args)
         if isinstance(self.note_result, Exception):
             raise self.note_result
         return self.note_result
 
-    def tag(self, *args):
-        return self.tag_result
+    def update_ref(self, *args):
+        self.update_ref_calls.append(args)
+        if isinstance(self.update_ref_result, Exception):
+            raise self.update_ref_result
+        return self.update_ref_result
 
 
-def _make_repo(fake_git=None, tags=None, remote_url=None):
+def _make_repo(fake_git=None, tags=None, remote_url=None, refs=None, create_tag=None):
     repo = GitRepository.__new__(GitRepository)
     repo.repo_path = Path("/tmp/repo")
     repo.repo = SimpleNamespace(
         git=fake_git or _FakeGit(),
         iter_commits=lambda ref: [1, 2, 3],
         tags=tags or [],
+        refs=refs or [],
+        create_tag=create_tag or (lambda name, ref: None),
         remotes=(
             SimpleNamespace(origin=SimpleNamespace(url=remote_url))
             if remote_url is not None
@@ -107,6 +93,8 @@ def _make_repo_with_head_commit(remote_url: str) -> GitRepository:
         git=repo.repo.git,
         iter_commits=repo.repo.iter_commits,
         tags=repo.repo.tags,
+        refs=repo.repo.refs,
+        create_tag=repo.repo.create_tag,
         remotes=repo.repo.remotes,
         head=SimpleNamespace(commit=commit),
         active_branch=SimpleNamespace(name="main"),
@@ -164,20 +152,14 @@ def test_get_commit_diff_returns_placeholder_when_empty():
     assert repo.get_commit_diff(commit) == "[No changes to display]"
 
 
-def test_set_note_invokes_git_notes_add_with_force(monkeypatch):
-    repo = _make_repo()
-    calls, _run = _make_subprocess_recorder()
-    monkeypatch.setattr(subprocess, "run", _run)
+def test_set_note_invokes_git_notes_add_with_force():
+    fake_git = _FakeGit()
+    repo = _make_repo(fake_git=fake_git)
 
     repo.set_note("abc123", "hello world", "ai-changelog")
 
-    _assert_single_subprocess_call(
-        calls,
-        [
-            "git",
-            "-C",
-            "/tmp/repo",
-            "notes",
+    assert fake_git.notes_calls == [
+        (
             "--ref",
             "ai-changelog",
             "add",
@@ -185,77 +167,49 @@ def test_set_note_invokes_git_notes_add_with_force(monkeypatch):
             "hello world",
             "-f",
             "abc123",
-        ],
-    )
-
-
-def test_set_note_raises_runtime_error_on_subprocess_failure(monkeypatch):
-    repo = _make_repo()
-
-    def _run(*args, **kwargs):
-        raise subprocess.CalledProcessError(
-            1,
-            kwargs.get("args", args[0] if args else "git"),
-            stderr="failure",
         )
+    ]
 
-    monkeypatch.setattr(subprocess, "run", _run)
+
+def test_set_note_raises_runtime_error_on_git_command_failure():
+    error = GitCommandError(
+        ["git", "notes", "add"],
+        1,
+        stderr="failure",
+    )
+    repo = _make_repo(fake_git=_FakeGit(note_result=error))
 
     with pytest.raises(RuntimeError, match="Failed to set git note"):
         repo.set_note("abc123", "hello world", "ai-changelog")
 
 
-def test_clear_notes_returns_false_when_namespace_missing(monkeypatch):
+def test_clear_notes_returns_false_when_namespace_missing():
     repo = _make_repo()
-    calls = []
-
-    def _run(cmd, check, capture_output, text):
-        calls.append({"cmd": cmd, "check": check})
-        return SimpleNamespace(returncode=1)
-
-    monkeypatch.setattr(subprocess, "run", _run)
 
     assert repo.clear_notes("ai-changelog") is False
-    assert len(calls) == 1
-    assert calls[0]["check"] is False
-    assert calls[0]["cmd"][-1] == "refs/notes/ai-changelog"
 
 
-def test_clear_notes_deletes_existing_namespace(monkeypatch):
-    repo = _make_repo()
-    calls = []
-
-    def _run(cmd, check, capture_output, text):
-        calls.append({"cmd": cmd, "check": check})
-        if "show-ref" in cmd:
-            return SimpleNamespace(returncode=0)
-        return SimpleNamespace(returncode=0)
-
-    monkeypatch.setattr(subprocess, "run", _run)
+def test_clear_notes_deletes_existing_namespace():
+    ref_name = "refs/notes/ai-changelog"
+    fake_git = _FakeGit()
+    repo = _make_repo(
+        fake_git=fake_git,
+        refs=[SimpleNamespace(path=ref_name)],
+    )
 
     assert repo.clear_notes("ai-changelog") is True
-    assert len(calls) == 2
-    assert calls[0]["check"] is False
-    assert calls[1]["check"] is True
-    assert calls[1]["cmd"] == [
-        "git",
-        "-C",
-        "/tmp/repo",
-        "update-ref",
-        "-d",
-        "refs/notes/ai-changelog",
-    ]
+    assert fake_git.update_ref_calls == [("-d", "refs/notes/ai-changelog")]
 
 
-def test_clear_notes_raises_runtime_error_when_delete_fails(monkeypatch):
-    repo = _make_repo()
-
-    def _run(cmd, check, capture_output, text):
-        if "show-ref" in cmd:
-            return SimpleNamespace(returncode=0)
-        raise subprocess.CalledProcessError(1, cmd, stderr="cannot delete")
-
-    monkeypatch.setattr(subprocess, "run", _run)
+def test_clear_notes_raises_runtime_error_when_delete_fails():
+    ref_name = "refs/notes/ai-changelog"
+    error = GitCommandError(
+        ["git", "update-ref", "-d", ref_name], 1, stderr="cannot delete"
+    )
+    repo = _make_repo(
+        fake_git=_FakeGit(update_ref_result=error),
+        refs=[SimpleNamespace(path=ref_name)],
+    )
 
     with pytest.raises(RuntimeError, match="Failed to clear git notes namespace"):
         repo.clear_notes("ai-changelog")
@@ -273,47 +227,29 @@ def test_has_commits_false_when_head_commit_access_raises():
     assert repo.has_commits() is False
 
 
-def test_create_tag_returns_false_when_tag_exists(monkeypatch):
-    repo = _make_repo(fake_git=_FakeGit(tag_result="v1.0.0"))
-    run_called = False
-
-    def _run(*args, **kwargs):
-        nonlocal run_called
-        run_called = True
-        return SimpleNamespace(returncode=0)
-
-    monkeypatch.setattr(subprocess, "run", _run)
+def test_create_tag_returns_false_when_tag_exists():
+    repo = _make_repo(tags=[SimpleNamespace(name="v1.0.0")])
 
     assert repo.create_tag("v1.0.0", "abc123") is False
-    assert run_called is False
 
 
-def test_create_tag_invokes_git_tag_command(monkeypatch):
-    repo = _make_repo(fake_git=_FakeGit(tag_result=""))
-    calls, _run = _make_subprocess_recorder()
-    monkeypatch.setattr(subprocess, "run", _run)
+def test_create_tag_invokes_gitpython_create_tag():
+    calls: list[tuple[str, str]] = []
+
+    def _create_tag(name: str, ref: str):
+        calls.append((name, ref))
+
+    repo = _make_repo(create_tag=_create_tag)
 
     assert repo.create_tag("v1.2.3", "abc123") is True
-    _assert_single_subprocess_call(
-        calls,
-        [
-            "git",
-            "-C",
-            "/tmp/repo",
-            "tag",
-            "v1.2.3",
-            "abc123",
-        ],
-    )
+    assert calls == [("v1.2.3", "abc123")]
 
 
-def test_create_tag_raises_runtime_error_on_subprocess_failure(monkeypatch):
-    repo = _make_repo(fake_git=_FakeGit(tag_result=""))
+def test_create_tag_raises_runtime_error_on_git_command_failure():
+    def _create_tag(name: str, ref: str):
+        raise GitCommandError(["git", "tag", name, ref], 1, stderr="cannot create")
 
-    def _run(*args, **kwargs):
-        raise subprocess.CalledProcessError(1, args[0], stderr="cannot create")
-
-    monkeypatch.setattr(subprocess, "run", _run)
+    repo = _make_repo(create_tag=_create_tag)
 
     with pytest.raises(RuntimeError, match="Failed to create tag"):
         repo.create_tag("v1.2.3", "abc123")

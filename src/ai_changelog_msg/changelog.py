@@ -159,8 +159,6 @@ class ChangelogItem:
         if not text:
             text = self.description
         sentence = re.split(r"(?<=[.!?])\s+", text, maxsplit=1)[0].strip()
-        if len(sentence) > 180:
-            sentence = sentence[:177].rstrip() + "..."
         if self.is_breaking and not sentence.lower().startswith("breaking"):
             sentence = f"BREAKING: {sentence}"
         return sentence
@@ -392,6 +390,8 @@ class ChangelogBuilder:
 
     def _render(self, sections: Sequence[ReleaseSection]) -> str:
         parts = [
+            "<!-- Markdownlint-disable MD024 -->",
+            "",
             "# Changelog",
             "",
             "All notable changes to this project will be documented in this file.",
@@ -687,3 +687,192 @@ def highest_release_type(items: Sequence[ChangelogItem]) -> str | None:
             highest = item.release_type
             highest_priority = priority
     return highest
+
+
+def extract_versions_from_changelog(changelog_text: str) -> set[str]:
+    """Extract all semantic version strings from existing changelog.
+
+    Uses regex to find release section headings in the format ``## [X.Y.Z]``
+    or ``## [vX.Y.Z]`` and returns the version tokens found inside brackets.
+
+    Args:
+        changelog_text: Markdown changelog content.
+
+    Returns:
+        Set of version strings (e.g. ``{"1.0.0", "1.1.0", "2.0.0"}``).
+    """
+    versions: set[str] = set()
+    pattern = re.compile(r"^## \[(?:v)?([^\]]+)\]", re.MULTILINE)
+    for match in pattern.finditer(changelog_text):
+        version_str = match.group(1).strip()
+        if parse_semantic_version(version_str) is not None:
+            versions.add(version_str)
+    return versions
+
+
+def merge_changelogs_with_keepachangelog(
+    existing_text: str,
+    generated_text: str,
+) -> tuple[str, int]:
+    """Merge generated changelog into existing file, avoiding duplicate releases.
+
+    This function uses keepachangelog-compatible logic to:
+    1. Preserve existing release sections.
+    2. Extract versions from both existing and generated changelogs.
+    3. Only add new release sections that are strictly newer than the highest
+       version already in the existing file (avoids back-filling old per-commit
+       tags that were never tracked in the changelog).
+    4. Maintain proper Keep a Changelog structure.
+
+    Args:
+        existing_text: Current changelog content (or empty string if new).
+        generated_text: Newly generated changelog content.
+
+    Returns:
+        Tuple of (merged_text, number_of_sections_added).
+    """
+    if not existing_text.strip():
+        return generated_text, 0
+
+    existing_versions = extract_versions_from_changelog(existing_text)
+
+    if not existing_versions:
+        # No existing releases, prepend unreleased section from existing
+        return _merge_with_no_existing_releases(existing_text, generated_text)
+
+    # Determine the ceiling: only append versions strictly above the current max
+    parsed_existing = [parse_semantic_version(v) for v in existing_versions]
+    max_existing: SemanticVersion | None = max(
+        (v for v in parsed_existing if v is not None), default=None
+    )
+
+    # Extract only the new release sections from generated changelog
+    generated_sections = _extract_release_sections_kac(generated_text)
+    appended_sections = 0
+    new_sections_text = ""
+
+    for heading, block in generated_sections:
+        version = _release_version_from_heading_kac(heading)
+        if version is None or version in existing_versions:
+            continue
+        # Skip versions older than or equal to the highest existing version
+        parsed_version = parse_semantic_version(version)
+        if max_existing is not None and (
+            parsed_version is None or parsed_version <= max_existing
+        ):
+            continue
+        if not new_sections_text:
+            new_sections_text = f"{heading}\n\n{block}"
+        else:
+            new_sections_text += f"\n\n{heading}\n\n{block}"
+        appended_sections += 1
+
+    if appended_sections == 0:
+        return existing_text, 0
+
+    # Find insertion point: after Unreleased section or at the end
+    insertion_point = _find_insertion_point_kac(existing_text)
+    merged = (
+        existing_text[:insertion_point]
+        + new_sections_text
+        + "\n\n"
+        + existing_text[insertion_point:]
+    )
+
+    return merged.strip() + "\n", appended_sections
+
+
+def _merge_with_no_existing_releases(
+    existing_text: str,
+    generated_text: str,
+) -> tuple[str, int]:
+    """Merge when existing file has no release sections yet."""
+    existing_sections = _extract_release_sections_kac(existing_text)
+    generated_sections = _extract_release_sections_kac(generated_text)
+
+    unreleased_blocks = [
+        block for heading, block in existing_sections if _is_unreleased_heading(heading)
+    ]
+
+    # Collect all generated releases
+    appended_sections = 0
+    merged_parts = []
+
+    # Add any existing unreleased content first
+    if unreleased_blocks:
+        merged_parts.append("## [Unreleased]\n")
+        merged_parts.append(unreleased_blocks[0])
+
+    # Add all generated release sections
+    for heading, block in generated_sections:
+        if not _is_unreleased_heading(heading):
+            merged_parts.append(heading)
+            merged_parts.append(block)
+            appended_sections += 1
+
+    if not merged_parts:
+        return generated_text, 0
+
+    result = "\n\n".join(merged_parts).strip() + "\n"
+    return result, appended_sections
+
+
+def _extract_release_sections_kac(changelog_text: str) -> list[tuple[str, str]]:
+    """Extract release sections from Keep a Changelog markdown.
+
+    Returns list of (heading, block) tuples where heading is the ## line
+    and block is everything until the next ## heading or EOF.
+    """
+    sections: list[tuple[str, str]] = []
+    pattern = re.compile(r"^(## \[[^\]]+\].*?)$", re.MULTILINE)
+    matches = list(pattern.finditer(changelog_text))
+
+    for idx, match in enumerate(matches):
+        start = match.start()
+        heading = match.group(1).strip()
+
+        # Find content end (next heading or EOF)
+        if idx + 1 < len(matches):
+            end = matches[idx + 1].start()
+        else:
+            end = len(changelog_text)
+
+        block = changelog_text[start + len(heading) : end].strip()
+        sections.append((heading, block))
+
+    return sections
+
+
+def _release_version_from_heading_kac(heading: str) -> str | None:
+    """Extract version from Keep a Changelog heading like ``## [1.2.3]``."""
+    match = re.match(r"^## \[(?:v)?([^\]]+)\]", heading.strip())
+    if match is None:
+        return None
+    version_str = match.group(1).strip()
+    return version_str if parse_semantic_version(version_str) is not None else None
+
+
+def _is_unreleased_heading(heading: str) -> bool:
+    """Check if heading is an Unreleased section."""
+    return re.match(r"^## \[Unreleased\]", heading, re.IGNORECASE) is not None
+
+
+def _find_insertion_point_kac(existing_text: str) -> int:
+    """Find the position to insert new release sections.
+
+    Returns the position right after the Unreleased section, or at the
+    beginning of the first semantic release section if no Unreleased exists.
+    """
+    pattern = re.compile(r"^(## \[Unreleased\].*?)^(## \[)", re.MULTILINE | re.DOTALL)
+    match = pattern.search(existing_text)
+
+    if match:
+        return match.end() - len("## [")  # Position just before next ## [
+
+    # No Unreleased found, insert at beginning
+    first_release = re.search(r"^## \[", existing_text, re.MULTILINE)
+    if first_release:
+        return first_release.start()
+
+    # No releases at all, append at end
+    return len(existing_text)

@@ -17,12 +17,16 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
-import subprocess
 import time
+from json import JSONDecodeError
 from typing import Any
+from urllib import error as urllib_error
+from urllib import parse as urllib_parse
+from urllib import request as urllib_request
 
 import litellm
 
@@ -245,31 +249,60 @@ class AIProvider:
         return bool(OLLAMA_MODEL_NOT_FOUND_RE.search(str(error)))
 
     def _pull_ollama_model(self) -> None:
-        """Pull the configured Ollama model through the local Ollama CLI.
+        """Pull the configured Ollama model through the Ollama HTTP API.
 
         Raises:
-            RuntimeError: If pulling fails or the Ollama CLI is unavailable.
+            RuntimeError: If pulling fails or the Ollama API is unavailable.
         """
         model_name = self.model.removeprefix("ollama/")
         logger.info("Ollama model '%s' not available locally; pulling", model_name)
+
+        api_base = self.config.litellm_api_base or "http://localhost:11434"
+        parsed_base = urllib_parse.urlsplit(api_base)
+        if parsed_base.scheme and parsed_base.netloc:
+            pull_base = f"{parsed_base.scheme}://{parsed_base.netloc}"
+        else:
+            pull_base = "http://localhost:11434"
+
+        payload = json.dumps({"name": model_name, "stream": False}).encode("utf-8")
+        request = urllib_request.Request(
+            f"{pull_base}/api/pull",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+
         try:
-            completed = subprocess.run(
-                ["ollama", "pull", model_name],
-                check=False,
-                capture_output=True,
-                text=True,
+            with urllib_request.urlopen(
+                request,
+                timeout=self.config.api_timeout,
+            ) as response:
+                body = response.read().decode("utf-8", errors="replace")
+        except urllib_error.HTTPError as error:
+            details = error.read().decode("utf-8", errors="replace").strip() or str(
+                error
             )
-        except OSError as error:
             raise RuntimeError(
-                "Ollama CLI is not available; install Ollama and ensure 'ollama' is "
-                "in PATH"
+                f"Failed to pull Ollama model '{model_name}': {details}"
+            ) from error
+        except (urllib_error.URLError, OSError) as error:
+            raise RuntimeError(
+                "Ollama API is not reachable; ensure Ollama is running and "
+                "accessible"
             ) from error
 
-        if completed.returncode != 0:
-            stderr = (completed.stderr or "").strip()
-            stdout = (completed.stdout or "").strip()
-            details = stderr or stdout or "unknown error"
-            raise RuntimeError(f"Failed to pull Ollama model '{model_name}': {details}")
+        if body.strip():
+            try:
+                payload_data = json.loads(body)
+                if isinstance(payload_data, dict) and payload_data.get("error"):
+                    raise RuntimeError(
+                        f"Failed to pull Ollama model '{model_name}': "
+                        f"{payload_data['error']}"
+                    )
+            except (JSONDecodeError, AttributeError):
+                # Some Ollama versions stream line-delimited JSON; if parsing
+                # fails, we still accept a successful HTTP response.
+                pass
 
     def summarize_diff(
         self,

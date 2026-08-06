@@ -79,6 +79,7 @@ def test_build_synthetic_changelog_without_tags():
         tags_by_commit={},
     )
 
+    assert "<!-- Markdownlint-disable MD024 -->" in changelog
     assert "## [1.0.1] - 2026-03-12" in changelog
     assert "## [1.0.0] - 2026-03-11" in changelog
     assert "### Added" in changelog
@@ -212,6 +213,30 @@ def test_build_changelog_uses_diff_line_counts_for_category():
     )
 
     assert "### Removed" in changelog
+
+
+def test_build_changelog_does_not_truncate_last_word_mid_sentence():
+    builder = ChangelogBuilder(namespace="ai-changelog")
+    commits = [
+        make_commit(
+            "ab12cd34",
+            "feat: improve sentence handling",
+            datetime(2026, 3, 7, tzinfo=UTC),
+        )
+    ]
+    note_summary = "Enabled " + "resilience " * 40 + "behavior."
+    notes = {
+        "ab12cd34": f"Category: Added\n\n{note_summary}",
+    }
+
+    changelog = builder.build(
+        commits=commits,
+        get_note=lambda commit_hash, namespace: notes.get(commit_hash),
+        tags_by_commit={},
+    )
+
+    assert "..." not in changelog
+    assert f"{note_summary} (ab12cd34)" in changelog
 
 
 def test_note_metadata_roundtrip_and_category_precedence():

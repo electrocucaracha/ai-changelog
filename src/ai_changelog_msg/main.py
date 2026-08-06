@@ -37,6 +37,7 @@ from ai_changelog_msg.changelog import (
     count_diff_lines,
     format_note,
     infer_category,
+    merge_changelogs_with_keepachangelog,
     parse_conventional_commit,
     parse_note_metadata,
     parse_semantic_version,
@@ -46,6 +47,7 @@ from ai_changelog_msg.git_helper import GitRepository
 
 logger = logging.getLogger(__name__)
 RELEASE_SECTION_HEADING_RE = re.compile(r"^## \[[^\]]+\](?: - .*)?$", re.MULTILINE)
+MARKDOWNLINT_MD024_DISABLE = "<!-- Markdownlint-disable MD024 -->"
 
 
 @dataclass(frozen=True)
@@ -249,8 +251,8 @@ def _generate_summaries_concurrently(
         for worker_id in range(workers):
             total = totals.get(worker_id, 0)
             done = completed.get(worker_id, 0)
-            bar = _render_worker_progress_bar(done, total)
-            lines.append(f"  Worker {worker_id + 1:>2}: {bar} {done}/{total}")
+            progress_bar = _render_worker_progress_bar(done, total)
+            lines.append(f"  Worker {worker_id + 1:>2}: {progress_bar} {done}/{total}")
         return lines
 
     last_line_count = 0
@@ -319,18 +321,20 @@ def _create_semver_tags_if_needed(
     create_semver_tags: bool,
     limit: int | None,
 ) -> int:
-    """Create semantic-version tags for untagged repositories.
+    """Create semantic-version tags for untagged noted commits.
 
     Tags are inferred from git-note categories using semantic-version rules:
     ``Added`` -> minor, ``Fixed``/``Changed`` -> patch, and
     ``Removed`` -> major. Tags are created as lightweight ``vX.Y.Z`` tags.
 
-    Creation only runs when explicitly requested and only if no semantic
-    version tags already exist in the repository.
+    Creation only runs when explicitly requested. If semantic tags already exist,
+    the highest existing tag is used as the baseline and only commits without a
+    tag receive a new tag. Commits that already have a semantic tag are skipped.
 
     Args:
         repo: Repository wrapper used to read existing tags and create new ones.
         commits: Commit iterable used as the release timeline.
+        namespace: Git notes namespace for reading categories.
         create_semver_tags: Enables this feature when ``True``.
         limit: Commit limit from the CLI. Tag creation is blocked when set to
             avoid partial or incorrect version history.
@@ -348,22 +352,23 @@ def _create_semver_tags_if_needed(
         raise ValueError("--create-semver-tags cannot be used with --limit")
 
     tags_by_commit = repo.get_semantic_version_tags()
-    has_semver_tags = any(
-        parse_semantic_version(tag_name) is not None
-        for tag_names in tags_by_commit.values()
-        for tag_name in tag_names
-    )
-    if has_semver_tags:
-        click.echo(
-            "Semantic version tags already exist; skipping automatic tag creation"
-        )
-        return 0
+
+    # Build set of commits that already have a semantic version tag
+    tagged_commits: set[str] = set()
+    highest_version: SemanticVersion | None = None
+    for commit_hash, tag_names in tags_by_commit.items():
+        for tag_name in tag_names:
+            parsed = parse_semantic_version(tag_name)
+            if parsed is not None:
+                tagged_commits.add(commit_hash)
+                if highest_version is None or parsed > highest_version:
+                    highest_version = parsed
 
     ordered_commits = sorted(
         commits,
         key=lambda commit: (commit.committed_datetime, commit.hexsha),
     )
-    current_version: SemanticVersion | None = None
+    current_version: SemanticVersion | None = highest_version
     created = 0
     category_to_release_type = {
         "Removed": "major",
@@ -373,6 +378,10 @@ def _create_semver_tags_if_needed(
     }
 
     for commit in ordered_commits:
+        # Skip commits that already have a semantic version tag
+        if commit.hexsha in tagged_commits:
+            continue
+
         note = repo.get_note(commit.hexsha, namespace)
         category, _ = parse_note_metadata(note or "")
         if category is None:
@@ -394,7 +403,7 @@ def _create_semver_tags_if_needed(
     if created > 0:
         click.echo(f"Created {created} semantic version tag(s)")
     else:
-        click.echo("No release commits found; no semantic version tags created")
+        click.echo("No new untagged release commits found; no new tags created")
     return created
 
 
@@ -420,39 +429,211 @@ def _extract_release_sections(changelog_text: str) -> list[tuple[str, str]]:
     return sections
 
 
+def _release_version_from_heading(heading: str) -> str | None:
+    """Extract the release version token from a level-2 release heading.
+
+    Supports headings such as ``## [1.2.3]`` and
+    ``## [1.2.3] - YYYY-MM-DD``.
+
+    Args:
+        heading: Raw heading line for a release section.
+
+    Returns:
+        Version token found inside square brackets, or ``None`` when the
+        heading does not follow the expected format.
+    """
+    match = re.match(r"^## \[([^\]]+)\]", heading.strip())
+    if match is None:
+        return None
+    return match.group(1).strip()
+
+
+def _normalize_release_sections(existing_text: str) -> str:
+    """Normalize release section ordering and remove duplicate versions.
+
+    Rules:
+    1. Semantic-version release sections must appear after ``## [Unreleased]``.
+    2. Duplicate semantic versions are removed, keeping the first occurrence.
+    """
+    matches = list(RELEASE_SECTION_HEADING_RE.finditer(existing_text))
+    if not matches:
+        return existing_text
+
+    prefix = existing_text[: matches[0].start()]
+    sections = _extract_release_sections(existing_text)
+
+    unreleased_index: int | None = None
+    for index, (heading, _) in enumerate(sections):
+        version = _release_version_from_heading(heading)
+        if version is not None and version.lower() == "unreleased":
+            unreleased_index = index
+            break
+
+    if unreleased_index is not None:
+        before = sections[:unreleased_index]
+        unreleased = sections[unreleased_index]
+        after = sections[unreleased_index + 1 :]
+
+        semantic_before = [
+            section for section in before if _is_semantic_release_heading(section[0])
+        ]
+        non_semantic_before = [
+            section
+            for section in before
+            if not _is_semantic_release_heading(section[0])
+        ]
+        ordered = non_semantic_before + [unreleased] + semantic_before + after
+    else:
+        ordered = sections
+
+    seen_versions: set[str] = set()
+    deduped: list[tuple[str, str]] = []
+    for heading, block in ordered:
+        version = _release_version_from_heading(heading)
+        if version is not None and parse_semantic_version(version) is not None:
+            if version in seen_versions:
+                continue
+            seen_versions.add(version)
+        deduped.append((heading, block))
+
+    rebuilt_sections = "\n\n".join(block.rstrip("\n") for _, block in deduped).rstrip(
+        "\n"
+    )
+    normalized_prefix = prefix.rstrip("\n")
+    if normalized_prefix and rebuilt_sections:
+        return f"{normalized_prefix}\n\n{rebuilt_sections}\n"
+    if rebuilt_sections:
+        return f"{rebuilt_sections}\n"
+    return normalized_prefix + ("\n" if normalized_prefix else "")
+
+
+def _is_semantic_release_heading(heading: str) -> bool:
+    """Return ``True`` when *heading* contains a semantic version token."""
+    version = _release_version_from_heading(heading)
+    if version is None:
+        return False
+    return parse_semantic_version(version) is not None
+
+
+def _ensure_unreleased_and_get_insertion_index(existing_text: str) -> tuple[str, int]:
+    """Ensure an ``## [Unreleased]`` section exists and return insertion index.
+
+    New semantic release sections are always inserted immediately after the
+    full ``## [Unreleased]`` section.
+    """
+    matches = list(RELEASE_SECTION_HEADING_RE.finditer(existing_text))
+    if not matches:
+        base_text = existing_text.rstrip("\n")
+        if base_text:
+            updated = f"{base_text}\n\n## [Unreleased]\n\n"
+        else:
+            updated = "## [Unreleased]\n\n"
+        return updated, len(updated)
+
+    for index, match in enumerate(matches):
+        heading = match.group(0).strip()
+        version = _release_version_from_heading(heading)
+        if version is not None and version.lower() == "unreleased":
+            return existing_text, (
+                matches[index + 1].start()
+                if index + 1 < len(matches)
+                else len(existing_text)
+            )
+
+    # If no Unreleased heading exists, insert one before the first semantic
+    # release heading so future release sections always appear after it.
+    for match in matches:
+        if _is_semantic_release_heading(match.group(0).strip()):
+            insertion_anchor = match.start()
+            prefix = existing_text[:insertion_anchor].rstrip("\n")
+            suffix = existing_text[insertion_anchor:].lstrip("\n")
+            separator = "\n\n" if prefix else ""
+            unreleased_block = "## [Unreleased]\n\n"
+            updated = f"{prefix}{separator}{unreleased_block}{suffix}"
+            insertion_index = len(f"{prefix}{separator}{unreleased_block}")
+            return updated, insertion_index
+
+    # Non-semantic headings exist but none are release headings.
+    base_text = existing_text.rstrip("\n")
+    if base_text:
+        updated = f"{base_text}\n\n## [Unreleased]\n\n"
+    else:
+        updated = "## [Unreleased]\n\n"
+    return updated, len(updated)
+
+
 def _merge_missing_release_sections(
     existing_text: str, generated_text: str
 ) -> tuple[str, int]:
-    """Return regenerated changelog text when release sections differ.
+    """Append only release sections that do not yet exist.
 
-    Existing release headings are treated as stable identities, but their
-    content must still be refreshed when regenerated output changes. This keeps
-    reruns idempotent while allowing stale or previously malformed entries to
-    be corrected in place.
+    Existing release sections are never rewritten so previously generated
+    content remains untouched. New sections are inserted immediately after
+    ``## [Unreleased]`` when present, otherwise before the first semantic
+    release heading.
 
     Returns:
-        Tuple of output text and number of release sections that changed.
+        Tuple of output text and number of sections appended.
     """
-    existing_sections = dict(_extract_release_sections(existing_text))
-    generated_sections = dict(_extract_release_sections(generated_text))
+    existing_text = _normalize_release_sections(existing_text)
+    existing_text, insertion_index = _ensure_unreleased_and_get_insertion_index(
+        existing_text
+    )
+    existing_sections = _extract_release_sections(existing_text)
+    generated_sections = _extract_release_sections(generated_text)
 
-    changed_sections = [
-        heading
-        for heading, block in generated_sections.items()
-        if existing_sections.get(heading) != block
-    ]
-    removed_sections = [
-        heading for heading in existing_sections if heading not in generated_sections
-    ]
-
-    if (
-        not changed_sections
-        and not removed_sections
-        and existing_text == generated_text
-    ):
+    if not generated_sections:
         return existing_text, 0
 
-    return generated_text, len(changed_sections) + len(removed_sections)
+    existing_versions = {
+        version
+        for heading, _ in existing_sections
+        for version in [_release_version_from_heading(heading)]
+        if version is not None and parse_semantic_version(version) is not None
+    }
+    parsed_existing = [parse_semantic_version(v) for v in existing_versions]
+    max_existing = max((v for v in parsed_existing if v is not None), default=None)
+
+    missing_blocks = [
+        block
+        for heading, block in generated_sections
+        for version in [_release_version_from_heading(heading)]
+        if version is not None
+        and parse_semantic_version(version) is not None
+        and version not in existing_versions
+        # Only add versions strictly newer than the current highest version
+        and (
+            max_existing is None
+            or (
+                parse_semantic_version(version) is not None
+                and parse_semantic_version(version) > max_existing
+            )
+        )
+    ]
+
+    if not missing_blocks:
+        return existing_text, 0
+
+    insert_block = "\n\n".join(missing_blocks).rstrip("\n") + "\n\n"
+
+    merged_text = (
+        existing_text[:insertion_index] + insert_block + existing_text[insertion_index:]
+    )
+    return merged_text, len(missing_blocks)
+
+
+def _ensure_markdownlint_md024_disable(changelog_text: str) -> tuple[str, bool]:
+    """Ensure the changelog starts with an MD024 markdownlint disable marker.
+
+    Returns:
+        Tuple of ``(possibly_updated_text, was_inserted)``.
+    """
+    if MARKDOWNLINT_MD024_DISABLE in changelog_text:
+        return changelog_text, False
+    stripped_text = changelog_text.lstrip("\n")
+    if not stripped_text:
+        return f"{MARKDOWNLINT_MD024_DISABLE}\n", True
+    return f"{MARKDOWNLINT_MD024_DISABLE}\n\n{stripped_text}", True
 
 
 @click.command()
@@ -695,8 +876,10 @@ def cli(
         else:
             click.echo(f"Using {effective_workers} worker(s) (from --workers)")
 
-        prepared_commits: list[_PreparedCommit] = []
+        actionable_commits: list[_PreparedCommit] = []
         summaries_to_generate: list[_PreparedCommit] = []
+        already_noted_count = 0
+        empty_diff_count = 0
 
         with click.progressbar(
             commits, label="Preparing commits", show_pos=True
@@ -725,9 +908,25 @@ def cli(
                     existing_note=existing_note,
                     diff=diff,
                 )
-                prepared_commits.append(prepared)
-                if (not existing_note or force) and diff.strip():
+
+                if not diff.strip():
+                    empty_diff_count += 1
+                    continue
+
+                if existing_note and not force:
+                    already_noted_count += 1
+                    continue
+
+                actionable_commits.append(prepared)
+                if not existing_note or force:
                     summaries_to_generate.append(prepared)
+
+        click.echo(
+            "Commit classification: "
+            f"actionable={len(actionable_commits)}, "
+            f"already-noted={already_noted_count}, "
+            f"empty-diff={empty_diff_count}"
+        )
 
         if not summaries_to_generate:
             click.echo(
@@ -736,102 +935,83 @@ def cli(
 
         overall_total = _resolve_overall_progress_total(
             overall_progress_mode=overall_progress_mode,
-            prepared_commits_count=len(prepared_commits),
+            prepared_commits_count=len(actionable_commits),
             summaries_to_generate_count=len(summaries_to_generate),
         )
         click.echo(f"Overall progress mode: {overall_progress_mode}")
-        with click.progressbar(
-            length=overall_total,
-            label="Overall progress",
-            show_pos=True,
-        ) as overall_progress:
-            summary_results = _generate_summaries_concurrently(
-                ai_provider=ai_provider,
-                prepared_commits=summaries_to_generate,
-                workers=effective_workers,
-                on_summary_completed=(
-                    (lambda: overall_progress.update(1))
-                    if overall_progress_mode == "work-units"
-                    else None
-                ),
+        processed = 0
+        skipped = 0
+        failed = 0
+
+        if overall_total == 0:
+            summary_results: dict[str, _SummaryResult] = {}
+            click.echo(
+                "No commit processing needed: all commits already have categorized "
+                "notes or empty diffs"
             )
-
-            processed = 0
-            skipped = 0
-            failed = 0
-
+        else:
             with click.progressbar(
-                prepared_commits, label="Processing commits", show_pos=True
-            ) as progress:
-                for prepared in progress:
-                    commit = prepared.commit
-                    try:
-                        logger.debug("Checking commit %s", commit.hexsha[:8])
-                        existing_note = prepared.existing_note
-                        diff = prepared.diff
-                        if not diff.strip():
-                            logger.debug("Skipping %s — empty diff", commit.hexsha[:8])
-                            click.echo(f"\nSkipping {commit.hexsha[:8]} (empty diff)")
-                            skipped += 1
-                            continue
+                length=overall_total,
+                label="Overall progress",
+                show_pos=True,
+            ) as overall_progress:
+                summary_results = _generate_summaries_concurrently(
+                    ai_provider=ai_provider,
+                    prepared_commits=summaries_to_generate,
+                    workers=effective_workers,
+                    on_summary_completed=(
+                        (lambda: overall_progress.update(1))
+                        if overall_progress_mode == "work-units"
+                        else None
+                    ),
+                )
 
-                        category = prepared.category
+                with click.progressbar(
+                    actionable_commits, label="Processing commits", show_pos=True
+                ) as progress:
+                    for prepared in progress:
+                        commit = prepared.commit
+                        try:
+                            logger.debug("Checking commit %s", commit.hexsha[:8])
+                            category = prepared.category
 
-                        if existing_note and not force:
-                            existing_category, existing_summary = parse_note_metadata(
-                                existing_note
+                            logger.debug(
+                                "Reading generated summary for %s", commit.hexsha[:8]
                             )
-                            if existing_category is not None:
-                                logger.debug(
-                                    "Skipping %s — note already exists",
-                                    commit.hexsha[:8],
+                            summary_result = summary_results.get(commit.hexsha)
+                            if summary_result is None:
+                                raise RuntimeError(
+                                    f"No summary result generated for {commit.hexsha[:8]}"
                                 )
-                                skipped += 1
-                                continue
+                            if summary_result.error is not None:
+                                raise summary_result.error
+                            summary = summary_result.summary
+                            if summary is None:
+                                raise RuntimeError(
+                                    f"Summary result is empty for {commit.hexsha[:8]}"
+                                )
+
                             note_payload = format_note(
-                                category=category,
-                                summary=existing_summary or existing_note,
+                                category=category, summary=summary
                             )
                             repo.set_note(commit.hexsha, note_payload, namespace)
-                            logger.debug(
-                                "Upgraded note format for %s", commit.hexsha[:8]
-                            )
+                            # Keep per-commit status at DEBUG so the progress bar output
+                            # remains readable at default INFO log level.
+                            logger.debug("Stored note for %s", commit.hexsha[:8])
                             processed += 1
-                            continue
-
-                        logger.debug(
-                            "Reading generated summary for %s", commit.hexsha[:8]
-                        )
-                        summary_result = summary_results.get(commit.hexsha)
-                        if summary_result is None:
-                            raise RuntimeError(
-                                f"No summary result generated for {commit.hexsha[:8]}"
+                        except Exception as error:
+                            logger.error(
+                                "Failed to process %s: %s",
+                                commit.hexsha[:8],
+                                error,
+                                exc_info=logger.isEnabledFor(logging.DEBUG),
                             )
-                        if summary_result.error is not None:
-                            raise summary_result.error
-                        summary = summary_result.summary
-                        if summary is None:
-                            raise RuntimeError(
-                                f"Summary result is empty for {commit.hexsha[:8]}"
+                            click.echo(
+                                f"\nError processing {commit.hexsha[:8]}: {error}"
                             )
-
-                        note_payload = format_note(category=category, summary=summary)
-                        repo.set_note(commit.hexsha, note_payload, namespace)
-                        # Keep per-commit status at DEBUG so the progress bar output
-                        # remains readable at default INFO log level.
-                        logger.debug("Stored note for %s", commit.hexsha[:8])
-                        processed += 1
-                    except Exception as error:
-                        logger.error(
-                            "Failed to process %s: %s",
-                            commit.hexsha[:8],
-                            error,
-                            exc_info=logger.isEnabledFor(logging.DEBUG),
-                        )
-                        click.echo(f"\nError processing {commit.hexsha[:8]}: {error}")
-                        failed += 1
-                    finally:
-                        overall_progress.update(1)
+                            failed += 1
+                        finally:
+                            overall_progress.update(1)
 
         click.echo("\nProcessing complete")
         click.echo(f"   Processed: {processed}")
@@ -841,7 +1021,7 @@ def cli(
             "Done — processed=%d skipped=%d failed=%d", processed, skipped, failed
         )
 
-        if processed == 0 and skipped > 0 and failed == 0:
+        if processed == 0 and failed == 0:
             click.echo(
                 "No notes were updated in this run; continuing with changelog "
                 "finalization from existing notes"
@@ -877,19 +1057,23 @@ def cli(
             changelog_path.parent.mkdir(parents=True, exist_ok=True)
             if changelog_path.exists():
                 existing_text = changelog_path.read_text(encoding="utf-8")
-                merged_text, appended_sections = _merge_missing_release_sections(
+                merged_text, appended_sections = merge_changelogs_with_keepachangelog(
                     existing_text=existing_text,
                     generated_text=changelog,
                 )
-                if appended_sections > 0:
-                    changelog_path.write_text(merged_text, encoding="utf-8")
+                final_text, _added_md024_guard = _ensure_markdownlint_md024_disable(
+                    merged_text
+                )
+                if final_text != existing_text:
+                    changelog_path.write_text(final_text, encoding="utf-8")
                     click.echo(
-                        f"Changelog updated with {appended_sections} changed release section(s): {changelog_path}"
+                        f"Changelog updated with {appended_sections} appended release section(s): {changelog_path}"
                     )
                 else:
                     click.echo(f"Changelog already up-to-date: {changelog_path}")
             else:
-                changelog_path.write_text(changelog, encoding="utf-8")
+                final_text, _ = _ensure_markdownlint_md024_disable(changelog)
+                changelog_path.write_text(final_text, encoding="utf-8")
                 click.echo(f"Changelog written to: {changelog_path}")
             progress.update(1)
 

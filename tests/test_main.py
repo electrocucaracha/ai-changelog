@@ -481,12 +481,44 @@ def test_create_semver_tags_if_needed_creates_tags_when_none_exist():
     ]
 
 
-def test_create_semver_tags_if_needed_skips_when_semver_tags_exist():
-    repo = DummyTagRepo(tags_by_commit={"abc": ["v2.3.4"]})
+def test_create_semver_tags_if_needed_skips_already_tagged_commits():
+    # Commit 'abc' already has tag v2.3.4, commit 'a1' has a note but no tag.
+    # New tag should be bumped from highest existing (v2.3.4 -> v2.4.0 for Added).
+    repo = DummyTagRepo(
+        tags_by_commit={"abc": ["v2.3.4"]},
+        notes_by_commit={"a1": "Category: Added\n\nNew feature."},
+    )
     commits = [
+        SimpleNamespace(
+            hexsha="abc",
+            message="fix: prior fix",
+            committed_datetime=datetime(2026, 1, 1, tzinfo=UTC),
+        ),
         SimpleNamespace(
             hexsha="a1",
             message="feat(api): add endpoint",
+            committed_datetime=datetime(2026, 1, 2, tzinfo=UTC),
+        ),
+    ]
+
+    created = main._create_semver_tags_if_needed(
+        repo, commits, "ai-changelog", True, None
+    )
+
+    assert created == 1
+    assert repo.created_tags == [("v2.4.0", "a1")]
+
+
+def test_create_semver_tags_if_needed_skips_when_no_new_noted_commits():
+    # All noted commits already have tags; nothing new to tag.
+    repo = DummyTagRepo(
+        tags_by_commit={"abc": ["v2.3.4"]},
+        notes_by_commit={"abc": "Category: Fixed\n\nFixed bug."},
+    )
+    commits = [
+        SimpleNamespace(
+            hexsha="abc",
+            message="fix: prior fix",
             committed_datetime=datetime(2026, 1, 1, tzinfo=UTC),
         )
     ]
@@ -513,7 +545,7 @@ def test_create_semver_tags_if_needed_rejects_limit():
         )
 
 
-def test_merge_missing_release_sections_replaces_changed_sections():
+def test_merge_missing_release_sections_appends_only_new_sections():
     existing = (
         "# Changelog\n\n"
         "All notable changes to this project will be documented in this file.\n\n"
@@ -540,11 +572,14 @@ def test_merge_missing_release_sections_replaces_changed_sections():
 
     merged, added = main._merge_missing_release_sections(existing, generated)
 
-    assert added == 2
-    assert merged == generated
-    assert "- Old entry" not in merged
-    assert "- Refreshed entry" in merged
+    assert added == 1
     assert "## [1.1.0] - 2026-02-01" in merged
+    assert "- New feature" in merged
+    assert "- Old entry" in merged
+    assert "- Refreshed entry" not in merged
+    assert "## [1.1.0] - 2026-02-01" in merged
+    assert merged.index("## [Unreleased]") < merged.index("## [1.1.0] - 2026-02-01")
+    assert merged.index("## [1.1.0] - 2026-02-01") < merged.index("## [1.0.0]")
 
 
 def test_merge_missing_release_sections_noop_when_all_exist():
@@ -567,9 +602,210 @@ def test_merge_missing_release_sections_noop_when_all_exist():
     assert merged == existing
 
 
-def test_cli_processes_commits_upgrades_legacy_notes_and_writes_changelog(
-    tmp_path, monkeypatch
-):
+def test_merge_missing_release_sections_skips_existing_version_with_different_date():
+    existing = (
+        "# Changelog\n\n"
+        "All notable changes to this project will be documented in this file.\n\n"
+        "## [Unreleased]\n\n"
+        "## [1.2.0] - 2026-08-04\n\n"
+        "### Added\n"
+        "- Existing note\n"
+    )
+    generated = (
+        "# Changelog\n\n"
+        "All notable changes to this project will be documented in this file.\n\n"
+        "## [Unreleased]\n\n"
+        "## [1.2.0] - 2026-08-06\n\n"
+        "### Added\n"
+        "- Regenerated note\n\n"
+        "## [1.3.0] - 2026-08-06\n\n"
+        "### Changed\n"
+        "- Newer release\n"
+    )
+
+    merged, added = main._merge_missing_release_sections(existing, generated)
+
+    assert added == 1
+    assert merged.count("## [1.2.0]") == 1
+    assert "- Existing note" in merged
+    assert "- Regenerated note" not in merged
+    assert "## [1.3.0] - 2026-08-06" in merged
+
+
+def test_merge_missing_release_sections_inserts_after_unreleased_with_md024_marker():
+    existing = (
+        "# Changelog\n\n"
+        "All notable changes to this project will be documented in this file.\n\n"
+        "<!-- Markdownlint-disable MD024 -->\n\n"
+        "## [Unreleased]\n\n"
+        "### Changed\n"
+        "- Placeholder\n\n"
+        "## [1.0.0] - 2026-01-01\n\n"
+        "### Added\n"
+        "- Initial release\n"
+    )
+    generated = (
+        "# Changelog\n\n"
+        "All notable changes to this project will be documented in this file.\n\n"
+        "## [Unreleased]\n\n"
+        "## [1.1.0] - 2026-02-01\n\n"
+        "### Added\n"
+        "- New feature\n\n"
+        "## [1.0.0] - 2026-01-01\n\n"
+        "### Added\n"
+        "- Initial release\n"
+    )
+
+    merged, added = main._merge_missing_release_sections(existing, generated)
+
+    assert added == 1
+    assert merged.index("<!-- Markdownlint-disable MD024 -->") < merged.index(
+        "## [Unreleased]"
+    )
+    assert merged.index("## [Unreleased]") < merged.index("## [1.1.0] - 2026-02-01")
+    assert merged.index("## [1.1.0] - 2026-02-01") < merged.index("## [1.0.0]")
+
+
+def test_merge_missing_release_sections_creates_unreleased_when_missing():
+    existing = (
+        "# Changelog\n\n"
+        "All notable changes to this project will be documented in this file.\n\n"
+        "<!-- Markdownlint-disable MD024 -->\n\n"
+        "## [1.0.0] - 2026-01-01\n\n"
+        "### Added\n"
+        "- Initial release\n"
+    )
+    generated = (
+        "# Changelog\n\n"
+        "All notable changes to this project will be documented in this file.\n\n"
+        "## [Unreleased]\n\n"
+        "## [1.1.0] - 2026-02-01\n\n"
+        "### Added\n"
+        "- New feature\n\n"
+        "## [1.0.0] - 2026-01-01\n\n"
+        "### Added\n"
+        "- Initial release\n"
+    )
+
+    merged, added = main._merge_missing_release_sections(existing, generated)
+
+    assert added == 1
+    assert "## [Unreleased]" in merged
+    assert merged.index("<!-- Markdownlint-disable MD024 -->") < merged.index(
+        "## [Unreleased]"
+    )
+    assert merged.index("## [Unreleased]") < merged.index("## [1.1.0] - 2026-02-01")
+    assert merged.index("## [1.1.0] - 2026-02-01") < merged.index("## [1.0.0]")
+
+
+def test_merge_missing_release_sections_inserts_unreleased_even_without_new_sections():
+    existing = (
+        "# Changelog\n\n"
+        "All notable changes to this project will be documented in this file.\n\n"
+        "<!-- Markdownlint-disable MD024 -->\n\n"
+        "## [1.0.0] - 2026-01-01\n\n"
+        "### Added\n"
+        "- Initial release\n"
+    )
+    generated = (
+        "# Changelog\n\n"
+        "All notable changes to this project will be documented in this file.\n\n"
+        "## [1.0.0] - 2026-01-01\n\n"
+        "### Added\n"
+        "- Initial release\n"
+    )
+
+    merged, added = main._merge_missing_release_sections(existing, generated)
+
+    assert added == 0
+    assert "## [Unreleased]" in merged
+    assert merged.index("<!-- Markdownlint-disable MD024 -->") < merged.index(
+        "## [Unreleased]"
+    )
+    assert merged.index("## [Unreleased]") < merged.index("## [1.0.0]")
+
+
+def test_merge_missing_release_sections_reorders_and_dedupes_existing_sections():
+    existing = (
+        "# Changelog\n\n"
+        "All notable changes to this project will be documented in this file.\n\n"
+        "<!-- Markdownlint-disable MD024 -->\n\n"
+        "## [1.2.0] - 2026-08-06\n\n"
+        "### Added\n"
+        "- New placement but wrong location\n\n"
+        "## [Unreleased]\n\n"
+        "## [1.2.0] - 2026-08-04\n\n"
+        "### Added\n"
+        "- Older duplicate\n\n"
+        "## [1.1.0] - 2026-08-01\n\n"
+        "### Added\n"
+        "- Prior release\n"
+    )
+    generated = existing
+
+    merged, added = main._merge_missing_release_sections(existing, generated)
+
+    assert added == 0
+    assert merged.index("## [Unreleased]") < merged.index("## [1.2.0]")
+    assert merged.count("## [1.2.0]") == 1
+    assert "- Older duplicate" not in merged
+    assert "- New placement but wrong location" in merged
+
+
+def test_merge_missing_release_sections_skips_versions_older_than_max_existing():
+    # Simulates hand-written CHANGELOG with milestone versions (1.0.0) while the
+    # generated changelog also contains finer per-commit tags (0.9.x) from before.
+    existing = (
+        "# Changelog\n\n"
+        "## [Unreleased]\n\n"
+        "## [1.0.0] - 2026-01-10\n\n"
+        "### Added\n"
+        "- Milestone release\n"
+    )
+    generated = (
+        "# Changelog\n\n"
+        "## [Unreleased]\n\n"
+        "## [1.1.0] - 2026-02-01\n\n"
+        "### Added\n"
+        "- New feature\n\n"
+        "## [1.0.0] - 2026-01-10\n\n"
+        "### Added\n"
+        "- Milestone release\n\n"
+        "## [0.9.1] - 2026-01-05\n\n"
+        "### Fixed\n"
+        "- Old per-commit fix tag\n\n"
+        "## [0.9.0] - 2026-01-01\n\n"
+        "### Added\n"
+        "- Old per-commit add tag\n"
+    )
+
+    merged, added = main._merge_missing_release_sections(existing, generated)
+
+    assert added == 1
+    assert "## [1.1.0]" in merged
+    assert "## [0.9.1]" not in merged
+    assert "## [0.9.0]" not in merged
+
+
+def test_ensure_markdownlint_md024_disable_prepends_when_missing():
+    text = "# Changelog\n\n## [Unreleased]\n"
+
+    updated, inserted = main._ensure_markdownlint_md024_disable(text)
+
+    assert inserted is True
+    assert updated.startswith("<!-- Markdownlint-disable MD024 -->\n\n# Changelog")
+
+
+def test_ensure_markdownlint_md024_disable_noop_when_present():
+    text = "<!-- Markdownlint-disable MD024 -->\n\n# Changelog\n"
+
+    updated, inserted = main._ensure_markdownlint_md024_disable(text)
+
+    assert inserted is False
+    assert updated == text
+
+
+def test_cli_skips_existing_notes_and_writes_changelog(tmp_path, monkeypatch):
     commits = [
         _build_commit(
             "a1b2c3d4",
@@ -615,10 +851,9 @@ def test_cli_processes_commits_upgrades_legacy_notes_and_writes_changelog(
 
     assert result.exit_code == 0
     assert any("Category: Added" in note for _, note, _ in repo.saved_notes)
-    assert any("Category: Fixed" in note for _, note, _ in repo.saved_notes)
-    assert repo.created_tags == [("v1.0.0", "a1b2c3d4"), ("v1.0.1", "b2c3d4e5")]
+    assert not any("Category: Fixed" in note for _, note, _ in repo.saved_notes)
+    assert repo.created_tags == [("v1.0.0", "a1b2c3d4")]
     changelog_text = (tmp_path / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "## [1.0.1] - 2026-03-02" in changelog_text
     assert "## [1.0.0] - 2026-03-01" in changelog_text
 
 

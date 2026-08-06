@@ -1,0 +1,3 @@
+Category: Changed
+
+The README overview and quickstart have been rewritten for clarity, removing redundant sections and making installation and usage instructions more direct. The new structure highlights the core features, explains the problem solved, and provides concise steps for getting started with the tool and its LiteLLM integration. This makes the README more accessible to new users and easier to maintain.

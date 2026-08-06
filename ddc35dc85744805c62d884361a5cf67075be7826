@@ -1,0 +1,3 @@
+Category: Changed
+
+Argument lists in test assertions have been reformatted for improved readability, aligning with standard Python practices. This change splits long argument lists across multiple lines and indents them consistently, making the code easier to read and maintain without introducing any functional changes. The reformatting affects two test functions but does not impact API or CLI contracts, config schema, migration steps, or security.

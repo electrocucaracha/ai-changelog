@@ -1,0 +1,3 @@
+Category: Changed
+
+The project's CI failures due to super-linter issues were addressed by disabling pylint/ruff-format, adding yamllint and isort configs, and modifying the linter.yml file. This change also includes fixes for actions/checkout usage in setup-python-env action.yml and adds comments explaining validation settings.

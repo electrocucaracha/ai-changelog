@@ -1,0 +1,3 @@
+Category: Changed
+
+The versions of several dependencies, including aiohttp and uv.lock, were updated in the project's configuration file. The update includes new version requirements for Python 3.11 and above, which may require users to migrate their code if they are using older versions of these dependencies. Additionally, the config schema has been updated with new resolution markers and dependency specifications.

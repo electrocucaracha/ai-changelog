@@ -1,0 +1,3 @@
+Category: Changed
+
+GitHub Actions dependencies were updated to their latest stable versions, addressing upstream bug fixes, security patches, and performance improvements. This includes actions/checkout, setup-python, setup-go, docker actions, super-linter, and others across all workflows. No workflow logic was changed, but the .yamllint config was normalized by removing a redundant document start.

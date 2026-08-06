@@ -1,0 +1,3 @@
+Category: Added
+
+Unit tests now run against multiple Python versions, including 3.10, 3.11, and 3.12, improving detection of compatibility issues across supported versions. The setup-python-env action accepts an explicit python-version input or falls back to pyproject.toml, allowing unit tests to be executed in tox environments matching each version. This change does not affect downstream jobs but may be extended to other workflows in the future.

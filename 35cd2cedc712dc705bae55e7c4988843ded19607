@@ -1,0 +1,3 @@
+Category: Changed
+
+The action dependencies in CI workflows were updated to the latest patch versions, reducing the risk of encountering known issues during runs. The github-action-markdown-link-check was updated to v1.1.3 and git-diff-action to a newer commit, ensuring compatibility with upstream changes and stability in linter workflow. These updates improve overall reliability in CI environments.

@@ -1,0 +1,3 @@
+Category: Added
+
+Changelog merging behavior has been updated to replace existing release sections when their content changes, ensuring idempotency and correcting stale entries in place. This may update previously generated sections on rerun. Additionally, parallelism and retry behavior can now be tuned via CLI flags or environment variables, with the effective worker count resolved based on user input, CPU availability, and commit count for efficient resource use.

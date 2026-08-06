@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
+from typing import cast
 
 from click.testing import CliRunner
 
@@ -203,7 +204,11 @@ def _run_summary_generation_with_output_capture(
         def summarize_diff(self, commit_message, diff, author=None):
             return "ok"
 
-    results = main._generate_summaries_concurrently(FastProvider(), prepared, workers)
+    results = main._generate_summaries_concurrently(
+        cast(main.AIProvider, FastProvider()),
+        prepared,
+        workers,
+    )
     return results, output_chunks
 
 

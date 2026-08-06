@@ -1,0 +1,3 @@
+Category: Changed
+
+The documentation for generating release notes has been revised to align with the Keep a Changelog style, emphasizing user- or maintainer-facing outcomes. The rewritten system and user prompts now require official action verbs, prohibit implementation details, and standardize tone and structure. This change improves the clarity and consistency of generated release notes by focusing on observable impact rather than internal code mechanics.

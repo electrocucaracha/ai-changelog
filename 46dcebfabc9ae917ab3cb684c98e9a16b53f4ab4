@@ -1,0 +1,3 @@
+Category: Added
+
+This initial commit sets up the AI Changelog Generator project, including configuration files, workflows for GitHub Actions, and dependencies for Python development. The project aims to automate changelog generation by analyzing git commit diffs using AI models.

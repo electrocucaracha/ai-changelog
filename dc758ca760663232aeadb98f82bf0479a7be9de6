@@ -1,0 +1,3 @@
+Category: Changed
+
+The README now directs users to the GitHub Pages documentation for all quickstart, CLI, and provider setup details, reducing duplication and maintenance overhead. The CLI reference has been updated with new options for worker threads, retry attempts, and backoff configuration, improving discoverability of advanced CLI options and reducing onboarding friction for new users. Future documentation changes should be made in the docs/ directory.

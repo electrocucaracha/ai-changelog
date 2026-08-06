@@ -1,0 +1,7 @@
+Category: Removed
+
+Python versions 3.13 and 3.14 are now included in the test matrix, ensuring compatibility with the latest Python releases.
+The minimum required Python version has been raised to 3.12, dropping support for earlier versions.
+This change simplifies maintenance by removing unnecessary dependency constraints.
+
+BREAKING CHANGE: Python <3.12 is no longer supported.

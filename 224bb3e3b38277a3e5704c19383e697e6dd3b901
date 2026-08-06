@@ -1,0 +1,3 @@
+Category: Changed
+
+The version of `aiohttp` was updated to 3.14.3, which includes various changes to the package's metadata, including updates to the upload time and hash for different platforms. The update does not appear to introduce any breaking behavior or migration requirements. The primary user outcome is an updated dependency with new versions available on PyPI.

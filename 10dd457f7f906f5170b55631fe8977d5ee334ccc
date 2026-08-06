@@ -1,0 +1,3 @@
+Category: Added
+
+A Universal Janitor agent specification was introduced to guide codebase cleanup efforts, focusing on aggressive debt removal, safe deletion, and incremental simplification. The agent outlines strategies for eliminating tech debt through code elimination, simplification, dependency hygiene, test optimization, and documentation cleanup. It provides actionable priorities and execution steps for maintaining lean, maintainable codebases. This reference serves as a guide for automated or manual tech debt remediation efforts.

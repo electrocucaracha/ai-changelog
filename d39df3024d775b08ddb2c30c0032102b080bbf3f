@@ -1,0 +1,3 @@
+Category: Fixed
+
+The GitHub workflow for updating dependencies now uses a fallback token to ensure successful execution, addressing an issue where the WORKFLOW_TOKEN secret was not accessible in all environments. This change does not break any behavior and does not require migration steps. The API contract remains unchanged, and there is no security impact or config schema changes.

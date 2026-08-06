@@ -1,0 +1,3 @@
+Category: Added
+
+A pre-commit configuration file was introduced to enforce code quality checks, including trailing whitespace removal, YAML validation, and Markdown linting. The CI script now runs pre-commit autoupdate after dependency sync to ensure hooks stay current with upstream versions. This change improves code consistency and reduces manual maintenance by automating these tasks.

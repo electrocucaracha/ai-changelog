@@ -1,0 +1,3 @@
+Category: Added
+
+The configuration now supports adaptive model selection based on the runtime environment, with Apple Silicon Macs defaulting to the quantized Llama 3.1 8B Instruct variant for improved latency and quality. The `model` field defaults to `"auto"` and resolves to the appropriate model during initialization. Additionally, support has been added for retry attempts and backoff seconds, configurable via environment variables, with comprehensive tests covering new behaviors and error cases.

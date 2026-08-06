@@ -1,0 +1,3 @@
+Category: Changed
+
+The changelog generation prompt has been revised to use strong action verbs instead of literal category labels, encouraging more informative summaries that better capture the intent and impact of changes for technical users. This change affects how AI-generated summaries are written but does not alter the underlying logic or output format. Breaking behavior, API or CLI contract changes, migration requirements, security impact, or config schema changes remain unchanged.

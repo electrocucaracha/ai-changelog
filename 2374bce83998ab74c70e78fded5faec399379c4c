@@ -1,0 +1,3 @@
+Category: Changed
+
+The markdownlint pre-commit hook has been updated to use the maintained markdownlint-cli Node.js tool, replacing the deprecated Ruby gem. This change ensures compatibility with current rules and improves cross-platform support. Developers must now have Node.js installed to run this hook, and custom arguments are no longer applicable. The config file has been adjusted accordingly to reflect these changes.

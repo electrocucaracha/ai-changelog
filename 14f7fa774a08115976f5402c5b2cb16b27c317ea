@@ -1,0 +1,3 @@
+Category: Changed
+
+The logic for resolving GitHub Action commit hashes was extracted into a reusable function to reduce code duplication and improve maintainability. The resolve_action_commit_hash function takes the action name and version pattern as arguments, making it easier to adjust matching logic in specific cases. This change does not introduce breaking behavior or API changes, but simplifies maintenance of the update process for GitHub Actions.

@@ -1,0 +1,3 @@
+Category: Changed
+
+Tests now use datetime.UTC instead of timezone.utc for timezone-aware datetimes, aligning with Python 3.11+ best practices and removing the need to import timezone. This change improves clarity and future compatibility but does not affect functional behavior. The tests are updated accordingly in multiple files.

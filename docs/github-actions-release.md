@@ -189,7 +189,7 @@ After completion,
 you will see:
 
 - A CHANGELOG.md update committed to master.
-- A pushed git tag.
+- A pushed Git tag.
 - A GitHub Release created from CHANGELOG.md.
 
 ## Verify results

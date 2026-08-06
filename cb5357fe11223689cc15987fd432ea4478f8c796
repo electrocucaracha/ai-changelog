@@ -1,0 +1,3 @@
+Category: Added
+
+The CLI now displays a shell-escaped execution command at startup, helping users reproduce runs and share invocation details for debugging. Sensitive values like API keys are masked with environment variable references. This change also introduces the `CHANGELOG_MODEL` environment variable for specifying the AI model to use. The command is printed after repository detection but before destructive actions.

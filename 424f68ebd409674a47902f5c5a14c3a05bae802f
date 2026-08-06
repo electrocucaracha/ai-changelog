@@ -1,0 +1,3 @@
+Category: Changed
+
+The documentation structure has been reorganized into intent-based sections: tutorials, guides, references, and explanations. This change improves discoverability for both new and advanced users by grouping conceptual overviews, step-by-step guides, and detailed reference material together. The quickstart and how-it-works pages have been moved to the tutorials and explanations sections respectively, with a new index added for each section linking to available topics and next steps.

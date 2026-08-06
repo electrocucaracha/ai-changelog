@@ -1,0 +1,3 @@
+Category: Added
+
+The changelog builder now diversifies repeated leading power verbs in category blocks to improve readability, especially for large releases. This change introduces logic to detect and replace repeated verbs with alternatives from a category-specific list when available, preserving the original verb on first occurrence. The new behavior is tested to ensure it works as intended.

@@ -1,0 +1,3 @@
+Category: Added
+
+The CLI now supports reading options from environment variables, making it easier to configure in automated environments and CI/CD pipelines. This adds envvar support for major options like CHANGELOG_NAMESPACE, CHANGELOG_FORCE, and others. No breaking changes exist for existing CLI usage, allowing seamless integration with current workflows.

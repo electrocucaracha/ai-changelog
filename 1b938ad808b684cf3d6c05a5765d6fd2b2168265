@@ -1,0 +1,3 @@
+Category: Added
+
+The CLI now offers an `--overall-progress-mode` option to choose between 'commits' (default) and 'work-units' for overall progress tracking, providing more granular feedback for large repositories. Additionally, per-worker summary progress reporting has been implemented when multiple workers are used for AI summarization, displaying a fixed-width progress bar for each worker in interactive TTYs or appending lines in non-interactive output. This enhances transparency and user experience for long-running changelog generation tasks.

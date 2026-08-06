@@ -1,0 +1,3 @@
+Category: Changed
+
+The super-linter CI configuration was updated to use correct config filenames and fix pylint violations. This change affects the API contract by renaming `.pylintrc` to `.python-lint` and adding an `isort.cfg` file, which may require migration steps for users who have customized their linters. The primary outcome is improved code quality and adherence to best practices.

@@ -1,0 +1,3 @@
+Category: Fixed
+
+The logic for selecting the latest annotated tag in GitHub Actions has been improved to ensure consistency when both annotated and lightweight tags exist for the same version. This change introduces a dereference flag to distinguish between annotated and lightweight tags, sorting by version and dereference status to prefer annotated tags when available. The update improves reliability and correctness of version pinning for dependencies, with no impact on other CI steps expected.

@@ -1,0 +1,3 @@
+Category: Changed
+
+The capitalization of "Git" in release documentation has been standardized to match its proper noun status, improving consistency and professionalism. This change affects the GitHub Actions Release documentation only, with no functional changes introduced. The update corrects a minor inconsistency, ensuring accurate representation of the version control system's name throughout the documentation.

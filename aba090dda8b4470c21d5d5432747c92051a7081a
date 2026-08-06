@@ -1,0 +1,3 @@
+Category: Changed
+
+Dependencies for new AI features and code formatting were added to the project. Headroom-ai 0.34.0 and toon-format 0.9.0b1 are now included, along with posthog 7.38.0 for improved analytics integration. These changes ensure compatibility with the latest features and maintain dependency consistency, but no breaking behavior or migration requirements were introduced.

@@ -1,0 +1,3 @@
+Category: Changed
+
+Markdownlint and ai-prepare-commit-msg hook versions were updated to the latest, bringing bug fixes and new features for improved linting accuracy and compatibility. No configuration changes were required for these upgrades, ensuring a seamless transition. The updates are now compatible with the latest upstream releases.

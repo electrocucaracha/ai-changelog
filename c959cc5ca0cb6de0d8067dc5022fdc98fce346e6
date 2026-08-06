@@ -1,0 +1,3 @@
+Category: Changed
+
+Node_modules and package files are now excluded from the repository, preventing accidental commits of dependencies and lock files. This change keeps the repository clean and focused on source code. The updated .gitignore file removes an obsolete instruction file for clarity.

@@ -1,0 +1,3 @@
+Category: Added
+
+The markdownlint configuration has been updated to relax rules for H1 headings and line length, allowing for more self-contained documents by permitting a second H1 in the body and disabling line length checks. This change aligns with Jekyll's front-matter provision of the main H1 via the title key and aims to maintain consistency with the project's documentation style. The updated rules are MD025: false (second H1 allowed) and MD013: false (line length disabled).

@@ -1,0 +1,5 @@
+Category: Changed
+
+The subprocess call recording logic was refactored to reduce repetition in tests, improving maintainability and clarity.
+A helper function, _make_subprocess_recorder, now encapsulates this pattern, returning both the call log and a stubbed _run function.
+No test behavior is altered; existing tests continue to work as before.

@@ -1,0 +1,3 @@
+Category: Added
+
+The project's dependencies have been updated to include headroom-ai and toon-format, enabling AI integration and code formatting capabilities. These additions support upcoming features but may conflict with downstream environments if not managed properly. No migration steps are required, and no breaking behavior is expected. The changes expand the project's functionality for users and maintainers relying on these libraries.

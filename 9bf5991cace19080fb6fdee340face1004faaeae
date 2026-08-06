@@ -1,0 +1,3 @@
+Category: Added
+
+Mutation testing has been integrated using mutmut to improve test suite effectiveness, enabling regular mutation testing to catch undetected bugs and increase confidence in test coverage. The "mutation" Makefile target automates setup and execution, while the pyproject.toml configures mutmut to target the main source directory with specified exclusions. All dependencies are locked in uv.lock for reproducibility.

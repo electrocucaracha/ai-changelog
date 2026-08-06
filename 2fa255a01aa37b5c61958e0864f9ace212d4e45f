@@ -1,0 +1,3 @@
+Category: Fixed
+
+The super-linter YAML file was renamed to match the default configuration file name, and the Copilot CLI install step was added before using AI inference in the linter workflow. The model used for AI inference was also switched from mistral-ai/Ministral-3B to gpt-4.1, and two environment variables were added: COPILOT_GITHUB_TOKEN and continue-on-error. These changes are necessary due to breaking changes in the Copilot CLI and AI inference actions.

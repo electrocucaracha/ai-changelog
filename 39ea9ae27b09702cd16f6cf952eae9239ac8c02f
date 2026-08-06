@@ -1,0 +1,3 @@
+Category: Changed
+
+The pre-commit hook for ai-prepare-commit-msg was updated to the latest revision, ensuring compatibility with new features and benefiting from upstream maintenance. This change may have introduced bug fixes and improvements not present in older revisions. No configuration changes were required for this update, making it a straightforward replacement of an outdated dependency. The impact on users is minimal as no breaking behavior or API changes are involved.

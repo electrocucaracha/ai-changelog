@@ -1,0 +1,3 @@
+Category: Added
+
+A new guide has been added detailing how to automate releases with AI Changelog Generator in GitHub Actions, covering workflow configuration, required secrets, model setup, and troubleshooting tips. This helps users adopt a reproducible release flow directly from the repository UI, reducing manual steps and errors. The guide also introduces cross-links for improved discoverability.

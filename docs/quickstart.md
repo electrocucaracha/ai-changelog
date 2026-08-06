@@ -62,3 +62,4 @@ export GITHUB_COPILOT_API_KEY_FILE="api-key.json"
 
 - Review options in [cli-reference.md](cli-reference.md)
 - Understand processing flow in [how-it-works.md](how-it-works.md)
+- Configure automated releases in [github-actions-release.md](github-actions-release.md)

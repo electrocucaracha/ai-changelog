@@ -55,6 +55,7 @@ uv run ai-changelog /path/to/repository
 - Quickstart: [quickstart.md](quickstart.md)
 - Command options: [cli-reference.md](cli-reference.md)
 - Changelog flow details: [how-it-works.md](how-it-works.md)
+- GitHub Actions release setup: [github-actions-release.md](github-actions-release.md)
 
 For GitHub Copilot via LiteLLM,
 see the Quickstart section "Run with GitHub Copilot provider (LiteLLM)".

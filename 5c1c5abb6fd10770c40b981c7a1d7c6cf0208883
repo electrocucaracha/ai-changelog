@@ -1,0 +1,3 @@
+Category: Changed
+
+The CLI test setup was refactored to use reusable helper functions, reducing duplication and making tests easier to maintain. This change introduces helper functions for building commits, repositories, and patching dependencies, ensuring consistent test setup and focusing on behavior rather than scaffolding. No functional changes were made to the CLI or its output; only test code is affected.

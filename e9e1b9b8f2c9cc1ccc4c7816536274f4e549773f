@@ -1,0 +1,3 @@
+Category: Changed
+
+Dependencies were unpinned, leading to unpredictable builds and potential security vulnerabilities due to outdated transitive packages. To address this, minimum versions for litellm, python-dotenv, and pytest were explicitly set, ensuring compatibility and stability. A [tool.uv] section was added with constraints for key dependencies containing known CVE fixes, improving build reproducibility and mitigating security risks. Future updates should review these constraints as needed to maintain stability.

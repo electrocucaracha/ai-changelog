@@ -1,0 +1,3 @@
+Category: Changed
+
+The default GITHUB_TOKEN no longer has sufficient permissions for some workflow operations, causing failures when creating pull requests and updating the Dockerfile. Switching to WORKFLOW_TOKEN resolves these permission issues and ensures the workflow completes successfully. This change assumes WORKFLOW_TOKEN is properly configured in repository secrets, which must be done separately.

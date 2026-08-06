@@ -1,0 +1,3 @@
+Category: Added
+
+The AI Changelog Generator now has initial documentation, including project overview, quickstart guide, CLI reference, and changelog generation flow details. This enables new users to quickly set up the tool while providing a reference for advanced configuration and future enhancements. The docs cover prerequisites, usage examples, environment variable configuration, and integration with LiteLLM and GitHub Copilot providers.

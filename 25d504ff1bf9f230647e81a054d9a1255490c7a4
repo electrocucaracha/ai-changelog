@@ -1,0 +1,3 @@
+Category: Removed
+
+The obsolete DeepEval telemetry file was removed from the project configuration to reduce clutter and prevent confusion about the status of DeepEval integration, which had no functional changes introduced by this removal. The .deepeval_telemetry.txt file contained outdated data that is no longer relevant. This change does not affect any API or CLI contract, nor introduce security concerns or config schema modifications.

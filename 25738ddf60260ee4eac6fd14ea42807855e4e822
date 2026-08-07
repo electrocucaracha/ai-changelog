@@ -1,0 +1,3 @@
+Category: Changed
+
+The quickstart documentation for setting up Ollama has been simplified and streamlined, clarifying model selection per platform and emphasizing verification steps. The Git notes configuration has also been reorganized for clarity, providing both command-line and manual `.git/config` options. Additionally, the bootstrap and update scenarios have been combined into a single process, removing redundant explanations.

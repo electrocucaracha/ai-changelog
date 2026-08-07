@@ -8,28 +8,22 @@ This quickstart gets you to a generated changelog in a few minutes.
 - uv
 - A local Git repository with commits
 
-## Ollama requirements (default setup)
+## Set up Ollama (default provider)
 
 By default,
-this project uses an Ollama-backed LiteLLM model route.
-To run with defaults,
-ensure all of the following are true:
+ai-changelog uses an Ollama-backed LiteLLM model route.
+Ensure all of the following are true before you continue:
 
 - Ollama is installed and running locally.
-- Ollama HTTP API is reachable at `http://localhost:11434`.
-- The default model is available,
-  or can be pulled automatically on first run.
+- The Ollama HTTP API is reachable at `http://localhost:11434`.
+- The default model is available.
 
-Default values used by the CLI:
+Default model per platform:
 
-- `CHANGELOG_MODEL`:
-  - `ollama/llama3.1:8b-instruct-q4_K_M` on Apple Silicon macOS.
-  - `ollama/llama3.1` on other platforms.
-- `CHANGELOG_NAMESPACE`: `ai-changelog`
-- `CHANGELOG_RETRY_ATTEMPTS`: `3`
-- `CHANGELOG_RETRY_BACKOFF_SECONDS`: `1.0`
+- Apple Silicon macOS: `ollama/llama3.1:8b-instruct-q4_K_M`
+- Other platforms: `ollama/llama3.1`
 
-Quick verification commands:
+Verify Ollama is running:
 
 ```bash
 ollama --version
@@ -37,8 +31,8 @@ ollama ps
 curl -fsS http://localhost:11434/api/tags
 ```
 
-If Ollama is not running yet,
-start it and pre-pull the default model for your platform:
+If Ollama is not running,
+start it and pull the default model for your platform:
 
 ```bash
 ollama serve
@@ -47,10 +41,18 @@ ollama pull llama3.1:8b-instruct-q4_K_M   # Apple Silicon macOS
 ollama pull llama3.1                       # Other platforms
 ```
 
-## Configure Git notes sync
+## Configure Git notes fetch (one-time setup)
 
-AI summaries are stored in Git notes under refs/notes/ai-changelog.
-Configure your repository so pull and fetch operations include that notes ref.
+ai-changelog stores AI summaries in Git notes under `refs/notes/ai-changelog`.
+Add the notes ref to your remote fetch configuration
+so pull and fetch operations include it:
+
+```bash
+git config --add remote.origin.fetch '+refs/notes/ai-changelog:refs/notes/ai-changelog'
+git fetch origin
+```
+
+Or add it directly in `.git/config`:
 
 ```ini
 [remote "origin"]
@@ -58,14 +60,7 @@ Configure your repository so pull and fetch operations include that notes ref.
   fetch = +refs/notes/ai-changelog:refs/notes/ai-changelog
 ```
 
-You can set this using Git commands:
-
-```bash
-git config --add remote.origin.fetch '+refs/notes/ai-changelog:refs/notes/ai-changelog'
-git fetch origin
-```
-
-## Scenario 1: Bootstrap from an existing project
+## Scenario 1: Bootstrap a new project
 
 From the root of your target repository,
 run ai-changelog directly from GitHub:
@@ -74,92 +69,70 @@ run ai-changelog directly from GitHub:
 uvx --from git+https://github.com/electrocucaracha/ai-changelog.git ai-changelog .
 ```
 
-Commit and push the generated changelog changes:
+Commit and push the generated changelog and AI notes:
 
 ```bash
 git add CHANGELOG.md
 git commit -m "docs(changelog): update release notes"
 git push origin HEAD
-```
-
-Push the Git notes namespace so teammates and CI can reuse summaries:
-
-```bash
 git push origin refs/notes/ai-changelog
 ```
 
 ## Scenario 2: Update an already configured project
 
-1. Ensure your repository fetches ai-changelog notes from origin.
-1. Pull code and notes.
-1. Run ai-changelog.
-1. Push both regular commits and notes updates.
-
-Configure fetch once if needed:
-
-```bash
-git config --add remote.origin.fetch '+refs/notes/ai-changelog:refs/notes/ai-changelog'
-```
-
-Update local repository state:
+Pull the latest code and notes:
 
 ```bash
 git pull --ff-only
 git fetch origin refs/notes/ai-changelog:refs/notes/ai-changelog
 ```
 
-Run ai-changelog from the project checkout:
+Run ai-changelog:
 
 ```bash
 uv run ai-changelog .
 ```
 
-Commit and push changelog updates:
+Commit and push the changelog and updated notes:
 
 ```bash
 git add CHANGELOG.md
 git commit -m "docs(changelog): update release notes"
 git push origin HEAD
-```
-
-Push updated notes:
-
-```bash
 git push origin refs/notes/ai-changelog
 ```
 
-## Run from this project checkout
-
-From this project checkout:
-
-```bash
-uv run ai-changelog /path/to/repository
-```
-
-This command will:
-
-1. Read commits from the target repository.
-1. Generate AI summaries from commit diffs.
-1. Store summaries in Git notes under the default namespace.
-1. Create or update CHANGELOG.md.
-
 ## Verify
 
-Check generated notes:
+Check that summaries were stored in Git notes:
 
 ```bash
 git -C /path/to/repository log --show-notes=refs/notes/ai-changelog
 ```
 
-Check the changelog file:
+Check the generated changelog:
 
 ```bash
 cat /path/to/repository/CHANGELOG.md
 ```
 
-## Run with GitHub Copilot provider (LiteLLM)
+## Run from this project's source
 
-Use the GitHub Copilot provider model route:
+If you have cloned this repository,
+run ai-changelog against any local repository path:
+
+```bash
+uv run ai-changelog /path/to/repository
+```
+
+The command reads commits from the target repository,
+generates AI summaries from commit diffs,
+stores summaries in Git notes under the default namespace,
+and creates or updates `CHANGELOG.md`.
+
+## Use the GitHub Copilot provider
+
+Set the model to a `github_copilot/` route to use GitHub Copilot instead of Ollama:
 
 ```bash
 export CHANGELOG_MODEL="github_copilot/gpt-4"
@@ -167,7 +140,7 @@ uv run ai-changelog /path/to/repository
 ```
 
 On first request,
-LiteLLM will prompt you for GitHub device-flow authentication.
+LiteLLM prompts you for GitHub device-flow authentication.
 Complete the URL and device-code verification shown in your terminal.
 
 Optional token storage variables:

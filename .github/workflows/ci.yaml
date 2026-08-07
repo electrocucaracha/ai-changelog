@@ -43,25 +43,27 @@ jobs:
       - name: Enforce no surviving mutations
         env:
           PYTHONPATH: src
-        run: |-
-          STATS="$(uv run mutmut export-cicd-stats)"
-          echo "$STATS"
-          python - <<'PY' "$STATS"
-          import json
-          import sys
+        run: |
+          uv run mutmut export-cicd-stats
 
-          raw_stats = sys.argv[1].strip()
-          if not raw_stats:
-              print("mutmut did not return CI stats")
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          stats_file = Path("mutants/mutmut-cicd-stats.json")
+
+          if not stats_file.exists():
+              print(f"mutmut CI stats file not found: {stats_file}")
               raise SystemExit(1)
 
-          stats = json.loads(raw_stats)
+          stats = json.loads(stats_file.read_text())
           survived = int(stats.get("survived", 0))
           suspicious = int(stats.get("suspicious", 0))
 
           if survived or suspicious:
               print(
-                  f"Mutation test gate failed: survived={survived}, suspicious={suspicious}"
+                  f"Mutation test gate failed: survived={survived}, "
+                  f"suspicious={suspicious}"
               )
               raise SystemExit(1)
 

@@ -1,0 +1,3 @@
+Category: Changed
+
+The commit message describes style changes made to the changelog, including standardizing GitHub link capitalization and adding markdownlint disables for line length warnings and redundant comments. These changes improve professionalism and clarity in the documentation without introducing any functional changes or breaking behavior. The updates align with project documentation style and do not require migration steps from users running previous versions.

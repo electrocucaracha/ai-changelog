@@ -1,0 +1,3 @@
+Category: Changed
+
+This commit adds regression tests for edge cases in the main, ai_provider, changelog, and git_helper modules. The tests verify correct handling of empty and malformed inputs, logging behavior, concurrency, and changelog merging logic. This improves mutation score and guards against future accidental breakage by ensuring robustness against subtle regressions.

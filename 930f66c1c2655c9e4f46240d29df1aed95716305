@@ -1,0 +1,3 @@
+Category: Added
+
+A comprehensive CHANGELOG.md has been added to the project, following Keep a Changelog and Semantic Versioning standards. This changelog documents all significant additions, changes, removals, and fixes across the project's history, including breaking changes and dependency updates. It improves transparency, facilitates release tracking, and serves as a single source of truth for users and contributors.

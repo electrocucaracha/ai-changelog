@@ -62,7 +62,9 @@ class _FakeGit:
         return self.update_ref_result
 
 
-def _make_repo(fake_git=None, tags=None, remote_url=None, refs=None, create_tag=None):
+def _make_repo(
+    fake_git=None, tags=None, remote_url=None, refs=None, create_tag=None
+) -> GitRepository:
     repo = GitRepository.__new__(GitRepository)
     repo.repo_path = Path("/tmp/repo")
     repo.repo = SimpleNamespace(

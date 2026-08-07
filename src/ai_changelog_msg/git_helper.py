@@ -6,6 +6,7 @@ import logging
 import re
 from importlib import import_module
 from pathlib import Path
+from typing import cast
 
 from git import Commit, Repo
 from git.exc import GitCommandError
@@ -339,4 +340,4 @@ class GitRepository:
                 "TOON output requires the optional toon-python dependency"
             ) from error
 
-        return encode(self.get_repository_info())
+        return cast(str, encode(self.get_repository_info()))

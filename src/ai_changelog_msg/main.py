@@ -598,17 +598,12 @@ def _merge_missing_release_sections(
         block
         for heading, block in generated_sections
         for version in [_release_version_from_heading(heading)]
-        if version is not None
-        and parse_semantic_version(version) is not None
-        and version not in existing_versions
+        for parsed_version in [
+            parse_semantic_version(version) if version is not None else None
+        ]
+        if parsed_version is not None and version not in existing_versions
         # Only add versions strictly newer than the current highest version
-        and (
-            max_existing is None
-            or (
-                parse_semantic_version(version) is not None
-                and parse_semantic_version(version) > max_existing
-            )
-        )
+        and (max_existing is None or parsed_version > max_existing)
     ]
 
     if not missing_blocks:

@@ -50,7 +50,7 @@ jobs:
       - name: Run mutation tests
         env:
           PYTHONPATH: src
-        run: uv run mutmut run --no-progress
+        run: uv run mutmut run
       - name: Export mutation stats
         env:
           PYTHONPATH: src

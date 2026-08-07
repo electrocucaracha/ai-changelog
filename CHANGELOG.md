@@ -10,6 +10,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.14.6] - 2026-08-07
+
+### Fixed
+
+- Resilience has been improved by stabilizing the workflow's mutmut stats retrieval mechanism which now directly reads from a JSON file instead of process output reducing brittleness and enhancing maintainability with explicit error handling for missing stats files. [24845d8f](https://github.com/electrocucaracha/ai-changelog/commit/24845d8f48c5bf5cce7bc9f6496aa86adc5b21ae)
+
+## [4.14.5] - 2026-08-07
+
+### Changed
+
+- Updated dependencies to ensure compatibility and security by upgrading the `aiohttp` library from version 3.14.2 to 3.14.3 across multiple platforms without introducing any breaking behavior or migration requirements. [db959cfb](https://github.com/electrocucaracha/ai-changelog/commit/db959cfb0921244f864ac8231d04b38e5626575d)
+
+## [4.14.4] - 2026-08-07
+
+### Changed
+
+- Streamlined CI runs and reduced maintenance burden by limiting the tox configuration to only include Python 3.12 in the envlist and updating mypy to target this version for type checking. [f9564666](https://github.com/electrocucaracha/ai-changelog/commit/f9564666aa4b3b1cd50a905f4fac6530553a3d12)
+
+## [4.14.3] - 2026-08-07
+
+### Changed
+
+- Simplified version filtering logic in the release section merge to parse each version once per iteration and streamlined related conditions improving readability and maintainability without altering functional behavior. [aa31bf2d](https://github.com/electrocucaracha/ai-changelog/commit/aa31bf2dcc32f18eb86c174ae3f8510dad5a02c9)
+
+## [4.14.2] - 2026-08-07
+
+### Changed
+
+- Updated the pre-commit hook for AI-generated commit messages to track official releases by switching from a specific commit hash to the latest tagged version of ai-prepare-commit-msg. [9793dff1](https://github.com/electrocucaracha/ai-changelog/commit/9793dff11124e4063210ff23e60e9789bc659261)
+
+## [4.14.1] - 2026-08-07
+
+### Changed
+
+- Standardized GitHub link capitalization for improved professionalism and clarity, and aligned markdownlint configuration to project documentation style without introducing any breaking behavior or requiring migration steps from users running previous versions. [c1eaaeac](https://github.com/electrocucaracha/ai-changelog/commit/c1eaaeacee7c276d6feaea6923b88beb6b98693f)
+
+## [4.14.0] - 2026-08-06
+
+### Added
+
+- Enabled project transparency and consistent communication of evolution by introducing a comprehensive CHANGELOG.md following Keep a Changelog and Semantic Versioning standards that documents all significant additions, changes, removals, and fixes across the project's history. [930f66c1](https://github.com/electrocucaracha/ai-changelog/commit/930f66c1c2655c9e4f46240d29df1aed95716305)
+
 ## [4.13.0] - 2026-08-06
 
 ### Added

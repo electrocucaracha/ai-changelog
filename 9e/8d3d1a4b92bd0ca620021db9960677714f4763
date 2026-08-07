@@ -1,0 +1,3 @@
+Category: Changed
+
+The placement of markdownlint disable comments was moved below the changelog introduction in CHANGELOG.md to ensure the introduction remains visible to readers, clarifying the file structure and preventing potential visibility issues. This change does not affect API or CLI contracts, nor does it introduce any security risks or config schema changes. The migration step involves updating the comment placement in existing files following this change.

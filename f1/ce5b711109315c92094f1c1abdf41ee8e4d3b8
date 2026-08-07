@@ -1,0 +1,3 @@
+Category: Changed
+
+The CLI reference documentation has been restructured to improve discoverability and reduce onboarding friction for new users. A structured table now presents common options, with explicit sections for LiteLLM gateway options and clear relationships between CLI flags and environment variables. Provider-specific variables and usage examples are grouped and formatted for readability, making it easier for users to find the information they need.

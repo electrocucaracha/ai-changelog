@@ -1,0 +1,3 @@
+Category: Changed
+
+The pre-commit hook for AI-generated commit messages was updated to use the latest version of ai-prepare-commit-msg, v7.0.1, to ensure compatibility with new features and bug fixes, improving maintainability by tracking official releases. This change does not require any configuration updates. The update replaces a specific commit hash with the tagged release, aligning with best practices for dependency management.

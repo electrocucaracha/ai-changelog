@@ -1,0 +1,3 @@
+Category: Changed
+
+The documentation for the AI Changelog Generator has been significantly expanded to include a visual pipeline diagram and detailed explanations of each stage in the process. The pipeline now consists of six stages: repository scanning, diff extraction, AI summary generation, Git notes storage, semantic version grouping, and changelog rendering. This improvement aims to enhance onboarding for new users and maintainers by making the architecture and CLI behavior explicit.

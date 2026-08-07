@@ -287,8 +287,7 @@ class AIProvider:
             ) from error
         except (urllib_error.URLError, OSError) as error:
             raise RuntimeError(
-                "Ollama API is not reachable; ensure Ollama is running and "
-                "accessible"
+                "Ollama API is not reachable; ensure Ollama is running and accessible"
             ) from error
 
         if body.strip():

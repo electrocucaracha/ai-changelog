@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# pylint: disable=too-many-lines
+import logging
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -892,3 +894,262 @@ def test_cli_reports_no_commits_and_exits(tmp_path, monkeypatch):
 
     assert result.exit_code == 0
     assert "No commits found in repository" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Tests for internal helper functions targeting specific surviving mutations
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_worker_count_returns_one_for_zero_items(monkeypatch):
+    """item_count=0 must return 1, not any other value (mutmut_1/3)."""
+    monkeypatch.setattr(main.os, "cpu_count", lambda: 8)
+
+    assert main._resolve_worker_count(None, 0) == 1
+    assert main._resolve_worker_count(4, 0) == 1
+
+
+def test_resolve_worker_count_caps_at_item_count():
+    """Worker count may not exceed item_count."""
+    assert main._resolve_worker_count(10, 3) == 3
+
+
+def test_commit_message_str_decodes_bytes():
+    """Bytes commit messages must be decoded as UTF-8 with error replacement."""
+    msg = b"feat: add support for caf\xc3\xa9"  # codespell:ignore
+    result = main._commit_message_str(msg)
+    assert result == "feat: add support for café"
+
+
+def test_commit_message_str_passes_string_through():
+    """String inputs are returned unchanged."""
+    assert main._commit_message_str("fix: typo") == "fix: typo"
+
+
+def test_commit_message_str_handles_bytes_with_replacement():
+    """Invalid byte sequences are replaced, not raised."""
+    result = main._commit_message_str(b"bad byte: \xff")
+    assert isinstance(result, str)
+    assert "bad byte:" in result
+
+
+def test_render_worker_progress_bar_with_total_zero():
+    """A total of zero should return a full bar, not a partial bar."""
+    result = main._render_worker_progress_bar(0, 0, width=4)
+    assert result == "[####]"
+
+
+def test_render_worker_progress_bar_with_total_one():
+    """A total of exactly 1 must not behave the same as a zero total (mutmut_3)."""
+    partial = main._render_worker_progress_bar(0, 1, width=4)
+    full = main._render_worker_progress_bar(1, 1, width=4)
+    # Partial bar for 0/1 should have at least one '-'
+    assert "-" in partial
+    assert full == "[####]"
+
+
+def test_build_execution_command_includes_create_semver_tags():
+    """--create-semver-tags flag must appear in the command string."""
+    cmd = main._build_execution_command(
+        repo_path="/repo",
+        model="gpt-4o",
+        namespace="ai-changelog",
+        force=False,
+        clear_all=False,
+        create_semver_tags=True,
+        limit=None,
+        log_level="INFO",
+        changelog_file="CHANGELOG.md",
+        litellm_api_base=None,
+        litellm_api_key=None,
+        litellm_headers_json=None,
+    )
+    assert "--create-semver-tags" in cmd
+
+
+def test_configure_logging_silences_third_party_loggers_above_debug():
+    """Third-party loggers must be silenced when log level is above DEBUG."""
+    main._configure_logging("INFO")
+    httpx_logger = logging.getLogger("httpx")
+    httpcore_logger = logging.getLogger("httpcore")
+    litellm_logger = logging.getLogger("LiteLLM")
+
+    assert httpx_logger.level == logging.WARNING
+    assert httpcore_logger.level == logging.WARNING
+    assert litellm_logger.level == logging.WARNING
+
+
+def test_configure_logging_does_not_silence_at_debug_level():
+    """At DEBUG level the application should not suppress third-party logs."""
+    # Reset levels first
+    logging.getLogger("httpx").setLevel(logging.NOTSET)
+    main._configure_logging("DEBUG")
+    # httpx should not be forced to WARNING
+    assert logging.getLogger("httpx").level != logging.WARNING
+
+
+def test_generate_summary_for_commit_uses_author_name(monkeypatch):
+    """Author name from commit.author.name is forwarded to summarize_diff."""
+    captured = {}
+
+    class FakeProvider:
+        def summarize_diff(self, commit_message, diff, author=None):
+            captured["author"] = author
+            return "Summary."
+
+    prepared = main._PreparedCommit(
+        commit=SimpleNamespace(
+            hexsha="abc123",
+            author=SimpleNamespace(name="Carol"),
+        ),
+        commit_message="feat: something",
+        category="Added",
+        existing_note=None,
+        diff="+line",
+    )
+
+    result = main._generate_summary_for_commit(
+        cast(main.AIProvider, FakeProvider()), prepared
+    )
+
+    assert result.commit_hash == "abc123"
+    assert result.summary == "Summary."
+    assert captured["author"] == "Carol"
+
+
+def test_generate_summary_for_commit_handles_missing_author():
+    """Commits without author attribute yield author=None in summarize_diff."""
+    captured = {}
+
+    class FakeProvider:
+        def summarize_diff(self, commit_message, diff, author=None):
+            captured["author"] = author
+            return "Summary."
+
+    prepared = main._PreparedCommit(
+        commit=SimpleNamespace(hexsha="def456"),  # no .author attribute
+        commit_message="fix: bug",
+        category="Fixed",
+        existing_note=None,
+        diff="-old",
+    )
+
+    result = main._generate_summary_for_commit(
+        cast(main.AIProvider, FakeProvider()), prepared
+    )
+
+    assert result.summary == "Summary."
+    assert captured["author"] is None
+
+
+def test_generate_summaries_concurrently_returns_empty_dict_for_no_commits():
+    """Empty input must produce an empty result without errors."""
+
+    class FakeProvider:
+        def summarize_diff(self, *a, **kw):
+            return "ok"
+
+    result = main._generate_summaries_concurrently(
+        cast(main.AIProvider, FakeProvider()), [], 2
+    )
+    assert result == {}
+
+
+def test_generate_summaries_concurrently_increments_completed_by_one(monkeypatch):
+    """Each completed future must increment its worker's count by exactly 1."""
+    on_completed_calls = {"n": 0}
+
+    class FakeProvider:
+        def summarize_diff(self, *a, **kw):
+            return "ok"
+
+    monkeypatch.setattr(main.sys.stdout, "isatty", lambda: False)
+    monkeypatch.setattr(main.click, "echo", lambda *a, **kw: None)
+
+    prepared = [
+        _build_prepared_commit(f"hash{i}", "X", "feat: x", "+x") for i in range(3)
+    ]
+
+    def capture_count():
+        on_completed_calls["n"] += 1
+
+    results = main._generate_summaries_concurrently(
+        cast(main.AIProvider, FakeProvider()),
+        prepared,
+        workers=1,
+        on_summary_completed=capture_count,
+    )
+
+    assert len(results) == 3
+    assert on_completed_calls["n"] == 3
+
+
+def test_normalize_release_sections_rstrips_before_joining():
+    """Rebuilt sections must use rstrip to remove trailing newlines."""
+    text = (
+        "# Changelog\n\n"
+        "## [Unreleased]\n\n"
+        "## [1.0.0] - 2026-01-01\n\n"
+        "### Added\n"
+        "- Entry\n\n\n"
+    )
+
+    result = main._normalize_release_sections(text)
+
+    # Trailing whitespace within sections should not cause double blank lines
+    assert "\n\n\n" not in result
+
+
+def test_ensure_unreleased_and_get_insertion_index_creates_header_for_empty_input():
+    """Empty text must produce exactly '## [Unreleased]\\n\\n'."""
+    updated, index = main._ensure_unreleased_and_get_insertion_index("")
+
+    assert updated == "## [Unreleased]\n\n"
+    assert index == len(updated)
+
+
+def test_ensure_unreleased_and_get_insertion_index_inserts_before_first_semver():
+    """When no Unreleased exists, inserts one before the first semantic release."""
+    text = "## [1.0.0] - 2026-01-01\n\n### Added\n- First\n"
+
+    updated, index = main._ensure_unreleased_and_get_insertion_index(text)
+
+    assert "## [Unreleased]" in updated
+    assert updated.index("## [Unreleased]") < updated.index("## [1.0.0]")
+    # Insertion point must fall after the Unreleased section
+    assert updated[index:].startswith("## [1.0.0]")
+
+
+def test_merge_missing_release_sections_separator_between_blocks():
+    """New sections must be separated by double newline, not arbitrary text."""
+    existing = (
+        "# Changelog\n\n"
+        "## [Unreleased]\n\n"
+        "## [1.0.0] - 2026-01-01\n\n"
+        "### Added\n"
+        "- First release\n"
+    )
+    generated = (
+        "# Changelog\n\n"
+        "## [Unreleased]\n\n"
+        "## [1.2.0] - 2026-03-01\n\n"
+        "### Added\n"
+        "- New version\n\n"
+        "## [1.1.0] - 2026-02-01\n\n"
+        "### Fixed\n"
+        "- A fix\n\n"
+        "## [1.0.0] - 2026-01-01\n\n"
+        "### Added\n"
+        "- First release\n"
+    )
+
+    merged, added = main._merge_missing_release_sections(existing, generated)
+
+    assert added == 2
+    # Both new sections present with correct double-newline separation
+    assert "## [1.2.0]" in merged
+    assert "## [1.1.0]" in merged
+    idx_12 = merged.index("## [1.2.0]")
+    idx_11 = merged.index("## [1.1.0]")
+    separator = merged[idx_12:idx_11]
+    assert "\n\n" in separator

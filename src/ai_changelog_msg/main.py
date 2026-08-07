@@ -15,6 +15,7 @@
 
 """Main CLI entry point for AI Changelog Generator."""
 
+# pylint: disable=too-many-lines
 from __future__ import annotations
 
 import json
@@ -844,7 +845,7 @@ def cli(
                 click.echo(f"No git notes found for namespace: {namespace}")
             return
 
-        ai_provider = AIProvider(config)
+        ai_provider: AIProvider | None = None
         commits = repo.get_all_commits(limit=limit)
         total_commits = len(commits)
         logger.debug("Retrieved %d commits (limit=%s)", total_commits, limit)
@@ -875,6 +876,7 @@ def cli(
         summaries_to_generate: list[_PreparedCommit] = []
         already_noted_count = 0
         empty_diff_count = 0
+        note_cache: dict[str, str | None] = {}
 
         with click.progressbar(
             commits, label="Preparing commits", show_pos=True
@@ -882,6 +884,7 @@ def cli(
             for commit in progress:
                 commit_message = _commit_message_str(commit.message)
                 existing_note = repo.get_note(commit.hexsha, namespace)
+                note_cache[commit.hexsha] = existing_note
 
                 # Fast path for no-op runs: when a commit already has a note and
                 # regeneration is not forced, skip diff hydration entirely.
@@ -948,6 +951,8 @@ def cli(
                 "notes or empty diffs"
             )
         else:
+            if ai_provider is None:
+                ai_provider = AIProvider(config)
             with click.progressbar(
                 length=overall_total,
                 label="Overall progress",
@@ -993,6 +998,7 @@ def cli(
                                 category=category, summary=summary
                             )
                             repo.set_note(commit.hexsha, note_payload, namespace)
+                            note_cache[commit.hexsha] = note_payload
                             # Keep per-commit status at DEBUG so the progress bar output
                             # remains readable at default INFO log level.
                             logger.debug("Stored note for %s", commit.hexsha[:8])
@@ -1045,14 +1051,28 @@ def cli(
 
             logger.debug("Rendering changelog using namespace '%s'", namespace)
             changelog_builder = ChangelogBuilder(namespace=namespace)
+            if not use_fast_finalization and ai_provider is None:
+                ai_provider = AIProvider(config)
+
+            def get_note_cached(commit_hash: str, note_namespace: str) -> str | None:
+                if commit_hash in note_cache:
+                    return note_cache[commit_hash]
+                note_value = repo.get_note(commit_hash, note_namespace)
+                note_cache[commit_hash] = note_value
+                return note_value
+
             changelog = changelog_builder.build(
                 commits=commits,
-                get_note=repo.get_note,
+                get_note=get_note_cached,
                 tags_by_commit=repo.get_semantic_version_tags(),
                 generate_entry=(
                     None
                     if use_fast_finalization
-                    else ai_provider.generate_changelog_entry
+                    else (
+                        ai_provider.generate_changelog_entry
+                        if ai_provider is not None
+                        else None
+                    )
                 ),
                 commit_url_for_hash=repo.get_commit_web_url,
                 get_diff=None if use_fast_finalization else repo.get_commit_diff,

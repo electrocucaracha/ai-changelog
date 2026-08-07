@@ -18,7 +18,13 @@ from types import SimpleNamespace
 
 from ai_changelog_msg.changelog import (
     ChangelogBuilder,
+    _extract_release_sections_kac,
+    _find_insertion_point_kac,
+    _is_unreleased_heading,
+    _release_version_from_heading_kac,
     format_note,
+    infer_release_type,
+    merge_changelogs_with_keepachangelog,
     parse_conventional_commit,
     parse_note_metadata,
 )
@@ -303,3 +309,246 @@ def test_build_changelog_diversifies_repeated_leading_power_verbs():
         "Corrected fallback behavior when retries are exhausted. (bbbb0002)"
         in changelog
     )
+
+
+# ---------------------------------------------------------------------------
+# Tests for merge_changelogs_with_keepachangelog and KAC helper functions
+# ---------------------------------------------------------------------------
+
+
+def test_extract_release_sections_kac_parses_headings_and_blocks():
+    text = (
+        "# Changelog\n\n"
+        "## [Unreleased]\n\n"
+        "### Changed\n"
+        "- Some change\n\n"
+        "## [1.0.0] - 2026-01-01\n\n"
+        "### Added\n"
+        "- Initial release\n"
+    )
+
+    sections = _extract_release_sections_kac(text)
+
+    assert len(sections) == 2
+    headings = [h for h, _ in sections]
+    assert "## [Unreleased]" in headings
+    assert "## [1.0.0] - 2026-01-01" in headings
+    unreleased_block = next(b for h, b in sections if h == "## [Unreleased]")
+    assert "Some change" in unreleased_block
+
+
+def test_extract_release_sections_kac_returns_empty_for_no_headings():
+    assert _extract_release_sections_kac("No headings here.\n") == []
+
+
+def test_release_version_from_heading_kac_parses_semver():
+    assert _release_version_from_heading_kac("## [1.2.3] - 2026-01-01") == "1.2.3"
+    assert _release_version_from_heading_kac("## [v2.0.0]") == "2.0.0"
+
+
+def test_release_version_from_heading_kac_returns_none_for_unreleased():
+    assert _release_version_from_heading_kac("## [Unreleased]") is None
+
+
+def test_release_version_from_heading_kac_returns_none_for_non_semver():
+    assert _release_version_from_heading_kac("## [not-a-version]") is None
+
+
+def test_is_unreleased_heading_matches_unreleased():
+    assert _is_unreleased_heading("## [Unreleased]") is True
+    assert _is_unreleased_heading("## [unreleased]") is True
+
+
+def test_is_unreleased_heading_rejects_semver():
+    assert _is_unreleased_heading("## [1.0.0] - 2026-01-01") is False
+    assert _is_unreleased_heading("## [2.3.0]") is False
+
+
+def test_find_insertion_point_kac_after_unreleased_section():
+    text = (
+        "## [Unreleased]\n\n"
+        "### Changed\n"
+        "- Old change\n\n"
+        "## [1.0.0] - 2026-01-01\n\n"
+        "### Added\n"
+        "- Initial release\n"
+    )
+
+    point = _find_insertion_point_kac(text)
+
+    # Insertion point should be before "## [1.0.0]"
+    assert text[point:].startswith("## [1.0.0]")
+
+
+def test_find_insertion_point_kac_falls_back_to_first_release_when_no_unreleased():
+    text = "# Changelog\n\n## [1.0.0] - 2026-01-01\n\n### Added\n- Initial release\n"
+
+    point = _find_insertion_point_kac(text)
+
+    assert text[point:].startswith("## [1.0.0]")
+
+
+def test_find_insertion_point_kac_returns_end_when_no_releases():
+    text = "# Changelog\n\nNo releases yet.\n"
+
+    point = _find_insertion_point_kac(text)
+
+    assert point == len(text)
+
+
+def test_merge_changelogs_with_keepachangelog_appends_new_version():
+    existing = (
+        "# Changelog\n\n"
+        "## [Unreleased]\n\n"
+        "## [1.0.0] - 2026-01-01\n\n"
+        "### Added\n"
+        "- Initial release\n"
+    )
+    generated = (
+        "# Changelog\n\n"
+        "## [Unreleased]\n\n"
+        "## [1.1.0] - 2026-02-01\n\n"
+        "### Added\n"
+        "- New feature\n\n"
+        "## [1.0.0] - 2026-01-01\n\n"
+        "### Added\n"
+        "- Initial release\n"
+    )
+
+    merged, added = merge_changelogs_with_keepachangelog(existing, generated)
+
+    assert added == 1
+    assert "## [1.1.0] - 2026-02-01" in merged
+    assert "- Initial release" in merged
+    # New section inserted after Unreleased, before existing 1.0.0
+    assert merged.index("## [1.1.0]") < merged.index("## [1.0.0]")
+
+
+def test_merge_changelogs_with_keepachangelog_skips_existing_version():
+    existing = (
+        "# Changelog\n\n"
+        "## [Unreleased]\n\n"
+        "## [1.0.0] - 2026-01-01\n\n"
+        "### Added\n"
+        "- Initial release\n"
+    )
+    generated = (
+        "# Changelog\n\n"
+        "## [Unreleased]\n\n"
+        "## [1.0.0] - 2026-01-01\n\n"
+        "### Added\n"
+        "- Initial release regenerated\n"
+    )
+
+    merged, added = merge_changelogs_with_keepachangelog(existing, generated)
+
+    assert added == 0
+    assert merged == existing
+
+
+def test_merge_changelogs_with_keepachangelog_skips_versions_older_than_max():
+    existing = (
+        "# Changelog\n\n"
+        "## [Unreleased]\n\n"
+        "## [2.0.0] - 2026-03-01\n\n"
+        "### Added\n"
+        "- Major release\n"
+    )
+    generated = (
+        "# Changelog\n\n"
+        "## [Unreleased]\n\n"
+        "## [2.0.0] - 2026-03-01\n\n"
+        "### Added\n"
+        "- Major release\n\n"
+        "## [1.9.0] - 2026-02-01\n\n"
+        "### Added\n"
+        "- Old version\n"
+    )
+
+    merged, added = merge_changelogs_with_keepachangelog(existing, generated)
+
+    assert added == 0
+    assert "## [1.9.0]" not in merged
+
+
+def test_merge_changelogs_with_keepachangelog_returns_generated_when_existing_empty():
+    generated = "# Changelog\n\n## [1.0.0] - 2026-01-01\n\n### Added\n- First release\n"
+
+    merged, added = merge_changelogs_with_keepachangelog("", generated)
+
+    assert added == 0
+    assert merged == generated
+
+
+def test_merge_changelogs_with_keepachangelog_handles_no_existing_releases():
+    existing = "# Changelog\n\n## [Unreleased]\n\n### Changed\n- Placeholder\n"
+    generated = (
+        "# Changelog\n\n"
+        "## [Unreleased]\n\n"
+        "## [1.0.0] - 2026-01-01\n\n"
+        "### Added\n"
+        "- First release\n"
+    )
+
+    merged, added = merge_changelogs_with_keepachangelog(existing, generated)
+
+    assert added == 1
+    assert "## [1.0.0] - 2026-01-01" in merged
+    assert "Placeholder" in merged
+
+
+def test_build_renders_blank_line_between_md024_comment_and_heading():
+    """The rendered changelog must have a blank line after the MD024 disable comment."""
+    builder = ChangelogBuilder(namespace="ai-changelog")
+    commits = [
+        make_commit(
+            "aa000001",
+            "feat: initial",
+            datetime(2026, 1, 1, tzinfo=UTC),
+        )
+    ]
+    notes = {"aa000001": "Added first feature."}
+
+    changelog = builder.build(
+        commits=commits,
+        get_note=lambda commit_hash, namespace: notes.get(commit_hash),
+        tags_by_commit={},
+    )
+
+    # The blank line between the comment and the Changelog heading must be present
+    assert "<!-- Markdownlint-disable MD024 -->\n\n# Changelog" in changelog
+
+
+def test_infer_release_type_returns_patch_for_perf_and_revert():
+    """'perf' and 'revert' commit types must produce a 'patch' release type."""
+    assert infer_release_type("perf", False) == "patch"
+    assert infer_release_type("revert", False) == "patch"
+
+
+def test_parse_conventional_commit_empty_message_uses_unclassified_fallback():
+    """An empty commit message must return 'Unclassified change' as description."""
+    result = parse_conventional_commit("")
+
+    assert result.description == "Unclassified change"
+    assert result.commit_type is None
+
+
+def test_parse_conventional_commit_non_conventional_has_none_commit_type():
+    """Non-conventional commit messages must have commit_type set to None."""
+    result = parse_conventional_commit("Updated README for clarity")
+
+    assert result.commit_type is None
+    assert result.description == "Updated README for clarity"
+
+
+def test_is_unreleased_heading_case_insensitive():
+    """Heading check must be case-insensitive to catch [Unreleased] in any case.
+
+    This test catches equivalent mutations in the regex pattern (e.g., changing
+    [Unreleased] to [unreleased]) because re.IGNORECASE makes them equivalent.
+    """
+    assert _is_unreleased_heading("## [Unreleased]") is True
+    assert _is_unreleased_heading("## [unreleased]") is True
+    assert _is_unreleased_heading("## [UNRELEASED]") is True
+    assert _is_unreleased_heading("## [unRELEASED]") is True
+    assert _is_unreleased_heading("## [v1.0.0]") is False

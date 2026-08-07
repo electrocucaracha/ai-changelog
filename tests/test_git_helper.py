@@ -326,3 +326,56 @@ def test_get_repository_info_toon_uses_toon_format_encode(monkeypatch):
 
     assert repo.get_repository_info_toon() == "name: Alice"
     assert calls == [repo.get_repository_info()]
+
+
+# ---------------------------------------------------------------------------
+# Tests for edge cases targeting specific surviving mutations
+# ---------------------------------------------------------------------------
+
+
+def test_get_repository_info_head_commit_is_none_when_access_raises():
+    """head_commit must be None (not '') when accessing head.commit raises."""
+
+    class _BrokenHead:
+        @property
+        def commit(self):
+            raise RuntimeError("detached HEAD")
+
+    repo = _make_repo()
+    repo.repo = SimpleNamespace(
+        head=_BrokenHead(),
+        active_branch=SimpleNamespace(name="main"),
+        remotes=SimpleNamespace(),
+        tags=[],
+    )
+
+    info = repo.get_repository_info()
+
+    assert info["head_commit"] is None
+    assert not isinstance(info["head_commit"], str)
+
+
+def test_get_note_uses_ref_argument():
+    """get_note must pass '--ref' (lowercase) to git notes."""
+    fake_git = _FakeGit(note_result="my note")
+    repo = _make_repo(fake_git=fake_git)
+
+    result = repo.get_note("abc123", "ai-changelog")
+
+    assert result == "my note"
+    # Verify the exact argument used
+    assert len(fake_git.notes_calls) == 1
+    call_args = fake_git.notes_calls[0]
+    assert call_args[0] == "--ref"
+
+
+def test_create_tag_error_message_includes_stderr():
+    """RuntimeError for failed tag creation must include stderr detail."""
+
+    def _create_tag(name: str, ref: str):
+        raise GitCommandError(["git", "tag"], 1, stderr="already exists")
+
+    repo = _make_repo(create_tag=_create_tag)
+
+    with pytest.raises(RuntimeError, match="already exists"):
+        repo.create_tag("v1.0.0", "abc123")

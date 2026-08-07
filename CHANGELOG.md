@@ -278,7 +278,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Simplified subprocess-based test creation by introducing a helper function that encapsulates the call recording pattern and returns both the call log and a stubbed _run function, making it easier to add or update tests in the future. [3a9062b6](https://Github.com/electrocucaracha/ai-changelog/commit/3a9062b6a359d2daf3105ee343a55c835c7bb098)
+- Simplified subprocess-based test creation by introducing a helper function that encapsulates the call recording pattern and returns both the call log and a stubbed \_run function, making it easier to add or update tests in the future. [3a9062b6](https://Github.com/electrocucaracha/ai-changelog/commit/3a9062b6a359d2daf3105ee343a55c835c7bb098)
 
 ## [4.0.2] - 2026-08-04
 

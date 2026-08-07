@@ -1,0 +1,3 @@
+Category: Changed
+
+Finalization for no-op runs now skips unnecessary computations, improving performance by avoiding diff hydration and AI entry generation when no notes are updated. This preserves deterministic output while reducing processing time for large repositories. Tests were added to ensure these optimizations are correctly applied in no-op scenarios. The change does not introduce any breaking behavior or API changes.

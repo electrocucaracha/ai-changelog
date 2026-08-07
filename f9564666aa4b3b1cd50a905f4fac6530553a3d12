@@ -1,0 +1,3 @@
+Category: Changed
+
+The tox configuration has been updated to only include Python 3.12 in the envlist, removing support for older versions. This change streamlines CI runs and reduces maintenance burden. The mypy configuration now targets Python 3.12, ensuring type checking aligns with the supported runtime, and overrides have been updated to improve accuracy and reduce noise from third-party stubs.

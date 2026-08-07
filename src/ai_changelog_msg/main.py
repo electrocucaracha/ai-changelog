@@ -882,6 +882,13 @@ def cli(
             for commit in progress:
                 commit_message = _commit_message_str(commit.message)
                 existing_note = repo.get_note(commit.hexsha, namespace)
+
+                # Fast path for no-op runs: when a commit already has a note and
+                # regeneration is not forced, skip diff hydration entirely.
+                if existing_note and not force:
+                    already_noted_count += 1
+                    continue
+
                 diff = repo.get_commit_diff(commit)
 
                 parsed = parse_conventional_commit(commit_message)
@@ -906,10 +913,6 @@ def cli(
 
                 if not diff.strip():
                     empty_diff_count += 1
-                    continue
-
-                if existing_note and not force:
-                    already_noted_count += 1
                     continue
 
                 actionable_commits.append(prepared)
@@ -1022,6 +1025,10 @@ def cli(
                 "finalization from existing notes"
             )
 
+        # When no notes changed, avoid per-commit AI rewrites and diff hydration.
+        # This keeps finalization fast while preserving deterministic output.
+        use_fast_finalization = processed == 0 and failed == 0
+
         click.echo("Finalizing release metadata and changelog...")
 
         with click.progressbar(
@@ -1042,9 +1049,13 @@ def cli(
                 commits=commits,
                 get_note=repo.get_note,
                 tags_by_commit=repo.get_semantic_version_tags(),
-                generate_entry=ai_provider.generate_changelog_entry,
+                generate_entry=(
+                    None
+                    if use_fast_finalization
+                    else ai_provider.generate_changelog_entry
+                ),
                 commit_url_for_hash=repo.get_commit_web_url,
-                get_diff=repo.get_commit_diff,
+                get_diff=None if use_fast_finalization else repo.get_commit_diff,
             )
             progress.update(1)
 

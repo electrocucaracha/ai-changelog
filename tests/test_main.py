@@ -124,6 +124,7 @@ def _install_fake_ai_provider(
     *,
     summary_text: str = "Added summary.",
     fail_on_summarize: bool = False,
+    fail_on_generate_entry: bool = False,
 ) -> None:
     """Install a predictable AI provider test double for CLI tests."""
 
@@ -137,6 +138,8 @@ def _install_fake_ai_provider(
             return summary_text
 
         def generate_changelog_entry(self, commit_message, note, category, is_breaking):
+            if fail_on_generate_entry:
+                raise AssertionError("generate_changelog_entry should not be called")
             return note.splitlines()[0] if note else commit_message
 
     monkeypatch.setattr(main, "AIProvider", FakeAIProvider)
@@ -409,6 +412,29 @@ def test_cli_reports_when_no_summaries_need_generation(tmp_path, monkeypatch):
     )
     assert "Finalizing release metadata and changelog..." in result.output
     assert "Finalization" in result.output
+
+
+def test_cli_noop_finalization_skips_ai_entry_generation_and_diff_reads(
+    tmp_path, monkeypatch
+):
+    repo = _setup_single_commit_repo(
+        tmp_path,
+        monkeypatch,
+        notes_by_commit={
+            "a1b2c3d4": "Category: Added\n\nAdded summary already exists."
+        },
+    )
+
+    def fail_get_commit_diff(commit):
+        raise AssertionError("get_commit_diff should not be called")
+
+    repo.get_commit_diff = fail_get_commit_diff
+    _install_fake_ai_provider(monkeypatch, fail_on_generate_entry=True)
+
+    result = _invoke_cli(tmp_path, [])
+
+    assert result.exit_code == 0
+    assert "Changelog" in result.output
 
 
 def test_per_worker_progress_redraws_in_interactive_tty(monkeypatch):

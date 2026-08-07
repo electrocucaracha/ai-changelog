@@ -1,0 +1,3 @@
+Category: Changed
+
+Mutation tests now run in parallel by module, reducing CI duration and improving issue traceability. This change splits testing across modules using a matrix strategy, with each module's mutations running independently. A new mutation-gate job aggregates stats from all modules, failing if any mutations survive or are suspicious. This approach ensures a single enforcement point for mutation issues.

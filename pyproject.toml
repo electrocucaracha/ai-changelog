@@ -65,7 +65,7 @@ packages = ["src/ai_changelog_msg"]
 [tool.tox]
 legacy_tox_ini = """
 [tox]
-envlist = py312,py311,py310
+envlist = py312
 skip_missing_interpreters = true
 isolated_build = true
 
@@ -132,21 +132,29 @@ indent-style = "space"
 line-ending = "auto"
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
 
 [[tool.mypy.overrides]]
-module = "requests.*"
+module = ["click", "click.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = "litellm.*"
+module = "headroom.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = "git.*"
+module = "litellm"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["git", "git.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pytest"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

@@ -1,0 +1,3 @@
+Category: Removed
+
+The --no-progress flag was removed from the mutmut run step in CI, allowing real-time feedback during mutation testing and improving visibility into long-running test jobs. This change affects the Run mutation tests job in the CI workflow, removing a flag that suppressed progress output. No other steps are impacted by this update.

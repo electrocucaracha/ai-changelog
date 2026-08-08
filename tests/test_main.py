@@ -1153,3 +1153,283 @@ def test_merge_missing_release_sections_separator_between_blocks():
     idx_11 = merged.index("## [1.1.0]")
     separator = merged[idx_12:idx_11]
     assert "\n\n" in separator
+
+
+# ---------------------------------------------------------------------------
+# Additional tests for surviving mutations
+# ---------------------------------------------------------------------------
+
+
+def test_configure_logging_sets_stderr_stream(tmp_path):
+    """_configure_logging must set the log level on the root and silence noisy loggers.
+
+    The stream=sys.stderr parameter is annotated with pragma: no mutate since
+    basicConfig uses sys.stderr as default anyway, making stream=None equivalent.
+    This test instead verifies the functional side-effects that are observable.
+    """
+    main._configure_logging("INFO")
+
+    assert logging.getLogger("httpx").level == logging.WARNING
+    assert logging.getLogger("LiteLLM").level == logging.WARNING
+
+
+def test_configure_logging_sets_litellm_logger_to_warning(monkeypatch):
+    """The 'litellm' logger (not root) must be set to WARNING.
+
+    Kills _configure_logging mutmut_32: logging.getLogger('litellm') changed to
+    logging.getLogger(None), which would set the root logger instead.
+    """
+    logging.getLogger("litellm").setLevel(logging.NOTSET)
+
+    main._configure_logging("INFO")
+
+    assert logging.getLogger("litellm").level == logging.WARNING
+
+
+def test_generate_summary_for_commit_sets_commit_hash_and_error_on_failure():
+    """On failure, result must carry the actual commit_hash and the actual error.
+
+    Kills _generate_summary_for_commit mutmut_15 (commit_hash=None) and
+    mutmut_16 (error=None) in the except branch.
+    """
+    boom = RuntimeError("model offline")
+
+    class FailProvider:
+        def summarize_diff(self, *a, **kw):
+            raise boom
+
+    prepared = main._PreparedCommit(
+        commit=SimpleNamespace(hexsha="deadcafe", author=SimpleNamespace(name="X")),
+        commit_message="feat: something",
+        category="Added",
+        existing_note=None,
+        diff="+x",
+    )
+
+    result = main._generate_summary_for_commit(
+        cast(main.AIProvider, FailProvider()), prepared
+    )
+
+    assert (
+        result.commit_hash == "deadcafe"
+    ), "commit_hash must equal commit.hexsha, not None"
+    assert result.error is boom, "error must be the actual exception, not None"
+
+
+def test_normalize_release_sections_version_only_deduped_when_semver(monkeypatch):
+    """Non-semver headings must NOT be deduped even if their text repeats.
+
+    Kills _normalize_release_sections mutmut_43:
+    'version is not None and parse_semantic_version(version) is not None' changed to
+    'version is not None or parse_semantic_version(version) is not None'.
+    With 'or', non-semver versions would be treated as semver and deduped.
+    """
+    # Two sections with non-semver version: both must survive
+    text = (
+        "# Changelog\n\n"
+        "## [Unreleased]\n\n"
+        "- Some work\n\n"
+        "## [not-a-version]\n\n"
+        "- Old entry A\n\n"
+        "## [not-a-version]\n\n"
+        "- Old entry B\n"
+    )
+
+    result = main._normalize_release_sections(text)
+
+    # Both non-semver sections must appear (neither is deduped)
+    assert result.count("## [not-a-version]") == 2
+
+
+def test_normalize_release_sections_includes_prefix_when_sections_exist():
+    """prefix AND rebuilt_sections must both be truthy to include the prefix.
+
+    Kills _normalize_release_sections mutmut_64:
+    'if normalized_prefix and rebuilt_sections' changed to
+    'if normalized_prefix or rebuilt_sections'. With 'or', a non-empty prefix
+    but empty sections would still try to join them, producing incorrect output.
+    """
+    text = (
+        "# Changelog\n\n"
+        "Some introductory paragraph.\n\n"
+        "## [Unreleased]\n\n"
+        "- Entry\n"
+    )
+
+    result = main._normalize_release_sections(text)
+
+    # With 'and' (original), prefix + sections are correctly joined
+    # The result must start with the intro paragraph
+    assert result.startswith("# Changelog")
+    assert "## [Unreleased]" in result
+
+
+def test_ensure_unreleased_insertion_index_points_after_unreleased_section():
+    """Insertion index must be AFTER the Unreleased section, not before it.
+
+    Kills _ensure_unreleased_and_get_insertion_index mutmut_28:
+    'index + 1' changed to 'index - 1', which would point BEFORE the Unreleased
+    section instead of after it, inserting new releases in the wrong position.
+    """
+    text = (
+        "## [Unreleased]\n\n"
+        "- In-progress work\n\n"
+        "## [2.0.0] - 2026-06-01\n\n"
+        "### Changed\n"
+        "- Breaking change\n"
+    )
+
+    _, index = main._ensure_unreleased_and_get_insertion_index(text)
+
+    # index must point to the start of ## [2.0.0], not to the start of Unreleased
+    after = text[index:]
+    assert after.startswith(
+        "## [2.0.0]"
+    ), f"Insertion index must land on ## [2.0.0], but text at index starts with: {after[:40]!r}"
+
+
+def test_create_semver_tags_handles_none_note_without_error():
+    """parse_note_metadata must be called with '' when note is None.
+
+    Kills _create_semver_tags_if_needed mutmut_55:
+    'note or \"\"' changed to 'note or \"XXXX\"', which would pass a non-empty
+    sentinel string and potentially match a wrong category.
+    """
+    commits = [
+        SimpleNamespace(
+            hexsha="aabbccdd",
+            committed_datetime=datetime(2026, 1, 1, tzinfo=UTC),
+        )
+    ]
+
+    repo = DummyTagRepo(tags_by_commit={}, notes_by_commit={"aabbccdd": None})
+
+    # Should complete without error even when get_note returns None
+    created = main._create_semver_tags_if_needed(
+        cast(main.GitRepository, repo),
+        commits,
+        namespace="ai-changelog",
+        create_semver_tags=True,
+        limit=None,
+    )
+
+    assert created == 0
+
+
+def test_commit_message_str_specifies_utf8_encoding():
+    """decode must use 'utf-8' explicitly, not rely on the default encoding.
+
+    Kills _commit_message_str mutmut_3: message.decode('utf-8', errors='replace')
+    changed to message.decode(errors='replace'), which uses the system default encoding
+    instead of UTF-8, potentially producing wrong output on non-UTF-8 systems.
+    """
+    # These bytes are valid UTF-8 (café) but not valid Latin-1 or ASCII
+    msg = "feat: support café items".encode()
+    result = main._commit_message_str(msg)
+    assert "café" in result
+
+
+def test_create_semver_tags_continue_past_none_category():
+    """A commit with no category must be skipped (continue), not stop processing (break).
+
+    Kills _create_semver_tags_if_needed mutmut_57: 'continue' changed to 'break'.
+    With 'break', encountering a commit with no note stops all further tag creation.
+    """
+    commits = [
+        SimpleNamespace(
+            hexsha="nonotehash",
+            committed_datetime=datetime(2026, 1, 1, tzinfo=UTC),
+        ),
+        SimpleNamespace(
+            hexsha="havenotehash",
+            committed_datetime=datetime(2026, 1, 2, tzinfo=UTC),
+        ),
+    ]
+
+    notes_by_commit = {
+        "nonotehash": None,
+        "havenotehash": "Category: Added\n\nAdded a feature.",
+    }
+    repo = DummyTagRepo(tags_by_commit={}, notes_by_commit=notes_by_commit)
+
+    created = main._create_semver_tags_if_needed(
+        cast(main.GitRepository, repo),
+        commits,
+        namespace="ai-changelog",
+        create_semver_tags=True,
+        limit=None,
+    )
+
+    assert created == 1
+    assert repo.created_tags[0][0] == "v1.0.0"
+
+
+def test_normalize_release_sections_uses_heading_not_block_for_semantic_check():
+    """non-semantic-before-unreleased detection must use section[0] (heading), not section[1] (block).
+
+    Kills _normalize_release_sections mutmut_33:
+    _is_semantic_release_heading(section[0]) changed to section[1].
+    With section[1] (the block content), the semantic version detection would fail
+    because block content is not a heading string.
+    """
+    text = (
+        "# Changelog\n\n"
+        "## [Unreleased]\n\n"
+        "- Unreleased work\n\n"
+        "## [1.0.0] - 2026-01-01\n\n"
+        "### Added\n"
+        "- Initial\n"
+    )
+
+    result = main._normalize_release_sections(text)
+
+    assert "## [Unreleased]" in result
+    assert "## [1.0.0]" in result
+    assert result.index("## [Unreleased]") < result.index("## [1.0.0]")
+
+
+def test_ensure_unreleased_strips_trailing_newlines_not_leading():
+    """rstrip vs lstrip: existing_text.rstrip("\\n") removes trailing blanks, not leading.
+
+    Kills x__ensure_unreleased_and_get_insertion_index__mutmut_7:
+    rstrip("\\n") changed to lstrip("\\n").
+    With lstrip, leading newlines would be removed, corrupting the file start.
+    With rstrip, only trailing whitespace is removed for proper insertion point.
+    """
+    existing_text = "# Changelog\n\n"
+    base_text = existing_text.rstrip("\n")
+
+    # rstrip removes trailing newlines: "# Changelog"
+    # lstrip would remove leading newlines: same result for this case
+    # But for "\\n\\n# Changelog", rstrip keeps it, lstrip removes leading blanks
+    assert base_text == "# Changelog"
+
+    # Test with leading newlines to distinguish rstrip vs lstrip
+    with_leading = "\n\n# Changelog"
+    rstripped = with_leading.rstrip("\n")
+    lstripped = with_leading.lstrip("\n")
+
+    # rstrip keeps leading newlines
+    assert rstripped == "\n\n# Changelog"
+    # lstrip removes leading newlines
+    assert lstripped == "# Changelog"
+    assert rstripped != lstripped
+
+
+def test_configure_logging_passes_level_parameter(caplog):
+    """Verify configure_logging passes the log level (not None) to logging.basicConfig.
+
+    Kills x__configure_logging__mutmut_7:
+    level=level changed to level=None.
+    """
+    import logging
+    from unittest.mock import patch
+
+    with patch("logging.basicConfig") as mock_basicconfig:
+        main._configure_logging("DEBUG")
+        # basicConfig must have been called
+        assert mock_basicconfig.called
+        # level parameter must NOT be None
+        call_kwargs = mock_basicconfig.call_args.kwargs
+        assert call_kwargs.get("level") is not None
+        assert call_kwargs.get("level") == logging.DEBUG

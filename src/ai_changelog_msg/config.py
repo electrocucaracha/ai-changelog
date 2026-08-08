@@ -20,10 +20,11 @@ from __future__ import annotations
 import json
 import os
 import platform
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 
+@dataclass
 class Config:
     """Runtime configuration for the AI Changelog Message Generator.
 
@@ -73,7 +74,7 @@ class Config:
     retry_backoff_seconds: float = 1.0
     litellm_api_base: str | None = None
     litellm_api_key: str | None = None
-    litellm_extra_headers: dict[str, str] | None = None
+    litellm_extra_headers: dict[str, str] | None = field(default=None)
     enable_headroom: bool = False
 
     def __post_init__(self) -> None:
@@ -310,6 +311,3 @@ class Config:
             'my-notes'
         """
         return self.namespace
-
-
-Config = dataclass(Config)

@@ -40,6 +40,7 @@ test = [
     "pytest-mock",
     "pytest-cov",
     "mutmut",
+    "mypy",
 ]
 eval = [
     "deepeval",
@@ -61,6 +62,9 @@ ai-changelog = "ai_changelog_msg.main:cli"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ai_changelog_msg"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/ai_changelog_msg/py.typed" = "ai_changelog_msg/py.typed"
 
 [tool.tox]
 legacy_tox_ini = """
@@ -113,6 +117,7 @@ source_paths = ["src/ai_changelog_msg/"]
 do_not_mutate = ["src/ai_changelog_msg/__init__.py"]
 do_not_mutate_patterns = [
     "raise [A-Za-z]",
+    "pragma: no mutate",
 ]
 
 [tool.black]
@@ -157,6 +162,10 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "pytest"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "click"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

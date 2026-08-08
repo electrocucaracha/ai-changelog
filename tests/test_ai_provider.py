@@ -590,3 +590,125 @@ def test_summarize_diff_logs_model_name_in_request_message(monkeypatch, caplog):
     assert "gpt-4o-test" in request_log_records[0].getMessage()
     # Must use lowercase format string (not mutated to uppercase)
     assert "SENDING REQUEST" not in caplog.text
+
+
+def test_extract_review_metadata_deduplicates_repeated_approver():
+    """Duplicate approver identity must appear exactly once, not twice.
+
+    Kills _extract_review_metadata mutmut_21: 'and identity not in approvers'
+    changed to 'or identity not in approvers'. With 'or', a duplicate identity
+    would be added again because the identity is truthy.
+    """
+    provider = AIProvider.__new__(AIProvider)
+    commit_message = (
+        "Merge pull request #10 from alice/feature\n\n"
+        "feat: add feature\n\n"
+        "Reviewed-by: Alice <alice@example.com>\n"
+        "Approved-by: Alice <alice@example.com>\n"
+    )
+
+    _, approver = provider._extract_review_metadata(commit_message)
+
+    assert approver == "Alice"
+
+
+def test_init_headroom_preserves_existing_callbacks(monkeypatch):
+    """Existing callbacks must be preserved when enabling Headroom.
+
+    Kills _enable_headroom_compression_if_requested mutmut_10:
+    getattr(litellm, 'callbacks', None) changed to getattr(litellm, 'CALLBACKS', None).
+    With 'CALLBACKS', the existing list is not found (returns None), a new empty list
+    is created, and the existing callback is lost.
+    """
+
+    class FakeHeadroomCallback:
+        pass
+
+    class ExistingCallback:
+        pass
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider._HeadroomCallback",
+        FakeHeadroomCallback,
+    )
+    existing = ExistingCallback()
+    monkeypatch.setattr("ai_changelog_msg.ai_provider.litellm.callbacks", [existing])
+
+    AIProvider(Config(enable_headroom=True))
+
+    callbacks = ai_provider.litellm.callbacks
+    assert any(
+        isinstance(c, ExistingCallback) for c in callbacks
+    ), "Existing callback must be preserved"
+    assert any(
+        isinstance(c, FakeHeadroomCallback) for c in callbacks
+    ), "Headroom callback must be appended"
+
+
+def test_init_headroom_converts_non_list_callbacks_to_list(monkeypatch):
+    """Non-list callbacks attribute must be converted to list before appending.
+
+    Kills _enable_headroom_compression_if_requested mutmut_16:
+    list(callbacks) changed to list(None), which would TypeError at runtime.
+    """
+
+    class FakeHeadroomCallback:
+        pass
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider._HeadroomCallback",
+        FakeHeadroomCallback,
+    )
+    # A tuple is not a list; must be converted
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.litellm.callbacks", ("preexisting_item",)
+    )
+
+    AIProvider(Config(enable_headroom=True))
+
+    callbacks = ai_provider.litellm.callbacks
+    assert isinstance(callbacks, list)
+    assert any(isinstance(c, FakeHeadroomCallback) for c in callbacks)
+
+
+def test_sanitize_changelog_entry_rejects_mixed_case_system_label():
+    """Structured labels must be rejected regardless of case (re.IGNORECASE).
+
+    Kills _sanitize_changelog_entry mutmut_43 (flags=re.IGNORECASE removed) and
+    mutmut_45 (regex pattern lowercased), both of which would fail to match
+    'System:' or similar mixed-case labels.
+    """
+    provider = AIProvider.__new__(AIProvider)
+
+    for label in ("System:", "USER:", "Assistant:", "Category:", "Notes:"):
+        result = provider._sanitize_changelog_entry(f"{label} This is a prompt leak.")
+        assert result is None, f"Expected None for label '{label}', got {result!r}"
+
+
+def test_sanitize_changelog_entry_joins_lines_with_single_space():
+    """Multiple input lines must be joined with a single space, not 'XX XX'.
+
+    Kills _sanitize_changelog_entry mutmut_16:
+    ' '.join(lines) changed to 'XX XX'.join(lines).
+    """
+    provider = AIProvider.__new__(AIProvider)
+
+    content = "First part of\nthe changelog entry."
+    result = provider._sanitize_changelog_entry(content)
+
+    assert result is not None
+    assert "XX" not in result
+    assert "First part of the changelog entry." == result
+
+
+def test_clean_identity_uses_first_angle_bracket():
+    """_clean_identity must split on the FIRST '<', not the last.
+
+    Kills _clean_identity mutmut_4: find('<') changed to rfind('<').
+    With rfind, 'Alice <a@b.com> <extra>' would find the second '<'.
+    """
+    provider = AIProvider.__new__(AIProvider)
+
+    result = provider._clean_identity("Alice Smith <alice@example.com> <secondary>")
+
+    assert result == "Alice Smith"

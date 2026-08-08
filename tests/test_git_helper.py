@@ -67,7 +67,7 @@ def _make_repo(
 ) -> GitRepository:
     repo = GitRepository.__new__(GitRepository)
     repo.repo_path = Path("/tmp/repo")
-    repo.repo = SimpleNamespace(
+    repo.repo = SimpleNamespace(  # type: ignore[assignment]
         git=fake_git or _FakeGit(),
         iter_commits=lambda ref: [1, 2, 3],
         tags=tags or [],
@@ -91,7 +91,7 @@ def _make_repo_with_head_commit(remote_url: str) -> GitRepository:
         committed_datetime=SimpleNamespace(isoformat=lambda: "2026-08-05T12:00:00"),
     )
     repo = _make_repo(remote_url=remote_url)
-    repo.repo = SimpleNamespace(
+    repo.repo = SimpleNamespace(  # type: ignore[assignment]
         git=repo.repo.git,
         iter_commits=repo.repo.iter_commits,
         tags=repo.repo.tags,
@@ -379,3 +379,29 @@ def test_create_tag_error_message_includes_stderr():
 
     with pytest.raises(RuntimeError, match="already exists"):
         repo.create_tag("v1.0.0", "abc123")
+
+
+def test_has_commits_returns_true_when_commits_exist():
+    """has_commits must return True (not False) when commits exist.
+
+    Kills xǁGitRepositoryǁhas_commits__mutmut_2:
+    return False replaces return True.
+    """
+    from tempfile import TemporaryDirectory
+
+    from git import Repo
+
+    with TemporaryDirectory() as tmpdir:
+        repo = Repo.init(tmpdir)
+        # Add a commit
+        file_path = Path(tmpdir) / "test.txt"
+        file_path.write_text("initial")
+        repo.index.add(["test.txt"])
+        repo.index.commit("Initial commit")
+
+        from ai_changelog_msg.git_helper import GitRepository
+
+        git_repo = GitRepository(tmpdir)
+
+        # should return True when commits exist
+        assert git_repo.has_commits() is True

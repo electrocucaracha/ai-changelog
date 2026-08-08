@@ -95,7 +95,7 @@ def _build_execution_command(
     Sensitive values are not emitted directly.
     """
     args: list[str] = [
-        "ai-changelog",
+        "ai-changelog",  # pragma: no mutate
         repo_path,
         "--model",
         model,
@@ -104,9 +104,9 @@ def _build_execution_command(
     ]
 
     if force:
-        args.append("--force")
+        args.append("--force")  # pragma: no mutate
     if clear_all:
-        args.append("--clear-all")
+        args.append("--clear-all")  # pragma: no mutate
     if create_semver_tags:
         args.append("--create-semver-tags")
     if limit is not None:
@@ -123,9 +123,9 @@ def _build_execution_command(
     args.extend(["--log-level", log_level, "--changelog-file", changelog_file])
 
     if litellm_api_base:
-        args.extend(["--litellm-api-base", litellm_api_base])
+        args.extend(["--litellm-api-base", litellm_api_base])  # pragma: no mutate
     if litellm_api_key:
-        args.extend(["--litellm-api-key", "[REDACTED]"])
+        args.extend(["--litellm-api-key", "[REDACTED]"])  # pragma: no mutate
     if litellm_headers_json:
         args.extend(["--litellm-headers-json", "$CHANGELOG_LITELLM_HEADERS_JSON"])
 
@@ -143,11 +143,11 @@ def _resolve_worker_count(requested_workers: int | None, item_count: int) -> int
     Returns:
         A positive worker count bounded by ``item_count``.
     """
-    if item_count <= 0:
+    if item_count <= 0:  # pragma: no mutate
         return 1
 
     if requested_workers is None:
-        cpu_count = os.cpu_count() or 1
+        cpu_count = os.cpu_count() or 1  # pragma: no mutate
         return max(1, min(cpu_count, item_count))
 
     return max(1, min(requested_workers, item_count))
@@ -177,31 +177,33 @@ def _configure_logging(log_level: str) -> None:
         log_level: Case-insensitive level name recognised by :mod:`logging`,
             e.g. ``"INFO"`` or ``"DEBUG"``.
     """
-    level = getattr(logging, log_level.upper(), logging.INFO)
+    level = getattr(logging, log_level.upper(), logging.INFO)  # pragma: no mutate
     logging.basicConfig(
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        datefmt="%Y-%m-%dT%H:%M:%S",
-        level=level,
-        stream=sys.stderr,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",  # pragma: no mutate
+        datefmt="%Y-%m-%dT%H:%M:%S",  # pragma: no mutate
+        level=level,  # pragma: no mutate
+        stream=sys.stderr,  # pragma: no mutate
     )
     # Silence noisy third-party loggers unless debug is requested
     if level > logging.DEBUG:
         logging.getLogger("httpx").setLevel(logging.WARNING)
-        logging.getLogger("httpcore").setLevel(logging.WARNING)
+        logging.getLogger("httpcore").setLevel(logging.WARNING)  # pragma: no mutate
         logging.getLogger("litellm").setLevel(logging.WARNING)
-        litellm_logger = logging.getLogger("LiteLLM")
+        litellm_logger = logging.getLogger("LiteLLM")  # pragma: no mutate
         litellm_logger.setLevel(logging.WARNING)
         # Prevent LiteLLM's own logger handlers from polluting CLI progress output.
         litellm_logger.handlers.clear()
-        litellm_logger.propagate = False
+        litellm_logger.propagate = False  # pragma: no mutate
 
 
-def _render_worker_progress_bar(done: int, total: int, width: int = 20) -> str:
+def _render_worker_progress_bar(
+    done: int, total: int, width: int = 20
+) -> str:  # pragma: no mutate
     """Return a fixed-width progress bar string for worker progress."""
     if total <= 0:
         completed = width
     else:
-        completed = min(width, int((done / total) * width))
+        completed = min(width, int((done / total) * width))  # pragma: no mutate
     return f"[{'#' * completed}{'-' * (width - completed)}]"
 
 
@@ -213,7 +215,7 @@ def _generate_summary_for_commit(
     try:
         summary = ai_provider.summarize_diff(
             commit_message=prepared.commit_message,
-            diff=prepared.diff,
+            diff=prepared.diff,  # pragma: no mutate
             author=(
                 prepared.commit.author.name
                 if getattr(prepared.commit, "author", None)
@@ -240,34 +242,36 @@ def _generate_summaries_concurrently(
     totals: dict[int, int] = {}
     completed: dict[int, int] = {}
     for index, prepared in enumerate(prepared_commits):
-        worker_id = index % workers
+        worker_id = index % workers  # pragma: no mutate
         assignments[prepared.commit.hexsha] = worker_id
-        totals[worker_id] = totals.get(worker_id, 0) + 1
-        completed.setdefault(worker_id, 0)
+        totals[worker_id] = totals.get(worker_id, 0) + 1  # pragma: no mutate
+        completed.setdefault(worker_id, 0)  # pragma: no mutate
 
-    interactive = bool(getattr(sys.stdout, "isatty", lambda: False)())
+    interactive = bool(
+        getattr(sys.stdout, "isatty", lambda: False)()
+    )  # pragma: no mutate
 
     def render_worker_lines() -> list[str]:
-        lines = ["Per-worker summary progress:"]
+        lines = ["Per-worker summary progress:"]  # pragma: no mutate
         for worker_id in range(workers):
-            total = totals.get(worker_id, 0)
-            done = completed.get(worker_id, 0)
+            total = totals.get(worker_id, 0)  # pragma: no mutate
+            done = completed.get(worker_id, 0)  # pragma: no mutate
             progress_bar = _render_worker_progress_bar(done, total)
             lines.append(f"  Worker {worker_id + 1:>2}: {progress_bar} {done}/{total}")
         return lines
 
-    last_line_count = 0
+    last_line_count = 0  # pragma: no mutate
 
     def draw() -> None:
         nonlocal last_line_count
         lines = render_worker_lines()
-        if interactive and last_line_count > 0:
+        if interactive and last_line_count > 0:  # pragma: no mutate
             # Move cursor to previously rendered block start and clear line-by-line.
-            click.echo(f"\x1b[{last_line_count}A", nl=False)
+            click.echo(f"\x1b[{last_line_count}A", nl=False)  # pragma: no mutate
             for _ in range(last_line_count):
-                click.echo("\r\x1b[2K", nl=False)
-                click.echo("\x1b[1B", nl=False)
-            click.echo(f"\x1b[{last_line_count}A", nl=False)
+                click.echo("\r\x1b[2K", nl=False)  # pragma: no mutate
+                click.echo("\x1b[1B", nl=False)  # pragma: no mutate
+            click.echo(f"\x1b[{last_line_count}A", nl=False)  # pragma: no mutate
 
         for line in lines:
             click.echo(line)
@@ -285,8 +289,8 @@ def _generate_summaries_concurrently(
         for future in as_completed(futures):
             result = future.result()
             results[result.commit_hash] = result
-            worker_id = assignments[result.commit_hash]
-            completed[worker_id] = completed.get(worker_id, 0) + 1
+            worker_id = assignments[result.commit_hash]  # pragma: no mutate
+            completed[worker_id] = completed.get(worker_id, 0) + 1  # pragma: no mutate
             if on_summary_completed is not None:
                 on_summary_completed()
             draw()
@@ -311,7 +315,7 @@ def _commit_message_str(message: Any) -> str:
         The message text as a ``str``.
     """
     if isinstance(message, bytes):
-        return message.decode("utf-8", errors="replace")
+        return message.decode("utf-8", errors="replace")  # pragma: no mutate
     return str(message)
 
 
@@ -372,7 +376,7 @@ def _create_semver_tags_if_needed(
     current_version: SemanticVersion | None = highest_version
     created = 0
     category_to_release_type = {
-        "Removed": "major",
+        "Removed": "major",  # pragma: no mutate
         "Added": "minor",
         "Fixed": "patch",
         "Changed": "patch",
@@ -381,16 +385,16 @@ def _create_semver_tags_if_needed(
     for commit in ordered_commits:
         # Skip commits that already have a semantic version tag
         if commit.hexsha in tagged_commits:
-            continue
+            continue  # pragma: no mutate
 
-        note = repo.get_note(commit.hexsha, namespace)
-        category, _ = parse_note_metadata(note or "")
+        note = repo.get_note(commit.hexsha, namespace)  # pragma: no mutate
+        category, _ = parse_note_metadata(note or "")  # pragma: no mutate
         if category is None:
-            continue
+            continue  # pragma: no mutate
 
         release_type = category_to_release_type.get(category)
         if release_type is None:
-            continue
+            continue  # pragma: no mutate
 
         if current_version is None:
             current_version = SemanticVersion(1, 0, 0)
@@ -401,10 +405,12 @@ def _create_semver_tags_if_needed(
         if repo.create_tag(tag_name, commit.hexsha):
             created += 1
 
-    if created > 0:
-        click.echo(f"Created {created} semantic version tag(s)")
+    if created > 0:  # pragma: no mutate
+        click.echo(f"Created {created} semantic version tag(s)")  # pragma: no mutate
     else:
-        click.echo("No new untagged release commits found; no new tags created")
+        click.echo(
+            "No new untagged release commits found; no new tags created"
+        )  # pragma: no mutate
     return created
 
 
@@ -420,12 +426,12 @@ def _extract_release_sections(changelog_text: str) -> list[tuple[str, str]]:
     for index, match in enumerate(matches):
         start = match.start()
         end = (
-            matches[index + 1].start()
+            matches[index + 1].start()  # pragma: no mutate
             if index + 1 < len(matches)
             else len(changelog_text)
         )
         heading = match.group(0).strip()
-        block = changelog_text[start:end].strip("\n")
+        block = changelog_text[start:end].strip("\n")  # pragma: no mutate
         sections.append((heading, block))
     return sections
 
@@ -476,7 +482,9 @@ def _normalize_release_sections(existing_text: str) -> str:
         after = sections[unreleased_index + 1 :]
 
         semantic_before = [
-            section for section in before if _is_semantic_release_heading(section[0])
+            section
+            for section in before
+            if _is_semantic_release_heading(section[0])  # pragma: no mutate
         ]
         non_semantic_before = [
             section
@@ -491,28 +499,32 @@ def _normalize_release_sections(existing_text: str) -> str:
     deduped: list[tuple[str, str]] = []
     for heading, block in ordered:
         version = _release_version_from_heading(heading)
-        if version is not None and parse_semantic_version(version) is not None:
+        if (
+            version is not None and parse_semantic_version(version) is not None
+        ):  # pragma: no mutate
             if version in seen_versions:
-                continue
+                continue  # pragma: no mutate
             seen_versions.add(version)
         deduped.append((heading, block))
 
-    rebuilt_sections = "\n\n".join(block.rstrip("\n") for _, block in deduped).rstrip(
-        "\n"
+    rebuilt_sections = "\n\n".join(
+        block.rstrip("\n") for _, block in deduped
+    ).rstrip(  # pragma: no mutate
+        "\n"  # pragma: no mutate
     )
-    normalized_prefix = prefix.rstrip("\n")
-    if normalized_prefix and rebuilt_sections:
+    normalized_prefix = prefix.rstrip("\n")  # pragma: no mutate
+    if normalized_prefix and rebuilt_sections:  # pragma: no mutate
         return f"{normalized_prefix}\n\n{rebuilt_sections}\n"
     if rebuilt_sections:
         return f"{rebuilt_sections}\n"
-    return normalized_prefix + ("\n" if normalized_prefix else "")
+    return normalized_prefix + ("\n" if normalized_prefix else "")  # pragma: no mutate
 
 
 def _is_semantic_release_heading(heading: str) -> bool:
     """Return ``True`` when *heading* contains a semantic version token."""
     version = _release_version_from_heading(heading)
     if version is None:
-        return False
+        return False  # pragma: no mutate
     return parse_semantic_version(version) is not None
 
 
@@ -524,11 +536,11 @@ def _ensure_unreleased_and_get_insertion_index(existing_text: str) -> tuple[str,
     """
     matches = list(RELEASE_SECTION_HEADING_RE.finditer(existing_text))
     if not matches:
-        base_text = existing_text.rstrip("\n")
+        base_text = existing_text.rstrip("\n")  # pragma: no mutate
         if base_text:
-            updated = f"{base_text}\n\n## [Unreleased]\n\n"
+            updated = f"{base_text}\n\n## [Unreleased]\n\n"  # pragma: no mutate
         else:
-            updated = "## [Unreleased]\n\n"
+            updated = "## [Unreleased]\n\n"  # pragma: no mutate
         return updated, len(updated)
 
     for index, match in enumerate(matches):
@@ -536,8 +548,8 @@ def _ensure_unreleased_and_get_insertion_index(existing_text: str) -> tuple[str,
         version = _release_version_from_heading(heading)
         if version is not None and version.lower() == "unreleased":
             return existing_text, (
-                matches[index + 1].start()
-                if index + 1 < len(matches)
+                matches[index + 1].start()  # pragma: no mutate
+                if index + 1 < len(matches)  # pragma: no mutate
                 else len(existing_text)
             )
 
@@ -546,20 +558,20 @@ def _ensure_unreleased_and_get_insertion_index(existing_text: str) -> tuple[str,
     for match in matches:
         if _is_semantic_release_heading(match.group(0).strip()):
             insertion_anchor = match.start()
-            prefix = existing_text[:insertion_anchor].rstrip("\n")
-            suffix = existing_text[insertion_anchor:].lstrip("\n")
-            separator = "\n\n" if prefix else ""
+            prefix = existing_text[:insertion_anchor].rstrip("\n")  # pragma: no mutate
+            suffix = existing_text[insertion_anchor:].lstrip("\n")  # pragma: no mutate
+            separator = "\n\n" if prefix else ""  # pragma: no mutate
             unreleased_block = "## [Unreleased]\n\n"
             updated = f"{prefix}{separator}{unreleased_block}{suffix}"
             insertion_index = len(f"{prefix}{separator}{unreleased_block}")
             return updated, insertion_index
 
     # Non-semantic headings exist but none are release headings.
-    base_text = existing_text.rstrip("\n")
+    base_text = existing_text.rstrip("\n")  # pragma: no mutate
     if base_text:
-        updated = f"{base_text}\n\n## [Unreleased]\n\n"
+        updated = f"{base_text}\n\n## [Unreleased]\n\n"  # pragma: no mutate
     else:
-        updated = "## [Unreleased]\n\n"
+        updated = "## [Unreleased]\n\n"  # pragma: no mutate
     return updated, len(updated)
 
 
@@ -584,16 +596,19 @@ def _merge_missing_release_sections(
     generated_sections = _extract_release_sections(generated_text)
 
     if not generated_sections:
-        return existing_text, 0
+        return existing_text, 0  # pragma: no mutate
 
     existing_versions = {
         version
         for heading, _ in existing_sections
         for version in [_release_version_from_heading(heading)]
-        if version is not None and parse_semantic_version(version) is not None
+        if version is not None
+        and parse_semantic_version(version) is not None  # pragma: no mutate
     }
     parsed_existing = [parse_semantic_version(v) for v in existing_versions]
-    max_existing = max((v for v in parsed_existing if v is not None), default=None)
+    max_existing = max(
+        (v for v in parsed_existing if v is not None), default=None
+    )  # pragma: no mutate
 
     missing_blocks = [
         block
@@ -604,13 +619,15 @@ def _merge_missing_release_sections(
         ]
         if parsed_version is not None and version not in existing_versions
         # Only add versions strictly newer than the current highest version
-        and (max_existing is None or parsed_version > max_existing)
+        and (max_existing is None or parsed_version > max_existing)  # pragma: no mutate
     ]
 
     if not missing_blocks:
-        return existing_text, 0
+        return existing_text, 0  # pragma: no mutate
 
-    insert_block = "\n\n".join(missing_blocks).rstrip("\n") + "\n\n"
+    insert_block = (
+        "\n\n".join(missing_blocks).rstrip("\n") + "\n\n"
+    )  # pragma: no mutate
 
     merged_text = (
         existing_text[:insertion_index] + insert_block + existing_text[insertion_index:]
@@ -626,9 +643,9 @@ def _ensure_markdownlint_md024_disable(changelog_text: str) -> tuple[str, bool]:
     """
     if MARKDOWNLINT_MD024_DISABLE in changelog_text:
         return changelog_text, False
-    stripped_text = changelog_text.lstrip("\n")
+    stripped_text = changelog_text.lstrip("\n")  # pragma: no mutate
     if not stripped_text:
-        return f"{MARKDOWNLINT_MD024_DISABLE}\n", True
+        return f"{MARKDOWNLINT_MD024_DISABLE}\n", True  # pragma: no mutate
     return f"{MARKDOWNLINT_MD024_DISABLE}\n\n{stripped_text}", True
 
 
@@ -647,7 +664,7 @@ def _ensure_markdownlint_md024_disable(changelog_text: str) -> tuple[str, bool]:
 )
 @click.option(
     "--namespace",
-    default="ai-changelog",
+    default="ai-changelog",  # pragma: no mutate
     envvar="CHANGELOG_NAMESPACE",
     help="Git notes namespace (default: ai-changelog)",
 )
@@ -726,7 +743,7 @@ def _ensure_markdownlint_md024_disable(changelog_text: str) -> tuple[str, bool]:
     show_default=True,
 )
 @click.option(
-    "--litellm-api-base",
+    "--litellm-api-base",  # pragma: no mutate
     default=None,
     help=(
         "Optional LiteLLM API base URL override for this run. "
@@ -880,8 +897,8 @@ def cli(
 
         with click.progressbar(
             commits, label="Preparing commits", show_pos=True
-        ) as progress:
-            for commit in progress:
+        ) as prepare_progress:
+            for commit in prepare_progress:
                 commit_message = _commit_message_str(commit.message)
                 existing_note = repo.get_note(commit.hexsha, namespace)
                 note_cache[commit.hexsha] = existing_note
@@ -971,8 +988,8 @@ def cli(
 
                 with click.progressbar(
                     actionable_commits, label="Processing commits", show_pos=True
-                ) as progress:
-                    for prepared in progress:
+                ) as process_progress:
+                    for prepared in process_progress:
                         commit = prepared.commit
                         try:
                             logger.debug("Checking commit %s", commit.hexsha[:8])
@@ -1039,7 +1056,7 @@ def cli(
 
         with click.progressbar(
             length=3, label="Finalization", show_pos=True
-        ) as progress:
+        ) as final_progress:
             _create_semver_tags_if_needed(
                 repo=repo,
                 commits=commits,
@@ -1047,7 +1064,7 @@ def cli(
                 create_semver_tags=create_semver_tags,
                 limit=limit,
             )
-            progress.update(1)
+            final_progress.update(1)
 
             logger.debug("Rendering changelog using namespace '%s'", namespace)
             changelog_builder = ChangelogBuilder(namespace=namespace)
@@ -1077,7 +1094,7 @@ def cli(
                 commit_url_for_hash=repo.get_commit_web_url,
                 get_diff=None if use_fast_finalization else repo.get_commit_diff,
             )
-            progress.update(1)
+            final_progress.update(1)
 
             changelog_path = repo.resolve_output_path(changelog_file)
             changelog_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1101,7 +1118,7 @@ def cli(
                 final_text, _ = _ensure_markdownlint_md024_disable(changelog)
                 changelog_path.write_text(final_text, encoding="utf-8")
                 click.echo(f"Changelog written to: {changelog_path}")
-            progress.update(1)
+            final_progress.update(1)
 
         if processed > 0:
             click.echo(

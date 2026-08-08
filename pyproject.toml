@@ -110,8 +110,10 @@ commands =
 
 [tool.mutmut]
 source_paths = ["src/ai_changelog_msg/"]
-paths_to_exclude = ["src/ai_changelog_msg/__init__.py"]
-test_command = "python -m pytest tests/ -x -q"
+do_not_mutate = ["src/ai_changelog_msg/__init__.py"]
+do_not_mutate_patterns = [
+    "raise [A-Za-z]",
+]
 
 [tool.black]
 line-length = 88

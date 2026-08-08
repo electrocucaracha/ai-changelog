@@ -54,7 +54,16 @@ class TestConfig:
             Config(model="")
 
         with pytest.raises(ValueError):
+            Config(namespace="")
+
+        with pytest.raises(ValueError):
             Config(max_diff_size=-1)
+
+        with pytest.raises(ValueError):
+            Config(max_diff_size=0)
+
+        with pytest.raises(ValueError):
+            Config(api_timeout=0)
 
         with pytest.raises(ValueError):
             Config(retry_attempts=0)
@@ -133,6 +142,29 @@ class TestConfig:
             Config.from_env()
 
         monkeypatch.setenv("CHANGELOG_RETRY_ATTEMPTS", "3")
-        monkeypatch.setenv("CHANGELOG_RETRY_BACKOFF_SECONDS", "-1")
+        monkeypatch.setenv("CHANGELOG_RETRY_BACKOFF_SECONDS", "0")
         with pytest.raises(ValueError, match="CHANGELOG_RETRY_BACKOFF_SECONDS"):
             Config.from_env()
+
+    def test_config_from_env_uses_default_values(self, monkeypatch):
+        """Test that from_env uses correct defaults when env vars are absent."""
+        monkeypatch.delenv("CHANGELOG_MODEL", raising=False)
+        monkeypatch.delenv("CHANGELOG_NAMESPACE", raising=False)
+        monkeypatch.delenv("CHANGELOG_RETRY_ATTEMPTS", raising=False)
+        monkeypatch.delenv("CHANGELOG_RETRY_BACKOFF_SECONDS", raising=False)
+
+        config = Config.from_env()
+
+        assert config.model == Config.get_default_model()
+        assert config.namespace == "ai-changelog"
+        assert config.retry_attempts == 3
+        assert config.retry_backoff_seconds == 1.0
+
+    def test_config_get_default_model_for_non_apple(self, monkeypatch):
+        """Test non-Apple Silicon default model resolver."""
+        monkeypatch.setattr("ai_changelog_msg.config.platform.system", lambda: "Linux")
+        monkeypatch.setattr(
+            "ai_changelog_msg.config.platform.machine", lambda: "x86_64"
+        )
+
+        assert Config.get_default_model() == "ollama/llama3.1"

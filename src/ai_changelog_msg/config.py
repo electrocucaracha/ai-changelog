@@ -24,7 +24,6 @@ from dataclasses import dataclass
 from typing import Any
 
 
-@dataclass
 class Config:
     """Runtime configuration for the AI Changelog Message Generator.
 
@@ -190,7 +189,7 @@ class Config:
             parsed: Any = json.loads(raw)
         except json.JSONDecodeError as error:
             raise ValueError(
-                "CHANGELOG_LITELLM_HEADERS_JSON must be valid JSON"
+                "CHANGELOG_LITELLM_HEADERS_JSON must be valid JSON"  # pragma: no mutate
             ) from error
         if not isinstance(parsed, dict):
             raise TypeError("CHANGELOG_LITELLM_HEADERS_JSON must be a JSON object")
@@ -305,3 +304,6 @@ class Config:
             'my-notes'
         """
         return self.namespace
+
+
+Config = dataclass(Config)

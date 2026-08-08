@@ -30,10 +30,18 @@ def collect_stats_files(stats_dir: Path) -> list[Path]:
 def parse_int_stat(stats: dict[str, object], key: str) -> int:
     """Parse integer stats defensively for clearer error output."""
     value = stats.get(key, 0)
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        raise ValueError(f"Invalid numeric value for '{key}': {value!r}") from None
+    if isinstance(value, int):
+        return value
+
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            raise ValueError(
+                f"Invalid numeric value for '{key}': {value!r}"
+            ) from None
+
+    raise ValueError(f"Invalid numeric value for '{key}': {value!r}")
 
 
 def summarize_file(stats_file: Path) -> tuple[int, int]:

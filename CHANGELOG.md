@@ -1,3 +1,5 @@
+<!-- Markdownlint-disable MD024 -->
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
@@ -9,6 +11,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!-- markdownlint-disable MD013 -->
 
 ## [Unreleased]
+
+## [5.0.0] - 2026-08-07
+
+### Removed
+
+- Enabled real-time feedback during mutation testing by removing the --no-progress flag from the mutmut run step in CI, thereby improving visibility into long-running test jobs and leaving other workflow steps unaffected. [50862f9e](https://github.com/electrocucaracha/ai-changelog/commit/50862f9e0456070e905508dc06a1e2bc64844d5b)
+
+## [4.15.8] - 2026-08-07
+
+### Changed
+
+- Optimized the helper function name to correctly display in the changelog by escaping the underscore character. [729f14dc](https://github.com/electrocucaracha/ai-changelog/commit/729f14dce3259e9e3276807a2b66654517fd66ee)
+
+## [4.15.7] - 2026-08-07
+
+### Changed
+
+- Optimized mutation testing by running each module's tests in parallel and enforcing aggregate gate stats to reduce CI duration and improve issue traceability. [2c4f2cbe](https://github.com/electrocucaracha/ai-changelog/commit/2c4f2cbe106fbe40eadcb4ba6391a3e9e795d379)
+
+## [4.15.6] - 2026-08-07
+
+### Changed
+
+- Enabled robustness against subtle regressions by introducing comprehensive regression tests for edge cases and specific surviving mutations in main, ai_provider, changelog, and git_helper modules. [cd36538d](https://github.com/electrocucaracha/ai-changelog/commit/cd36538ddee9e38e369335530a085d599871d109)
+
+## [4.15.5] - 2026-08-07
+
+### Changed
+
+- Streamlined quickstart documentation to provide clearer and more concise instructions for setting up Ollama as the default provider, including model selection per platform, verification steps, and Git notes configuration options. [25738ddf](https://github.com/electrocucaracha/ai-changelog/commit/25738ddf60260ee4eac6fd14ea42807855e4e822)
+
+## [4.15.4] - 2026-08-07
+
+### Changed
+
+- Improved discoverability and reduced onboarding friction for new users by reorganizing the CLI reference documentation into structured tables and clear sections that group provider-specific variables and usage examples. [f1ce5b71](https://github.com/electrocucaracha/ai-changelog/commit/f1ce5b711109315c92094f1c1abdf41ee8e4d3b8)
+
+## [4.15.3] - 2026-08-07
+
+### Changed
+
+- Clarified the architecture and CLI behavior of the AI Changelog Generator by significantly expanding documentation to include detailed explanations of each pipeline stage and a visual pipeline diagram, improving onboarding for new users and maintainers. [5b68d503](https://github.com/electrocucaracha/ai-changelog/commit/5b68d503fac0e64c02eee569d63aed1648dc27bc)
+
+## [4.15.2] - 2026-08-07
+
+### Changed
+
+- Clarified the structure of CHANGELOG.md by relocating markdownlint disable comments below the introduction to improve visibility and maintain a clean layout without affecting API contracts or introducing security risks. [9e8d3d1a](https://github.com/electrocucaracha/ai-changelog/commit/9e8d3d1a4b92bd0ca620021db9960677714f4763)
+
+## [4.15.1] - 2026-08-07
+
+### Changed
+
+- Optimized finalization for no-op runs to skip unnecessary computations and preserve deterministic output, significantly improving performance by avoiding diff hydration and AI entry generation when no notes are updated without introducing any breaking behavior or API changes. [3f58dbbd](https://github.com/electrocucaracha/ai-changelog/commit/3f58dbbd0c341e8f62dad517df372ffd1fad7105)
+
+## [4.15.0] - 2026-08-07
+
+### Added
+
+- Enabled detailed changelog entries for versions 4.14.0 through 4.14.6, covering new features, fixes, and dependency updates without introducing breaking behavior or migration requirements, thereby improving project transparency and maintainability by standardizing GitHub link capitalization and aligning markdownlint configuration with the project's style. [1f89b12e](https://github.com/electrocucaracha/ai-changelog/commit/1f89b12e634015e066236bc64bda14d1e6cb4e15)
 
 ## [4.14.6] - 2026-08-07
 

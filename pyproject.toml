@@ -113,6 +113,7 @@ commands =
 """
 
 [tool.mutmut]
+only_mutate = ["src/ai_changelog_msg/config.py"]
 source_paths = ["src/ai_changelog_msg/"]
 do_not_mutate = ["src/ai_changelog_msg/__init__.py"]
 do_not_mutate_patterns = [

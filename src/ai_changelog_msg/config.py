@@ -24,6 +24,134 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+def _parse_headers_json(raw: str) -> dict[str, str]:
+    """Parse a JSON object into string-based HTTP headers.
+
+    Args:
+        raw: JSON-encoded string containing the headers dictionary.
+
+    Returns:
+        A ``dict[str, str]`` mapping header names to their values.
+
+    Raises:
+        ValueError: If *raw* is not valid JSON.
+        TypeError: If the parsed JSON is not a ``dict`` or contains
+            non-string keys or values.
+    """
+    try:
+        parsed: Any = json.loads(raw)
+    except json.JSONDecodeError as error:
+        raise ValueError(
+            "CHANGELOG_LITELLM_HEADERS_JSON must be valid JSON"  # pragma: no mutate
+        ) from error
+    if not isinstance(parsed, dict):
+        raise TypeError("CHANGELOG_LITELLM_HEADERS_JSON must be a JSON object")
+
+    headers: dict[str, str] = {}
+    for key, value in parsed.items():
+        if not isinstance(key, str):
+            raise TypeError("CHANGELOG_LITELLM_HEADERS_JSON keys must be strings")
+        if not isinstance(value, str):
+            raise TypeError("CHANGELOG_LITELLM_HEADERS_JSON values must be strings")
+        headers[key] = value
+    return headers
+
+
+def _parse_optional_bool(
+    raw: str | None,
+    variable_name: str,
+    default: bool = False,
+) -> bool:
+    """Parse a boolean-like environment variable.
+
+    Accepted truthy values: ``1``, ``true``, ``yes``, ``on``.
+    Accepted falsy values: ``0``, ``false``, ``no``, ``off``, and empty.
+
+    Args:
+        raw: Raw environment variable value or ``None``.
+        variable_name: Variable name used in error messages.
+        default: Value returned when *raw* is ``None``.
+
+    Returns:
+        Parsed boolean value.
+
+    Raises:
+        ValueError: If *raw* is not a supported boolean representation.
+    """
+    if raw is None:  # pragma: no mutate
+        return default
+    normalized = raw.strip().lower()
+    if normalized in {"", "0", "false", "no", "off"}:  # pragma: no mutate
+        return False  # pragma: no mutate
+    if normalized in {"1", "true", "yes", "on"}:  # pragma: no mutate
+        return True  # pragma: no mutate
+    raise ValueError(
+        f"{variable_name} must be one of: 1, true, yes, on, 0, false, no, off"
+    )
+
+
+def _parse_positive_int(
+    raw: str | None,
+    variable_name: str,
+    default: int,
+) -> int:
+    """Parse a positive integer environment variable.
+
+    Args:
+        raw: Raw string value or ``None``.
+        variable_name: Variable name used in error messages.
+        default: Value returned when *raw* is ``None``.
+
+    Returns:
+        The parsed positive integer.
+
+    Raises:
+        ValueError: If *raw* cannot be converted to a positive integer.
+    """
+    if raw is None:  # pragma: no mutate
+        return default  # pragma: no mutate
+
+    try:
+        value = int(raw.strip())
+    except ValueError as error:
+        raise ValueError(f"{variable_name} must be a positive integer") from error
+
+    if value <= 0:  # pragma: no mutate
+        raise ValueError(f"{variable_name} must be a positive integer")
+    return value  # pragma: no mutate
+
+
+def _parse_positive_float(
+    raw: str | None,
+    variable_name: str,
+    default: float,
+) -> float:
+    """Parse a positive floating-point environment variable.
+
+    Args:
+        raw: Raw string value or ``None``.
+        variable_name: Variable name used in error messages.
+        default: Value returned when *raw* is ``None``.
+
+    Returns:
+        The parsed positive float.
+
+    Raises:
+        ValueError: If *raw* cannot be converted to a positive number.
+    """
+    if raw is None:  # pragma: no mutate
+        return default  # pragma: no mutate
+
+    try:
+        value = float(raw.strip())
+    except ValueError as error:
+        raise ValueError(f"{variable_name} must be a positive number") from error
+
+    if value <= 0:  # pragma: no mutate
+        raise ValueError(f"{variable_name} must be a positive number")
+    return value  # pragma: no mutate
+
+
 @dataclass
 class Config:
     """Runtime configuration for the AI Changelog Message Generator.
@@ -192,23 +320,7 @@ class Config:
     @staticmethod
     def _parse_headers_json(raw: str) -> dict[str, str]:
         """Parse a JSON object into string-based HTTP headers."""
-        try:
-            parsed: Any = json.loads(raw)
-        except json.JSONDecodeError as error:
-            raise ValueError(
-                "CHANGELOG_LITELLM_HEADERS_JSON must be valid JSON"  # pragma: no mutate
-            ) from error
-        if not isinstance(parsed, dict):
-            raise TypeError("CHANGELOG_LITELLM_HEADERS_JSON must be a JSON object")
-
-        headers: dict[str, str] = {}
-        for key, value in parsed.items():
-            if not isinstance(key, str):
-                raise TypeError("CHANGELOG_LITELLM_HEADERS_JSON keys must be strings")
-            if not isinstance(value, str):
-                raise TypeError("CHANGELOG_LITELLM_HEADERS_JSON values must be strings")
-            headers[key] = value
-        return headers
+        return _parse_headers_json(raw)
 
     @staticmethod
     def _parse_optional_bool(
@@ -231,16 +343,7 @@ class Config:
         Raises:
             ValueError: If *raw* is not a supported boolean representation.
         """
-        if raw is None:  # pragma: no mutate
-            return default
-        normalized = raw.strip().lower()
-        if normalized in {"", "0", "false", "no", "off"}:  # pragma: no mutate
-            return False  # pragma: no mutate
-        if normalized in {"1", "true", "yes", "on"}:  # pragma: no mutate
-            return True  # pragma: no mutate
-        raise ValueError(
-            f"{variable_name} must be one of: 1, true, yes, on, 0, false, no, off"
-        )
+        return _parse_optional_bool(raw, variable_name, default)
 
     @staticmethod
     def _parse_positive_int(
@@ -249,17 +352,7 @@ class Config:
         default: int,
     ) -> int:
         """Parse a positive integer environment variable."""
-        if raw is None:  # pragma: no mutate
-            return default  # pragma: no mutate
-
-        try:
-            value = int(raw.strip())
-        except ValueError as error:
-            raise ValueError(f"{variable_name} must be a positive integer") from error
-
-        if value <= 0:  # pragma: no mutate
-            raise ValueError(f"{variable_name} must be a positive integer")
-        return value  # pragma: no mutate
+        return _parse_positive_int(raw, variable_name, default)
 
     @staticmethod
     def _parse_positive_float(
@@ -268,17 +361,7 @@ class Config:
         default: float,
     ) -> float:
         """Parse a positive floating-point environment variable."""
-        if raw is None:  # pragma: no mutate
-            return default  # pragma: no mutate
-
-        try:
-            value = float(raw.strip())
-        except ValueError as error:
-            raise ValueError(f"{variable_name} must be a positive number") from error
-
-        if value <= 0:  # pragma: no mutate
-            raise ValueError(f"{variable_name} must be a positive number")
-        return value  # pragma: no mutate
+        return _parse_positive_float(raw, variable_name, default)
 
     @staticmethod
     def get_default_model() -> str:

@@ -15,7 +15,7 @@
 
 import pytest
 
-from ai_changelog_msg.config import Config
+from ai_changelog_msg.config import Config, _parse_optional_bool
 
 
 class TestConfig:
@@ -261,6 +261,11 @@ class TestConfig:
         """Test that implicit default parameter is False, not True."""
         # When None is passed without explicit default, should return False
         result = Config._parse_optional_bool(None, "TEST_VAR")
+        assert result is False
+
+    def test_module_parse_optional_bool_implicit_default_is_false(self):
+        """Test module-level helper implicit default remains False."""
+        result = _parse_optional_bool(None, "TEST_VAR")
         assert result is False
 
     def test_parse_positive_int_boundary(self):

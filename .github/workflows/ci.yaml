@@ -45,46 +45,18 @@ jobs:
       - name: Install test dependencies
         run: uv sync --extra test
       - name: Restrict mutations to ${{ matrix.module }}
-        run: |
-          python - <<'PY'
-          import pathlib
-          import re
-
-          module = "${{ matrix.module }}"
-          target_path = f"src/ai_changelog_msg/{module}.py"
-          replacement = f'only_mutate = ["{target_path}"]'
-
-          pyproject_path = pathlib.Path("pyproject.toml")
-          pyproject_text = pyproject_path.read_text(encoding="utf-8")
-
-          pyproject_text, replacement_count = re.subn(
-            r"only_mutate\s*=\s*\[[^\]]*\]",
-            replacement,
-            pyproject_text,
-            count=1,
-          )
-          if replacement_count == 0:
-            pyproject_text, section_count = re.subn(
-              r"(\[tool\.mutmut\]\n)",
-              r"\1" + replacement + "\n",
-              pyproject_text,
-              count=1,
-            )
-            if section_count != 1:
-              raise SystemExit("Could not locate [tool.mutmut] in pyproject.toml")
-
-          pyproject_path.write_text(pyproject_text, encoding="utf-8")
-          print(f"Mutmut restricted to {target_path}")
-          PY
+        run: python ci/restrict_mutations.py --module "${{ matrix.module }}"
       - name: Run mutation tests
         env:
           PYTHONPATH: src
         run: uv run mutmut run
       - name: Export mutation stats
+        if: always()
         env:
           PYTHONPATH: src
         run: uv run mutmut export-cicd-stats
       - name: Upload mutation stats
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: mutmut-stats-${{ matrix.module }}
@@ -96,32 +68,14 @@ jobs:
     permissions:
       contents: read
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Download all mutation stats
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: mutmut-stats-*
           path: mutmut-stats
       - name: Check no surviving mutations
-        run: |
-          python - <<'PY'
-          import json, sys
-          from pathlib import Path
-
-          total_survived = 0
-          total_suspicious = 0
-
-          for stats_file in Path("mutmut-stats").rglob("mutmut-cicd-stats.json"):
-              stats = json.loads(stats_file.read_text())
-              total_survived += int(stats.get("survived", 0))
-              total_suspicious += int(stats.get("suspicious", 0))
-
-          if total_survived or total_suspicious:
-              print(
-                  f"Mutation test gate failed: survived={total_survived}, "
-                  f"suspicious={total_suspicious}"
-              )
-              sys.exit(1)
-
-          print("Mutation test gate passed")
-          PY
+        run: python ci/check_mutation_gate.py --stats-dir mutmut-stats
         # jscpd:ignore-end

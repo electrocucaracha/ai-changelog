@@ -168,3 +168,235 @@ class TestConfig:
         )
 
         assert Config.get_default_model() == "ollama/llama3.1"
+
+    def test_config_boundary_max_diff_size(self):
+        """Test boundary conditions for max_diff_size validation."""
+        # 1 is valid (positive)
+        config = Config(max_diff_size=1)
+        assert config.max_diff_size == 1
+
+        # Negative should fail
+        with pytest.raises(ValueError, match="Max diff size must be positive"):
+            Config(max_diff_size=-1)
+
+    def test_config_boundary_api_timeout(self):
+        """Test boundary conditions for api_timeout validation."""
+        # 1 is valid (positive)
+        config = Config(api_timeout=1)
+        assert config.api_timeout == 1
+
+        # Negative should fail
+        with pytest.raises(ValueError, match="API timeout must be positive"):
+            Config(api_timeout=-1)
+
+    def test_config_boundary_retry_attempts(self):
+        """Test boundary conditions for retry_attempts validation."""
+        # 1 is valid (positive)
+        config = Config(retry_attempts=1)
+        assert config.retry_attempts == 1
+
+        # Negative should fail
+        with pytest.raises(ValueError, match="Retry attempts must be positive"):
+            Config(retry_attempts=-1)
+
+    def test_config_boundary_retry_backoff(self):
+        """Test boundary conditions for retry_backoff_seconds validation."""
+        # Very small positive value is valid
+        config = Config(retry_backoff_seconds=0.1)
+        assert config.retry_backoff_seconds == 0.1
+
+        # Negative should fail
+        with pytest.raises(ValueError, match="Retry backoff seconds must be positive"):
+            Config(retry_backoff_seconds=-0.1)
+
+    def test_config_api_calls_timeout_none_accepted(self):
+        """Test that api_calls_timeout can be None."""
+        config = Config(api_calls_timeout=None)
+        assert config.api_calls_timeout is None
+
+    def test_config_litellm_headers_validation(self):
+        """Test LiteLLM extra headers validation."""
+        # Valid headers
+        config = Config(litellm_extra_headers={"X-Custom": "value"})
+        assert config.litellm_extra_headers == {"X-Custom": "value"}
+
+        # Invalid - not a dict
+        with pytest.raises(ValueError, match="must be a dictionary"):
+            Config(litellm_extra_headers="not-a-dict")
+
+        # Invalid - non-string key
+        with pytest.raises(TypeError, match="must contain string keys"):
+            Config(litellm_extra_headers={1: "value"})
+
+        # Invalid - non-string value
+        with pytest.raises(TypeError, match="must contain string keys and values"):
+            Config(litellm_extra_headers={"key": 123})
+
+    def test_parse_optional_bool_uses_default_when_none(self):
+        """Test that _parse_optional_bool uses default when raw is None."""
+        # When raw is None, the default should be returned
+        assert Config._parse_optional_bool(None, "TEST_VAR", default=True) is True
+        assert Config._parse_optional_bool(None, "TEST_VAR", default=False) is False
+
+    def test_parse_optional_bool_all_truthy_values(self):
+        """Test all accepted truthy values."""
+        for truthy in ["1", "true", "yes", "on", "TRUE", "YES", "ON"]:
+            assert (
+                Config._parse_optional_bool(truthy, "TEST_VAR") is True
+            ), f"Failed for {truthy}"
+
+    def test_parse_optional_bool_all_falsy_values(self):
+        """Test all accepted falsy values."""
+        for falsy in ["0", "false", "no", "off", "", "FALSE", "NO", "OFF"]:
+            assert (
+                Config._parse_optional_bool(falsy, "TEST_VAR") is False
+            ), f"Failed for {falsy}"
+
+    def test_parse_optional_bool_with_whitespace(self):
+        """Test boolean parsing with leading/trailing whitespace."""
+        assert Config._parse_optional_bool("  true  ", "TEST_VAR") is True
+        assert Config._parse_optional_bool("  false  ", "TEST_VAR") is False
+
+    def test_parse_optional_bool_implicit_default_is_false(self):
+        """Test that implicit default parameter is False, not True."""
+        # When None is passed without explicit default, should return False
+        result = Config._parse_optional_bool(None, "TEST_VAR")
+        assert result is False
+
+    def test_parse_positive_int_boundary(self):
+        """Test positive integer parsing at boundary."""
+        assert Config._parse_positive_int("1", "TEST_VAR", default=0) == 1
+
+    def test_parse_positive_int_uses_default_when_none(self):
+        """Test that default is used when raw is None."""
+        assert Config._parse_positive_int(None, "TEST_VAR", default=42) == 42
+
+    def test_parse_positive_int_rejects_zero(self):
+        """Test that zero is rejected."""
+        with pytest.raises(ValueError, match="must be a positive integer"):
+            Config._parse_positive_int("0", "TEST_VAR", default=1)
+
+    def test_parse_positive_float_boundary(self):
+        """Test positive float parsing at boundary."""
+        assert Config._parse_positive_float("0.1", "TEST_VAR", default=0.0) == 0.1
+
+    def test_parse_positive_float_uses_default_when_none(self):
+        """Test that default is used when raw is None."""
+        assert Config._parse_positive_float(None, "TEST_VAR", default=3.14) == 3.14
+
+    def test_parse_positive_float_rejects_zero(self):
+        """Test that zero is rejected."""
+        with pytest.raises(ValueError, match="must be a positive number"):
+            Config._parse_positive_float("0.0", "TEST_VAR", default=1.0)
+
+    def test_parse_headers_json_roundtrip(self):
+        """Test JSON parsing for headers."""
+        headers = {"X-Key-1": "value1", "X-Key-2": "value2"}
+        import json
+
+        raw = json.dumps(headers)
+        result = Config._parse_headers_json(raw)
+        assert result == headers
+
+    def test_parse_headers_json_rejects_non_dict(self):
+        """Test that JSON arrays are rejected."""
+        with pytest.raises(TypeError, match="must be a JSON object"):
+            Config._parse_headers_json('["not", "an", "object"]')
+
+    def test_parse_headers_json_requires_string_values(self):
+        """Test that non-string header values are rejected."""
+        import json
+
+        with pytest.raises(TypeError, match="must be strings"):
+            Config._parse_headers_json(json.dumps({"key": 123}))
+
+    def test_config_from_env_reads_model_from_env(self, monkeypatch):
+        """Test that from_env specifically reads CHANGELOG_MODEL."""
+        monkeypatch.setenv("CHANGELOG_MODEL", "custom-model")
+        monkeypatch.delenv("CHANGELOG_NAMESPACE", raising=False)
+
+        config = Config.from_env()
+
+        assert config.model == "custom-model"
+
+    def test_config_from_env_reads_namespace_from_env(self, monkeypatch):
+        """Test that from_env specifically reads CHANGELOG_NAMESPACE."""
+        monkeypatch.delenv("CHANGELOG_MODEL", raising=False)
+        monkeypatch.setenv("CHANGELOG_NAMESPACE", "custom-namespace")
+
+        config = Config.from_env()
+
+        assert config.namespace == "custom-namespace"
+
+    def test_config_from_env_model_override_beats_env(self, monkeypatch):
+        """Test that overrides take precedence over environment variables."""
+        monkeypatch.setenv("CHANGELOG_MODEL", "env-model")
+
+        config = Config.from_env(model="override-model")
+
+        assert config.model == "override-model"
+
+    def test_config_from_env_namespace_override_beats_env(self, monkeypatch):
+        """Test that namespace override beats environment."""
+        monkeypatch.setenv("CHANGELOG_NAMESPACE", "env-namespace")
+
+        config = Config.from_env(namespace="override-namespace")
+
+        assert config.namespace == "override-namespace"
+
+    def test_config_from_env_reads_api_base(self, monkeypatch):
+        """Test LiteLLM API base URL reading from environment."""
+        # API base is read from native LiteLLM env vars, not CHANGELOG_*
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+
+        config = Config.from_env()
+
+        # When not set, should be None
+        assert config.litellm_api_base is None
+
+    def test_config_from_env_reads_retry_attempts_from_env(self, monkeypatch):
+        """Test that CHANGELOG_RETRY_ATTEMPTS is read."""
+        monkeypatch.setenv("CHANGELOG_RETRY_ATTEMPTS", "7")
+        monkeypatch.delenv("CHANGELOG_RETRY_BACKOFF_SECONDS", raising=False)
+        monkeypatch.delenv("CHANGELOG_ENABLE_HEADROOM", raising=False)
+
+        config = Config.from_env()
+
+        assert config.retry_attempts == 7
+
+    def test_config_from_env_reads_retry_backoff_from_env(self, monkeypatch):
+        """Test that CHANGELOG_RETRY_BACKOFF_SECONDS is read."""
+        monkeypatch.setenv("CHANGELOG_RETRY_BACKOFF_SECONDS", "4.5")
+        monkeypatch.delenv("CHANGELOG_RETRY_ATTEMPTS", raising=False)
+        monkeypatch.delenv("CHANGELOG_ENABLE_HEADROOM", raising=False)
+
+        config = Config.from_env()
+
+        assert config.retry_backoff_seconds == 4.5
+
+    def test_config_get_model_returns_model_field(self):
+        """Test that get_model() returns the model field."""
+        config = Config(model="test-model")
+        assert config.get_model() == "test-model"
+
+    def test_config_get_namespace_returns_namespace_field(self):
+        """Test that get_namespace() returns the namespace field."""
+        config = Config(namespace="test-namespace")
+        assert config.get_namespace() == "test-namespace"
+
+    def test_config_model_auto_resolves_at_init(self):
+        """Test that 'auto' model value is resolved to platform-specific default."""
+        config = Config(model="auto")
+        # Should be resolved to the default model, not "auto"
+        assert config.model != "auto"
+        assert config.model == Config.get_default_model()
+
+    def test_config_from_env_resolves_auto_model(self, monkeypatch):
+        """Test that from_env resolves 'auto' model."""
+        monkeypatch.delenv("CHANGELOG_MODEL", raising=False)
+
+        config = Config.from_env()
+
+        # Should be resolved to default, not "auto"
+        assert config.model != "auto"
+        assert config.model == Config.get_default_model()

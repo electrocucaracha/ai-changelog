@@ -46,7 +46,36 @@ jobs:
         run: uv sync --extra test
       - name: Restrict mutations to ${{ matrix.module }}
         run: |
-          sed -i 's|source_paths = \["src/ai_changelog_msg/"\]|source_paths = ["src/ai_changelog_msg/${{ matrix.module }}.py"]|' pyproject.toml
+          python - <<'PY'
+          import pathlib
+          import re
+
+          module = "${{ matrix.module }}"
+          target_path = f"src/ai_changelog_msg/{module}.py"
+          replacement = f'only_mutate = ["{target_path}"]'
+
+          pyproject_path = pathlib.Path("pyproject.toml")
+          pyproject_text = pyproject_path.read_text(encoding="utf-8")
+
+          pyproject_text, replacement_count = re.subn(
+            r"only_mutate\s*=\s*\[[^\]]*\]",
+            replacement,
+            pyproject_text,
+            count=1,
+          )
+          if replacement_count == 0:
+            pyproject_text, section_count = re.subn(
+              r"(\[tool\.mutmut\]\n)",
+              r"\1" + replacement + "\n",
+              pyproject_text,
+              count=1,
+            )
+            if section_count != 1:
+              raise SystemExit("Could not locate [tool.mutmut] in pyproject.toml")
+
+          pyproject_path.write_text(pyproject_text, encoding="utf-8")
+          print(f"Mutmut restricted to {target_path}")
+          PY
       - name: Run mutation tests
         env:
           PYTHONPATH: src

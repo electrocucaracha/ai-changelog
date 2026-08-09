@@ -248,9 +248,10 @@ def test_clear_notes_logs_namespace_name_when_missing(caplog):
     with caplog.at_level(logging.DEBUG, logger="ai_changelog_msg.git_helper"):
         repo.clear_notes("ai-changelog")
 
-    assert "ai-changelog" in caplog.text
-    assert "Notes namespace" in caplog.text
-    assert "does not exist" in caplog.text
+    assert any(
+        record.getMessage() == "Notes namespace 'ai-changelog' does not exist"
+        for record in caplog.records
+    )
 
 
 def test_clear_notes_deletes_existing_namespace():

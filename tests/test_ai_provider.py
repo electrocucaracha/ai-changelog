@@ -69,7 +69,8 @@ def test_summarize_diff_raises_runtime_error_on_api_failure(monkeypatch):
     assert calls["count"] == 1
 
 
-def test_summarize_diff_retries_timeout_and_succeeds(monkeypatch):
+def test_summarize_diff_retries_timeout_and_succeeds(caplog, monkeypatch):
+    caplog.set_level(logging.WARNING, logger="ai_changelog_msg.ai_provider")
     calls = {"count": 0}
     observed_delays = []
 
@@ -100,6 +101,61 @@ def test_summarize_diff_retries_timeout_and_succeeds(monkeypatch):
     assert summary == "Recovered after retry."
     assert calls["count"] == 3
     assert observed_delays == [1.0, 2.0]
+    assert any(
+        record.getMessage()
+        == "Transient AI API error on attempt 1/3: litellm.APIConnectionError: OllamaException - litellm.Timeout: Connection timed out after 600.0 seconds.. Retrying in 1.0s"
+        for record in caplog.records
+    )
+
+
+def test_completion_with_ollama_auto_pull_forwards_max_tokens(monkeypatch):
+    calls = {
+        "count": 0,
+        "max_tokens": [],
+        "messages": [],
+        "model": [],
+        "temperature": [],
+    }
+
+    def fake_completion(**kwargs):
+        calls["count"] += 1
+        calls["max_tokens"].append(kwargs["max_tokens"])
+        calls["messages"].append(kwargs["messages"])
+        calls["model"].append(kwargs["model"])
+        calls["temperature"].append(kwargs["temperature"])
+        if calls["count"] == 1:
+            raise ValueError("model 'llama3.1:8b-instruct-q4_K_M' not found")
+        return _make_response("Recovered after pull.")
+
+    class _Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return b'{"status":"success"}'
+
+    def fake_urlopen(*args, **kwargs):
+        return _Response()
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
+    )
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.urllib_request.urlopen", fake_urlopen
+    )
+
+    provider = AIProvider(Config(model="ollama/llama3.1:8b-instruct-q4_K_M"))
+    summary = provider.summarize_diff("feat: improve defaults", "+change")
+
+    assert summary == "Recovered after pull."
+    assert calls["count"] == 2
+    assert calls["max_tokens"] == [500, 500]
+    assert calls["messages"][0] == calls["messages"][1]
+    assert calls["model"] == [provider.model, provider.model]
+    assert calls["temperature"] == [0.3, 0.3]
 
 
 def test_summarize_diff_pulls_missing_ollama_model_then_retries(monkeypatch):
@@ -164,6 +220,103 @@ def test_summarize_diff_raises_when_ollama_pull_fails(monkeypatch):
 
     with pytest.raises(RuntimeError, match="Failed to pull Ollama model"):
         provider.summarize_diff("feat: improve defaults", "+change")
+
+
+def test_pull_ollama_model_uses_post_request_and_utf8_replace(caplog, monkeypatch):
+    caplog.set_level(logging.INFO, logger="ai_changelog_msg.ai_provider")
+    captured = {}
+
+    class _Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return b"{\xff\xfe\xfd}"
+
+    def fake_urlopen(request, timeout):
+        captured["request"] = request
+        captured["timeout"] = timeout
+        return _Response()
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.urllib_request.urlopen", fake_urlopen
+    )
+
+    provider = AIProvider(
+        Config(
+            model="ollama/llama3.1:8b-instruct-q4_K_M",
+            litellm_api_base="https://ollama.example:11434/api/v1",
+        )
+    )
+
+    provider._pull_ollama_model()
+
+    request = captured["request"]
+    assert request.full_url.startswith("https://ollama.example:11434/api/pull")
+    assert request.get_method() == "POST"
+    assert request.data is not None
+    assert request.headers["Content-type"] == "application/json"
+    assert captured["timeout"] == provider.config.api_timeout
+    assert any(
+        record.getMessage()
+        == "Ollama model 'llama3.1:8b-instruct-q4_K_M' not available locally; pulling"
+        for record in caplog.records
+    )
+
+
+def test_pull_ollama_model_decodes_http_error_details_with_utf8_replace(monkeypatch):
+    def fake_urlopen(request, timeout):
+        raise ai_provider.urllib_error.HTTPError(
+            url=request.full_url,
+            code=500,
+            msg="Internal Server Error",
+            hdrs=None,
+            fp=BytesIO(b"pull access denied for llama3.1:8b-instruct-q4_K_M\xff"),
+        )
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.urllib_request.urlopen", fake_urlopen
+    )
+
+    provider = AIProvider(Config(model="ollama/llama3.1:8b-instruct-q4_K_M"))
+
+    with pytest.raises(
+        RuntimeError, match="pull access denied for llama3.1:8b-instruct-q4_K_M"
+    ):
+        provider._pull_ollama_model()
+
+
+def test_pull_ollama_model_falls_back_to_localhost_for_malformed_api_base(monkeypatch):
+    captured = {}
+
+    class _Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return b'{"status":"success"}'
+
+    def fake_urlopen(request, timeout):
+        captured["request"] = request
+        return _Response()
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.urllib_request.urlopen", fake_urlopen
+    )
+
+    provider = AIProvider(
+        Config(model="ollama/llama3.1:8b-instruct-q4_K_M", litellm_api_base="http://")
+    )
+
+    provider._pull_ollama_model()
+
+    assert captured["request"].full_url.startswith("http://localhost:11434/api/pull")
 
 
 def test_generate_changelog_entry_returns_ai_content(monkeypatch):
@@ -252,6 +405,32 @@ def test_generate_changelog_entry_falls_back_to_note_on_failure(monkeypatch):
     assert result == "Refreshed README details."
 
 
+def test_generate_changelog_entry_logs_fallback_reason(caplog, monkeypatch):
+    caplog.set_level(logging.WARNING, logger="ai_changelog_msg.ai_provider")
+
+    def fake_completion(**kwargs):
+        raise RuntimeError("offline")
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
+    )
+
+    provider = AIProvider(Config())
+
+    result = provider.generate_changelog_entry(
+        "docs: refresh readme",
+        "Refreshed README details.",
+        "Changed",
+        False,
+    )
+
+    assert result == "Refreshed README details."
+    assert any(
+        record.getMessage() == "Falling back to note text for changelog entry: offline"
+        for record in caplog.records
+    )
+
+
 def test_summarize_diff_passes_litellm_gateway_kwargs(monkeypatch):
     captured = {}
 
@@ -277,6 +456,47 @@ def test_summarize_diff_passes_litellm_gateway_kwargs(monkeypatch):
     assert captured["api_base"] == "https://gateway.example"
     assert captured["api_key"] == "token"
     assert captured["extra_headers"] == {"X-Org": "platform"}
+
+
+def test_summarize_diff_logs_truncation_and_failure(caplog, monkeypatch):
+    caplog.set_level(logging.DEBUG, logger="ai_changelog_msg.ai_provider")
+
+    def fake_completion(**kwargs):
+        raise RuntimeError("offline")
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
+    )
+
+    provider = AIProvider(Config(max_diff_size=4))
+
+    with pytest.raises(RuntimeError, match="AI API call failed: offline"):
+        provider.summarize_diff("feat: add support", "abcdefghi")
+
+    messages = [record.getMessage() for record in caplog.records]
+    assert "Truncating diff from 9 to 4 chars" in messages
+    assert any(message.startswith("API call to '") for message in messages)
+
+
+def test_summarize_diff_logs_model_response(caplog, monkeypatch):
+    caplog.set_level(logging.DEBUG, logger="ai_changelog_msg.ai_provider")
+
+    def fake_completion(**kwargs):
+        return _make_response("Response content.")
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
+    )
+
+    provider = AIProvider(Config())
+
+    summary = provider.summarize_diff("feat: add support", "+new line")
+
+    assert summary == "Response content."
+    assert any(
+        record.getMessage() == f"Response received from model '{provider.model}'"
+        for record in caplog.records
+    )
 
 
 def test_summarize_diff_includes_pr_author_and_approver_when_present(monkeypatch):
@@ -328,7 +548,7 @@ def test_build_prompt_includes_summarization_best_practices():
     assert "Optional additional context" in prompt
 
 
-def test_init_enables_headroom_callback_once(monkeypatch):
+def test_init_enables_headroom_callback_once(caplog, monkeypatch):
     class FakeHeadroomCallback:
         pass
 
@@ -337,6 +557,8 @@ def test_init_enables_headroom_callback_once(monkeypatch):
         FakeHeadroomCallback,
     )
     monkeypatch.setattr("ai_changelog_msg.ai_provider.litellm.callbacks", [])
+
+    caplog.set_level(logging.INFO, logger="ai_changelog_msg.ai_provider")
 
     AIProvider(Config(enable_headroom=True))
     AIProvider(Config(enable_headroom=True))
@@ -347,6 +569,10 @@ def test_init_enables_headroom_callback_once(monkeypatch):
         if callback.__class__.__name__ == "FakeHeadroomCallback"
     ]
     assert len(callbacks) == 1
+    assert any(
+        record.getMessage() == "Headroom compression enabled for LiteLLM requests"
+        for record in caplog.records
+    )
 
 
 def test_init_raises_when_headroom_enabled_but_not_installed(monkeypatch):
@@ -712,3 +938,19 @@ def test_clean_identity_uses_first_angle_bracket():
     result = provider._clean_identity("Alice Smith <alice@example.com> <secondary>")
 
     assert result == "Alice Smith"
+
+
+def test_clean_identity_strips_identity_when_bracket_is_at_index_one():
+    provider = AIProvider.__new__(AIProvider)
+
+    result = provider._clean_identity("A<alice@example.com>")
+
+    assert result == "A"
+
+
+def test_clean_identity_preserves_leading_angle_bracket_identity():
+    provider = AIProvider.__new__(AIProvider)
+
+    result = provider._clean_identity("<anonymous@example.com>")
+
+    assert result == "<anonymous@example.com>"

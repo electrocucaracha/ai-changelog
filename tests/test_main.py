@@ -2,6 +2,8 @@ from __future__ import annotations
 
 # pylint: disable=too-many-lines
 import logging
+import shlex
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -537,8 +539,9 @@ def test_create_semver_tags_if_needed_skips_already_tagged_commits():
     assert repo.created_tags == [("v2.4.0", "a1")]
 
 
-def test_create_semver_tags_if_needed_skips_when_no_new_noted_commits():
+def test_create_semver_tags_if_needed_skips_when_no_new_noted_commits(monkeypatch):
     # All noted commits already have tags; nothing new to tag.
+    output_chunks: list[str] = []
     repo = DummyTagRepo(
         tags_by_commit={"abc": ["v2.3.4"]},
         notes_by_commit={"abc": "Category: Fixed\n\nFixed bug."},
@@ -551,12 +554,20 @@ def test_create_semver_tags_if_needed_skips_when_no_new_noted_commits():
         )
     ]
 
+    monkeypatch.setattr(
+        main.click, "echo", lambda text="", nl=True: output_chunks.append(text)
+    )
+
     created = main._create_semver_tags_if_needed(
         repo, commits, "ai-changelog", True, None
     )
 
     assert created == 0
     assert repo.created_tags == []
+    assert any(
+        "No new untagged release commits found; no new tags created" in chunk
+        for chunk in output_chunks
+    )
 
 
 def test_create_semver_tags_if_needed_rejects_limit():
@@ -571,6 +582,24 @@ def test_create_semver_tags_if_needed_rejects_limit():
         raise AssertionError(
             "Expected ValueError when using --create-semver-tags with --limit"
         )
+
+
+def test_create_semver_tags_if_needed_returns_zero_when_disabled():
+    class FailingRepo(DummyTagRepo):
+        def get_semantic_version_tags(self):
+            raise AssertionError("get_semantic_version_tags should not be called")
+
+    repo = FailingRepo(tags_by_commit={})
+
+    created = main._create_semver_tags_if_needed(
+        repo,
+        [],
+        "ai-changelog",
+        False,
+        None,
+    )
+
+    assert created == 0
 
 
 def test_merge_missing_release_sections_appends_only_new_sections():
@@ -628,6 +657,22 @@ def test_merge_missing_release_sections_noop_when_all_exist():
 
     assert added == 0
     assert merged == existing
+
+
+def test_merge_missing_release_sections_returns_existing_when_generated_has_no_sections():
+    existing = (
+        "# Changelog\n\n"
+        "All notable changes to this project will be documented in this file.\n\n"
+        "## [Unreleased]\n\n"
+        "## [1.0.0] - 2026-01-01\n"
+    )
+    generated = "# Changelog\n\nNo release headings here.\n"
+
+    merged, added = main._merge_missing_release_sections(existing, generated)
+
+    assert added == 0
+    assert merged.startswith("# Changelog")
+    assert "No release headings here." not in merged
 
 
 def test_merge_missing_release_sections_skips_existing_version_with_different_date():
@@ -948,6 +993,12 @@ def test_render_worker_progress_bar_with_total_one():
     assert full == "[####]"
 
 
+def test_render_worker_progress_bar_uses_hyphen_fill_for_incomplete_work():
+    bar = main._render_worker_progress_bar(2, 5, width=4)
+
+    assert bar == "[#---]"
+
+
 def test_build_execution_command_includes_create_semver_tags():
     """--create-semver-tags flag must appear in the command string."""
     cmd = main._build_execution_command(
@@ -964,7 +1015,9 @@ def test_build_execution_command_includes_create_semver_tags():
         litellm_api_key=None,
         litellm_headers_json=None,
     )
-    assert "--create-semver-tags" in cmd
+    parts = shlex.split(cmd)
+    assert "--create-semver-tags" in parts
+    assert parts.count("--create-semver-tags") == 1
 
 
 def test_configure_logging_silences_third_party_loggers_above_debug():
@@ -1084,6 +1137,38 @@ def test_generate_summaries_concurrently_increments_completed_by_one(monkeypatch
     assert on_completed_calls["n"] == 3
 
 
+def test_generate_summaries_concurrently_renders_final_worker_totals(monkeypatch):
+    """Final progress output must reflect per-worker completion counts."""
+
+    class FakeProvider:
+        def summarize_diff(self, *a, **kw):
+            return "ok"
+
+    output_chunks: list[str] = []
+    monkeypatch.setattr(main.sys.stdout, "isatty", lambda: False)
+    monkeypatch.setattr(
+        main.click, "echo", lambda text="", nl=True: output_chunks.append(text)
+    )
+
+    prepared = [
+        _build_prepared_commit(f"hash{i}", "X", "feat: x", "+x") for i in range(3)
+    ]
+
+    results = main._generate_summaries_concurrently(
+        cast(main.AIProvider, FakeProvider()),
+        prepared,
+        workers=2,
+    )
+
+    assert len(results) == 3
+    assert any(
+        "Worker  1: [####################] 2/2" in chunk for chunk in output_chunks
+    )
+    assert any(
+        "Worker  2: [####################] 1/1" in chunk for chunk in output_chunks
+    )
+
+
 def test_normalize_release_sections_rstrips_before_joining():
     """Rebuilt sections must use rstrip to remove trailing newlines."""
     text = (
@@ -1098,6 +1183,42 @@ def test_normalize_release_sections_rstrips_before_joining():
 
     # Trailing whitespace within sections should not cause double blank lines
     assert "\n\n\n" not in result
+
+
+def test_normalize_release_sections_preserves_trailing_spaces_in_blocks():
+    text = (
+        "# Changelog\n\n"
+        "## [Unreleased]\n\n"
+        "## [1.0.0] - 2026-01-01\n\n"
+        "### Added\n"
+        "- Entry with space \n"
+    )
+
+    result = main._normalize_release_sections(text)
+
+    assert "Entry with space " in result
+
+
+def test_normalize_release_sections_preserves_trailing_x_characters():
+    text = (
+        "# Changelog\n\n"
+        "## [Unreleased]\n\n"
+        "## [1.0.0] - 2026-01-01\n\n"
+        "### Added\n"
+        "- EntryX\n"
+    )
+
+    result = main._normalize_release_sections(text)
+
+    assert "EntryX" in result
+
+
+def test_normalize_release_sections_returns_text_without_headings_unchanged():
+    text = "# Changelog\n\nPlain introduction without release headings.\n"
+
+    result = main._normalize_release_sections(text)
+
+    assert result == text
 
 
 def test_ensure_unreleased_and_get_insertion_index_creates_header_for_empty_input():
@@ -1184,6 +1305,19 @@ def test_configure_logging_sets_litellm_logger_to_warning(monkeypatch):
     main._configure_logging("INFO")
 
     assert logging.getLogger("litellm").level == logging.WARNING
+
+
+def test_configure_logging_clears_litellm_handlers_and_disables_propagation(
+    monkeypatch,
+):
+    logger = logging.getLogger("LiteLLM")
+    logger.handlers = [logging.StreamHandler()]
+    logger.propagate = True
+
+    main._configure_logging("INFO")
+
+    assert logger.handlers == []
+    assert logger.propagate is False
 
 
 def test_generate_summary_for_commit_sets_commit_hash_and_error_on_failure():
@@ -1433,3 +1567,49 @@ def test_configure_logging_passes_level_parameter(caplog):
         call_kwargs = mock_basicconfig.call_args.kwargs
         assert call_kwargs.get("level") is not None
         assert call_kwargs.get("level") == logging.DEBUG
+
+
+def test_configure_logging_passes_format_parameter(caplog):
+    """Verify configure_logging passes an explicit formatter string."""
+
+    from unittest.mock import patch
+
+    with patch("logging.basicConfig") as mock_basicconfig:
+        main._configure_logging("INFO")
+
+        call_kwargs = mock_basicconfig.call_args.kwargs
+        assert (
+            call_kwargs.get("format")
+            == "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+        )
+    assert call_kwargs.get("datefmt") == "%Y-%m-%dT%H:%M:%S"
+    assert call_kwargs.get("stream") is sys.stderr
+
+
+def test_generate_summary_for_commit_forwards_diff(monkeypatch):
+    """The original commit diff must be forwarded unchanged to summarize_diff."""
+
+    captured = {}
+
+    class FakeProvider:
+        def summarize_diff(self, commit_message, diff, author=None):
+            captured["diff"] = diff
+            return "Summary."
+
+    prepared = main._PreparedCommit(
+        commit=SimpleNamespace(
+            hexsha="abc123",
+            author=SimpleNamespace(name="Carol"),
+        ),
+        commit_message="feat: something",
+        category="Added",
+        existing_note=None,
+        diff="+new line",
+    )
+
+    result = main._generate_summary_for_commit(
+        cast(main.AIProvider, FakeProvider()), prepared
+    )
+
+    assert result.summary == "Summary."
+    assert captured["diff"] == "+new line"

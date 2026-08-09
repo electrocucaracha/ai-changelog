@@ -383,23 +383,37 @@ class AIProvider:
                         "role": "system",
                         "content": (  # pragma: no mutate
                             "You write concise git-note summaries for a Keep a Changelog style "  # pragma: no mutate
-                            "workflow. First identify the core thesis of the change and only the most "  # pragma: no mutate
-                            "important supporting impacts. Ignore minor refactors, repetitive examples, "  # pragma: no mutate
-                            "and low-level implementation trivia. Keep the summary objective and grounded "  # pragma: no mutate
-                            "in the commit content; do not add personal opinions or outside analysis. "  # pragma: no mutate
-                            "Output plain text only with exactly one paragraph of 2 to 4 sentences and "  # pragma: no mutate
-                            "typically at most 80 words. Never drop critical information to satisfy length. "  # pragma: no mutate
-                            "Preserve this priority order when condensing: (1) breaking behavior or migration "  # pragma: no mutate
-                            "requirements, (2) API or CLI contract changes, (3) security impact, (4) config "  # pragma: no mutate
-                            "schema changes, (5) primary user or maintainer outcome. The first sentence "  # pragma: no mutate
+                            "workflow. First identify the core thesis of the change "  # pragma: no mutate
+                            "and only the most "  # pragma: no mutate
+                            "important supporting impacts. Ignore minor refactors, "  # pragma: no mutate
+                            "repetitive examples, "  # pragma: no mutate
+                            "and low-level implementation trivia. Keep the summary "  # pragma: no mutate
+                            "objective and grounded "  # pragma: no mutate
+                            "in the commit content; do not add personal opinions "  # pragma: no mutate
+                            "or outside analysis. "  # pragma: no mutate
+                            "Output plain text only with exactly one paragraph "  # pragma: no mutate
+                            "of 2 to 4 sentences and "  # pragma: no mutate
+                            "typically at most 80 words. Never drop critical "  # pragma: no mutate
+                            "information to satisfy length. "  # pragma: no mutate
+                            "Preserve this priority order when condensing: (1) breaking "  # pragma: no mutate
+                            "behavior or migration "  # pragma: no mutate
+                            "requirements, (2) API or CLI contract changes, "  # pragma: no mutate
+                            "(3) security impact, (4) config "  # pragma: no mutate
+                            "schema changes, (5) primary user or maintainer outcome. "  # pragma: no mutate
+                            "The first sentence "  # pragma: no mutate
                             "must state what changed and why it "  # pragma: no mutate
                             "matters to users or maintainers. Use your own words and avoid direct "  # pragma: no mutate
-                            "copying from the commit message or diff. Do not include headings, lead-ins, "  # pragma: no mutate
-                            "labels, markdown, bullets, numbered lists, code fences, or quote marks. "  # pragma: no mutate
+                            "copying from the commit message or diff. Do not include "  # pragma: no mutate
+                            "headings, lead-ins, "  # pragma: no mutate
+                            "labels, markdown, bullets, numbered lists, code fences, "  # pragma: no mutate
+                            "or quote marks. "  # pragma: no mutate
                             "Never write phrases such as 'Here is a summary of the changes' or "  # pragma: no mutate
-                            "'Optional additional context'. Always mention breaking behavior, API or CLI "  # pragma: no mutate
-                            "changes, config schema changes, migration steps, and security impact when "  # pragma: no mutate
-                            "present. Never mention file paths, variable names, line numbers, commit "  # pragma: no mutate
+                            "'Optional additional context'. Always mention breaking "  # pragma: no mutate
+                            "behavior, API or CLI "  # pragma: no mutate
+                            "changes, config schema changes, migration steps, "  # pragma: no mutate
+                            "and security impact when "  # pragma: no mutate
+                            "present. Never mention file paths, variable names, "  # pragma: no mutate
+                            "line numbers, commit "  # pragma: no mutate
                             "hashes, or reviewer metadata."  # pragma: no mutate
                         ),
                     },
@@ -453,7 +467,8 @@ class AIProvider:
             "state that clearly in one sentence. Prefer precise high-impact verbs such as "  # pragma: no mutate
             "enabled, introduced, optimized, modernized, hardened, resolved, "  # pragma: no mutate
             "stabilized, or simplified when they fit. "  # pragma: no mutate
-            "Avoid repeating the same opening verb as nearby entries when a natural alternative exists. "  # pragma: no mutate
+            "Avoid repeating the same opening verb as nearby entries when a "  # pragma: no mutate
+            "natural alternative exists. "  # pragma: no mutate
             "Do not start with Added, Changed, Deprecated, Removed, Fixed, or Security. "  # pragma: no mutate
             "Do not use markdown, bullets, commit hashes, file paths, "  # pragma: no mutate
             "or code identifiers."  # pragma: no mutate
@@ -465,19 +480,27 @@ class AIProvider:
                     {
                         "role": "system",  # pragma: no mutate
                         "content": (  # pragma: no mutate
-                            "You normalize engineering summaries into one uniform Keep a Changelog "  # pragma: no mutate
+                            "You normalize engineering summaries into one uniform "  # pragma: no mutate
+                            "Keep a Changelog "  # pragma: no mutate
                             "entry sentence written for a technical audience. Output exactly one "  # pragma: no mutate
-                            "sentence in plain text with no markdown, list markers, labels, or quotes. "  # pragma: no mutate
-                            "Start with a strong action verb that matches the provided category intent, "  # pragma: no mutate
-                            "but do not start with literal labels Added, Changed, Deprecated, Removed, "  # pragma: no mutate
+                            "sentence in plain text with no markdown, list markers, "  # pragma: no mutate
+                            "labels, or quotes. "  # pragma: no mutate
+                            "Start with a strong action verb that matches the "  # pragma: no mutate
+                            "provided category intent, "  # pragma: no mutate
+                            "but do not start with literal labels Added, Changed, "  # pragma: no mutate
+                            "Deprecated, Removed, "  # pragma: no mutate
                             "Fixed, or Security. Prefer specific high-impact verbs such as "  # pragma: no mutate
                             "enabled, introduced, optimized, modernized, hardened, resolved, "  # pragma: no mutate
-                            "stabilized, or simplified when accurate. Avoid repeating the same opening "  # pragma: no mutate
-                            "verb in nearby entries when a natural alternative exists. Describe the observable impact "  # pragma: no mutate
+                            "stabilized, or simplified when accurate. Avoid repeating "  # pragma: no mutate
+                            "the same opening "  # pragma: no mutate
+                            "verb in nearby entries when a natural alternative exists. "  # pragma: no mutate
+                            "Describe the observable impact "  # pragma: no mutate
                             "for developers or operators; "  # pragma: no mutate
                             "never describe internal code mechanics. State breaking behavior, API "  # pragma: no mutate
-                            "contract changes, or migration requirements explicitly. Do not include "  # pragma: no mutate
-                            "commit hashes, file paths, code identifiers, or implementation trivia. "  # pragma: no mutate
+                            "contract changes, or migration requirements explicitly. "  # pragma: no mutate
+                            "Do not include "  # pragma: no mutate
+                            "commit hashes, file paths, code identifiers, "  # pragma: no mutate
+                            "or implementation trivia. "  # pragma: no mutate
                             "Every entry must read as if written by the same author."  # pragma: no mutate
                         ),
                     },

@@ -330,18 +330,7 @@ class Config:
     ) -> bool:
         """Parse a boolean-like environment variable.
 
-        Accepted truthy values: ``1``, ``true``, ``yes``, ``on``.
-        Accepted falsy values: ``0``, ``false``, ``no``, ``off``, and empty.
-
-        Args:
-            raw: Raw environment variable value or ``None``.
-            variable_name: Variable name used in error messages.
-
-        Returns:
-            Parsed boolean value.
-
-        Raises:
-            ValueError: If *raw* is not a supported boolean representation.
+        See module-level ``_parse_optional_bool`` for details.
         """
         return _parse_optional_bool(raw, variable_name, default)
 

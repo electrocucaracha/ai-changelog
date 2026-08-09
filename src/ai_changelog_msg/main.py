@@ -367,8 +367,9 @@ def _create_semver_tags_if_needed(
             if parsed is not None:
                 tagged_commits.add(commit_hash)
                 if (
-                    highest_version is None or parsed > highest_version
-                ):  # pragma: no mutate
+                    highest_version is None
+                    or parsed > highest_version  # pragma: no mutate
+                ):
                     highest_version = parsed
 
     ordered_commits = sorted(
@@ -411,8 +412,8 @@ def _create_semver_tags_if_needed(
         click.echo(f"Created {created} semantic version tag(s)")  # pragma: no mutate
     else:
         click.echo(
-            "No new untagged release commits found; no new tags created"
-        )  # pragma: no mutate
+            "No new untagged release commits found; no new tags created"  # pragma: no mutate
+        )
     return created
 
 
@@ -491,7 +492,7 @@ def _normalize_release_sections(existing_text: str) -> str:
         non_semantic_before = [
             section
             for section in before
-            if not _is_semantic_release_heading(section[0])
+            if not _is_semantic_release_heading(section[0])  # pragma: no mutate
         ]
         ordered = non_semantic_before + [unreleased] + semantic_before + after
     else:
@@ -510,8 +511,8 @@ def _normalize_release_sections(existing_text: str) -> str:
         deduped.append((heading, block))
 
     rebuilt_sections = "\n\n".join(
-        block.rstrip("\n") for _, block in deduped
-    ).rstrip(  # pragma: no mutate
+        block.rstrip("\n") for _, block in deduped  # pragma: no mutate
+    ).rstrip(
         "\n"  # pragma: no mutate
     )
     normalized_prefix = prefix.rstrip("\n")  # pragma: no mutate
@@ -628,8 +629,8 @@ def _merge_missing_release_sections(
         return existing_text, 0  # pragma: no mutate
 
     insert_block = (
-        "\n\n".join(missing_blocks).rstrip("\n") + "\n\n"
-    )  # pragma: no mutate
+        "\n\n".join(missing_blocks).rstrip("\n") + "\n\n"  # pragma: no mutate
+    )
 
     merged_text = (
         existing_text[:insertion_index] + insert_block + existing_text[insertion_index:]

@@ -192,6 +192,13 @@ def _build_prepared_commit(hexsha: str, author_name: str, message: str, diff: st
     )
 
 
+class _FastProvider:
+    """Minimal AI provider stub that always returns 'ok'."""
+
+    def summarize_diff(self, commit_message, diff, author=None):
+        return "ok"
+
+
 def _run_summary_generation_with_output_capture(
     monkeypatch,
     *,
@@ -207,12 +214,8 @@ def _run_summary_generation_with_output_capture(
         main.click, "echo", lambda text="", nl=True: output_chunks.append(text)
     )
 
-    class FastProvider:
-        def summarize_diff(self, commit_message, diff, author=None):
-            return "ok"
-
     results = main._generate_summaries_concurrently(
-        cast(main.AIProvider, FastProvider()),
+        cast(main.AIProvider, _FastProvider()),
         prepared,
         workers,
     )
@@ -1223,18 +1226,46 @@ def test_generate_summaries_concurrently_defaults_to_non_interactive_without_isa
         main.click, "echo", lambda text="", nl=True: output_chunks.append(text)
     )
 
-    class FastProvider:
-        def summarize_diff(self, commit_message, diff, author=None):
-            return "ok"
-
     results = main._generate_summaries_concurrently(
-        cast(main.AIProvider, FastProvider()),
+        cast(main.AIProvider, _FastProvider()),
         prepared,
         workers=1,
     )
 
     assert len(results) == 1
     assert not any("\x1b[" in chunk for chunk in output_chunks)
+
+
+def test_generate_summaries_concurrently_passes_workers_to_executor(monkeypatch):
+    """ThreadPoolExecutor must receive the exact workers value, not None."""
+    from concurrent.futures import ThreadPoolExecutor as _RealTPE
+
+    captured: dict[str, object] = {}
+    OrigTPE = _RealTPE
+
+    class _TrackingTPE:
+        def __init__(self, max_workers=None):
+            captured["max_workers"] = max_workers
+            self._inner = OrigTPE(max_workers=max_workers)
+
+        def __enter__(self):
+            return self._inner.__enter__()
+
+        def __exit__(self, *args):
+            return self._inner.__exit__(*args)
+
+        def submit(self, *args, **kwargs):
+            return self._inner.submit(*args, **kwargs)
+
+    monkeypatch.setattr(main, "ThreadPoolExecutor", _TrackingTPE)
+    monkeypatch.setattr(main.click, "echo", lambda *a, **kw: None)
+
+    prepared = [_build_prepared_commit("h1", "X", "feat: x", "+x")]
+    main._generate_summaries_concurrently(
+        cast(main.AIProvider, _FastProvider()), prepared, workers=5
+    )
+
+    assert captured["max_workers"] == 5
 
 
 def test_normalize_release_sections_rstrips_before_joining():

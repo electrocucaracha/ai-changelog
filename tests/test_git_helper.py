@@ -151,6 +151,22 @@ def test_get_commit_diff_uses_show_for_root_commit_and_returns_error_on_failure(
     assert "[Error retrieving diff: bad diff]" == failing_repo.get_commit_diff(commit)
 
 
+def test_get_commit_diff_logs_fetching_with_8char_hexsha(caplog):
+    import logging
+
+    fake_git = _FakeGit(diff_result="+added")
+    repo = _make_repo(fake_git=fake_git)
+    commit = SimpleNamespace(
+        hexsha="abc12345longerhash", parents=[SimpleNamespace(hexsha="parent")]
+    )
+
+    with caplog.at_level(logging.DEBUG, logger="ai_changelog_msg.git_helper"):
+        repo.get_commit_diff(commit)
+
+    assert "Fetching diff for commit abc12345" in caplog.text
+    assert "abc12345l" not in caplog.text
+
+
 def test_get_commit_diff_logs_warning_with_expected_capitalization(caplog):
     caplog.set_level("WARNING")
     failing_repo = _make_repo(fake_git=_FakeGit(diff_result=RuntimeError("bad diff")))
@@ -236,6 +252,21 @@ def test_clear_notes_deletes_existing_namespace():
     assert fake_git.update_ref_calls == [("-d", "refs/notes/ai-changelog")]
 
 
+def test_clear_notes_logs_deletion_message(caplog):
+    import logging
+
+    ref_name = "refs/notes/ai-changelog"
+    repo = _make_repo(
+        refs=[SimpleNamespace(path=ref_name)],
+    )
+
+    with caplog.at_level(logging.INFO, logger="ai_changelog_msg.git_helper"):
+        repo.clear_notes("ai-changelog")
+
+    assert "Deleted git notes namespace" in caplog.text
+    assert "ai-changelog" in caplog.text
+
+
 def test_clear_notes_raises_runtime_error_when_delete_fails():
     ref_name = "refs/notes/ai-changelog"
     error = GitCommandError(
@@ -291,11 +322,41 @@ def test_create_tag_invokes_gitpython_create_tag():
     assert calls == [("v1.2.3", "abc123")]
 
 
-def test_create_tag_does_not_skip_when_only_other_tags_exist():
+def test_create_tag_logs_created_message(caplog):
+    import logging
+
+    repo = _make_repo()
+
+    with caplog.at_level(logging.INFO, logger="ai_changelog_msg.git_helper"):
+        repo.create_tag("v1.2.3", "abc12345longerhash")
+
+    assert "Created tag 'v1.2.3' at abc12345" in caplog.text
+
+
+def test_create_tag_logs_skipped_message_when_exists(caplog):
+    import logging
+
+    repo = _make_repo(tags=[SimpleNamespace(name="v1.0.0")])
+
+    with caplog.at_level(logging.DEBUG, logger="ai_changelog_msg.git_helper"):
+        repo.create_tag("v1.0.0", "abc12345")
+
+    assert "already exists" in caplog.text
+    assert "v1.0.0" in caplog.text
+
+
+def _make_tag_spy() -> tuple[list[tuple[str, str]], object]:
+    """Return a (calls, create_tag) pair for recording tag creation calls."""
     calls: list[tuple[str, str]] = []
 
-    def _create_tag(name: str, ref: str):
+    def _create_tag(name: str, ref: str) -> None:
         calls.append((name, ref))
+
+    return calls, _create_tag
+
+
+def test_create_tag_does_not_skip_when_only_other_tags_exist():
+    calls, _create_tag = _make_tag_spy()
 
     repo = _make_repo(
         tags=[SimpleNamespace(name="v9.9.9")],
@@ -414,6 +475,34 @@ def test_get_repository_info_head_commit_is_none_when_access_raises():
     assert not isinstance(info["head_commit"], str)
 
 
+def test_get_repository_info_branch_is_none_when_active_branch_raises():
+    """branch must be None (not '') when active_branch.name raises."""
+
+    class _BrokenBranch:
+        @property
+        def name(self) -> str:
+            raise RuntimeError("detached HEAD")
+
+    head_commit = SimpleNamespace(
+        hexsha="abc12345",
+        message="msg\n",
+        author=SimpleNamespace(name="Alice"),
+        committed_datetime=SimpleNamespace(isoformat=lambda: "2026-01-01T00:00:00"),
+    )
+    repo = _make_repo()
+    repo.repo = SimpleNamespace(
+        head=SimpleNamespace(commit=head_commit),
+        active_branch=_BrokenBranch(),
+        remotes=SimpleNamespace(),
+        tags=[],
+    )
+
+    info = repo.get_repository_info()
+
+    assert info["branch"] is None
+    assert not isinstance(info["branch"], str)
+
+
 def test_get_note_uses_ref_argument():
     """get_note must pass '--ref' (lowercase) to git notes."""
     fake_git = _FakeGit(note_result="my note")
@@ -430,10 +519,7 @@ def test_get_note_uses_ref_argument():
 
 
 def test_create_tag_does_not_call_backend_when_exact_tag_exists():
-    calls: list[tuple[str, str]] = []
-
-    def _create_tag(name: str, ref: str):
-        calls.append((name, ref))
+    calls, _create_tag = _make_tag_spy()
 
     repo = _make_repo(
         tags=[SimpleNamespace(name="v1.0.0")],

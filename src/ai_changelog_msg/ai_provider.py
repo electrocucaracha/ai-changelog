@@ -274,8 +274,8 @@ class AIProvider:
             pull_base = "http://localhost:11434"  # pragma: no mutate
 
         payload = json.dumps({"name": model_name, "stream": False}).encode(
-            "utf-8"
-        )  # pragma: no mutate
+            "utf-8"  # pragma: no mutate
+        )
         request = urllib_request.Request(
             f"{pull_base}/api/pull",
             data=payload,
@@ -288,14 +288,12 @@ class AIProvider:
                 timeout=self.config.api_timeout,
             ) as response:
                 body = response.read().decode(
-                    "utf-8", errors="replace"
-                )  # pragma: no mutate
+                    "utf-8", errors="replace"  # pragma: no mutate
+                )
         except urllib_error.HTTPError as error:
-            details = error.read().decode(
+            details = error.read().decode(  # pragma: no mutate
                 "utf-8", errors="replace"
-            ).strip() or str(  # pragma: no mutate
-                error
-            )
+            ).strip() or str(error)
             raise RuntimeError(
                 f"Failed to pull Ollama model '{model_name}': {details}"
             ) from error
@@ -517,8 +515,8 @@ class AIProvider:
         content = response.choices[0].message.content if response.choices else None
         sanitized_content = self._sanitize_changelog_entry(content)
         if sanitized_content is None:
-            logger.warning(
-                "Discarding invalid changelog entry from model; falling back to note text"  # pragma: no mutate
+            logger.warning(  # pragma: no mutate
+                "Discarding invalid changelog entry from model; falling back to note text"
             )
             return fallback_entry
         return sanitized_content

@@ -321,8 +321,9 @@ def test_pull_ollama_model_decodes_http_error_details_with_utf8_replace(monkeypa
         provider._pull_ollama_model()
 
 
-def test_pull_ollama_model_falls_back_to_localhost_for_malformed_api_base(monkeypatch):
-    captured = {}
+def _patch_ollama_urlopen(monkeypatch: pytest.MonkeyPatch) -> dict:
+    """Patch urlopen with a fake that captures the request and returns success."""
+    captured: dict = {}
 
     class _Response:
         def __enter__(self):
@@ -341,6 +342,11 @@ def test_pull_ollama_model_falls_back_to_localhost_for_malformed_api_base(monkey
     monkeypatch.setattr(
         "ai_changelog_msg.ai_provider.urllib_request.urlopen", fake_urlopen
     )
+    return captured
+
+
+def test_pull_ollama_model_falls_back_to_localhost_for_malformed_api_base(monkeypatch):
+    captured = _patch_ollama_urlopen(monkeypatch)
 
     provider = AIProvider(Config(model=OLLAMA_MODEL, litellm_api_base="http://"))
 
@@ -350,9 +356,39 @@ def test_pull_ollama_model_falls_back_to_localhost_for_malformed_api_base(monkey
 
 
 def test_pull_ollama_model_uses_default_localhost_base_when_not_configured(monkeypatch):
-    captured = {}
+    captured = _patch_ollama_urlopen(monkeypatch)
 
-    class _Response:
+    provider = AIProvider(Config(model=OLLAMA_MODEL, litellm_api_base=None))
+    provider._pull_ollama_model()
+
+    assert captured["request"].full_url == "http://localhost:11434/api/pull"
+
+
+def test_pull_ollama_model_sends_correct_json_payload_with_name_key(monkeypatch):
+    """Verify the JSON payload contains the 'name' key (not corrupted variants)."""
+    import json as json_module
+
+    captured = _patch_ollama_urlopen(monkeypatch)
+
+    provider = AIProvider(Config(model=OLLAMA_MODEL))
+    provider._pull_ollama_model()
+
+    # Extract and parse the JSON payload
+    payload_bytes = captured["request"].data
+    assert payload_bytes is not None
+    payload_dict = json_module.loads(payload_bytes.decode("utf-8"))
+
+    # Verify the correct key is present and has the right value
+    assert "name" in payload_dict
+    assert payload_dict["name"] == OLLAMA_MODEL_NAME
+    assert payload_dict["stream"] is False
+
+
+def test_pull_ollama_model_detects_error_key_in_response(monkeypatch):
+    """Verify the response error checking uses the 'error' key (not corrupted variants)."""
+    import json as json_module
+
+    class _ErrorResponse:
         def __enter__(self):
             return self
 
@@ -360,20 +396,21 @@ def test_pull_ollama_model_uses_default_localhost_base_when_not_configured(monke
             return False
 
         def read(self):
-            return b'{"status":"success"}'
+            return json_module.dumps({"error": "model not available"}).encode("utf-8")
 
     def fake_urlopen(request, timeout):
-        captured["request"] = request
-        return _Response()
+        return _ErrorResponse()
 
     monkeypatch.setattr(
         "ai_changelog_msg.ai_provider.urllib_request.urlopen", fake_urlopen
     )
 
-    provider = AIProvider(Config(model=OLLAMA_MODEL, litellm_api_base=None))
-    provider._pull_ollama_model()
+    provider = AIProvider(Config(model=OLLAMA_MODEL))
 
-    assert captured["request"].full_url == "http://localhost:11434/api/pull"
+    with pytest.raises(
+        RuntimeError, match="Failed to pull Ollama model.*model not available"
+    ):
+        provider._pull_ollama_model()
 
 
 def test_generate_changelog_entry_returns_ai_content(monkeypatch):

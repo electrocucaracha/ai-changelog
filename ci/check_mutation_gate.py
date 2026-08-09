@@ -37,9 +37,7 @@ def parse_int_stat(stats: dict[str, object], key: str) -> int:
         try:
             return int(value)
         except ValueError:
-            raise ValueError(
-                f"Invalid numeric value for '{key}': {value!r}"
-            ) from None
+            raise ValueError(f"Invalid numeric value for '{key}': {value!r}") from None
 
     raise ValueError(f"Invalid numeric value for '{key}': {value!r}")
 
@@ -105,8 +103,7 @@ def main() -> int:
         total_suspicious += suspicious
 
     print(
-        "Mutation totals:"
-        f" survived={total_survived}, suspicious={total_suspicious}"
+        "Mutation totals:" f" survived={total_survived}, suspicious={total_suspicious}"
     )
 
     if total_survived or total_suspicious:

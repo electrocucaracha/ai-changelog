@@ -19,12 +19,15 @@ from types import SimpleNamespace
 from ai_changelog_msg.changelog import (
     ChangelogBuilder,
     ChangelogItem,
+    ReleaseSection,
+    SemanticVersion,
     _extract_release_sections_kac,
     _find_insertion_point_kac,
     _is_unreleased_heading,
     _merge_with_no_existing_releases,
     _release_version_from_heading_kac,
     format_note,
+    infer_category,
     infer_release_type,
     merge_changelogs_with_keepachangelog,
     parse_conventional_commit,
@@ -364,6 +367,12 @@ def test_is_unreleased_heading_matches_unreleased():
 def test_is_unreleased_heading_rejects_semver():
     assert _is_unreleased_heading("## [1.0.0] - 2026-01-01") is False
     assert _is_unreleased_heading("## [2.3.0]") is False
+
+
+def test_is_unreleased_heading_requires_exact_token():
+    """Only the exact [Unreleased] heading should match."""
+    assert _is_unreleased_heading("## [Unreleased Candidate]") is False
+    assert _is_unreleased_heading("## [Unreleased-v2]") is False
 
 
 def test_find_insertion_point_kac_after_unreleased_section():
@@ -841,6 +850,191 @@ def test_build_item_passes_commit_message_to_generate_entry():
     assert len(captured_messages) == 1
     assert captured_messages[0] is not None
     assert "expose new endpoint" in captured_messages[0]
+
+
+def test_build_item_passes_commit_url_and_ai_entry_into_item():
+    """_build_item must preserve generated entry and commit URL in output item."""
+    builder = ChangelogBuilder(namespace="ai-changelog")
+    commit = make_commit(
+        "faceb00c",
+        "fix(core): preserve generated metadata",
+        datetime(2026, 1, 1, tzinfo=UTC),
+    )
+
+    captured_commit_hashes: list[str] = []
+
+    def _commit_url_for_hash(commit_hash: str) -> str:
+        captured_commit_hashes.append(commit_hash)
+        return f"https://example.test/commit/{commit_hash}"
+
+    item = builder._build_item(
+        commit,
+        lambda _h, _n: "Fixed metadata propagation.",
+        lambda _message, _note, _category, _is_breaking: "Fixed output payload.",
+        _commit_url_for_hash,
+        None,
+    )
+
+    assert captured_commit_hashes == ["faceb00c"]
+    assert item.changelog_entry == "Fixed output payload."
+    assert item.commit_url == "https://example.test/commit/faceb00c"
+
+
+def test_build_item_defaults_changelog_entry_to_none_without_generator():
+    builder = ChangelogBuilder(namespace="ai-changelog")
+    commit = make_commit(
+        "faceb00d",
+        "chore: no ai rewrite",
+        datetime(2026, 1, 1, tzinfo=UTC),
+    )
+
+    item = builder._build_item(
+        commit,
+        lambda _h, _n: "Maintenance update.",
+        None,
+        None,
+        None,
+    )
+
+    assert item.changelog_entry is None
+
+
+def test_build_item_preserves_parsed_commit_description():
+    builder = ChangelogBuilder(namespace="ai-changelog")
+    commit = make_commit(
+        "faceb00e",
+        "fix(parser): handle empty values",
+        datetime(2026, 1, 1, tzinfo=UTC),
+    )
+
+    item = builder._build_item(
+        commit,
+        lambda _h, _n: "Handled empty parser values.",
+        None,
+        None,
+        None,
+    )
+
+    assert item.description == "handle empty values"
+
+
+def test_merge_changelogs_with_keepachangelog_counts_each_inserted_section():
+    """The merge helper must count every appended semantic version section."""
+    existing = (
+        "# Changelog\n\n"
+        "## [Unreleased]\n\n"
+        "## [1.0.0] - 2026-01-01\n\n"
+        "### Added\n"
+        "- Initial release\n"
+    )
+    generated = (
+        "# Changelog\n\n"
+        "## [Unreleased]\n\n"
+        "## [1.2.0] - 2026-03-01\n\n"
+        "### Added\n"
+        "- Feature wave\n\n"
+        "## [1.1.0] - 2026-02-01\n\n"
+        "### Added\n"
+        "- Earlier feature\n\n"
+        "## [1.0.0] - 2026-01-01\n\n"
+        "### Added\n"
+        "- Initial release\n"
+    )
+
+    merged, added = merge_changelogs_with_keepachangelog(existing, generated)
+
+    assert added == 2
+    assert "## [1.2.0] - 2026-03-01" in merged
+    assert "## [1.1.0] - 2026-02-01" in merged
+
+
+def test_render_preamble_is_stable_and_ordered():
+    builder = ChangelogBuilder(namespace="ai-changelog")
+    commits = [
+        make_commit(
+            "12345678",
+            "feat: bootstrap changelog",
+            datetime(2026, 1, 1, tzinfo=UTC),
+        )
+    ]
+    notes = {"12345678": "Added first changelog entry."}
+
+    changelog = builder.build(
+        commits=commits,
+        get_note=lambda commit_hash, namespace: notes.get(commit_hash),
+        tags_by_commit={},
+    )
+
+    assert changelog.startswith(
+        "<!-- Markdownlint-disable MD024 -->\n\n"
+        "# Changelog\n\n"
+        "All notable changes to this project will be documented in this file.\n\n"
+        "The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),\n"
+    )
+    assert (
+        "and this project adheres to [Semantic Versioning]"
+        "(https://semver.org/spec/v2.0.0.html)."
+    ) in changelog
+
+
+def test_render_does_not_emit_predicted_line_for_released_sections():
+    builder = ChangelogBuilder(namespace="ai-changelog")
+    section = builder._render(
+        [
+            ReleaseSection(
+                title="1.0.0",
+                date="2026-01-01",
+                items=(),
+                predicted_release_type="minor",
+                predicted_version=SemanticVersion(1, 1, 0),
+            )
+        ]
+    )
+
+    assert "Predicted next version:" not in section
+
+
+def test_infer_category_treats_revert_as_fixed():
+    assert infer_category("revert", "revert a bad deploy", False) == "Fixed"
+
+
+def test_infer_category_single_added_line_is_added():
+    assert (
+        infer_category(
+            commit_type="chore",
+            description="update tooling",
+            is_breaking=False,
+            added_lines=1,
+            removed_lines=0,
+        )
+        == "Added"
+    )
+
+
+def test_infer_category_breaking_without_diff_lines_is_changed():
+    assert (
+        infer_category(
+            commit_type="chore",
+            description="adjust internals",
+            is_breaking=True,
+            added_lines=0,
+            removed_lines=0,
+        )
+        == "Changed"
+    )
+
+
+def test_infer_category_breaking_with_balanced_single_line_diff_is_removed():
+    assert (
+        infer_category(
+            commit_type="chore",
+            description="retire deprecated path",
+            is_breaking=True,
+            added_lines=1,
+            removed_lines=1,
+        )
+        == "Removed"
+    )
 
 
 def test_build_synthetic_sections_unreleased_receives_current_version():

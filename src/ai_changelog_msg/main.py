@@ -366,7 +366,9 @@ def _create_semver_tags_if_needed(
             parsed = parse_semantic_version(tag_name)
             if parsed is not None:
                 tagged_commits.add(commit_hash)
-                if highest_version is None or parsed > highest_version:
+                if (
+                    highest_version is None or parsed > highest_version
+                ):  # pragma: no mutate
                     highest_version = parsed
 
     ordered_commits = sorted(

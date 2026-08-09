@@ -280,7 +280,6 @@ class AIProvider:
             f"{pull_base}/api/pull",
             data=payload,
             headers={"Content-Type": "application/json"},  # pragma: no mutate
-            method="POST",  # pragma: no mutate
         )
 
         try:

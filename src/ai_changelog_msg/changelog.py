@@ -399,7 +399,10 @@ class ChangelogBuilder:
             "All notable changes to this project will be documented in this file.",  # pragma: no mutate
             "",  # pragma: no mutate
             "The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),",  # pragma: no mutate
-            "and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).",  # pragma: no mutate
+            (
+                "and this project adheres to [Semantic Versioning]"
+                "(https://semver.org/spec/v2.0.0.html)."
+            ),  # pragma: no mutate
         ]
 
         for section in sections:
@@ -866,7 +869,7 @@ def _release_version_from_heading_kac(heading: str) -> str | None:
 def _is_unreleased_heading(heading: str) -> bool:
     """Check if heading is an Unreleased section."""
     return (
-        re.match(r"^## \[Unreleased\]", heading, re.IGNORECASE) is not None
+        re.match(r"^## \[Unreleased\]\s*$", heading.strip(), re.IGNORECASE) is not None
     )  # pragma: no mutate
 
 

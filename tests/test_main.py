@@ -860,6 +860,22 @@ def test_merge_missing_release_sections_skips_versions_older_than_max_existing()
     assert "## [0.9.0]" not in merged
 
 
+def test_merge_missing_release_sections_ignores_unreleased_heading_in_version_set():
+    existing = "# Changelog\n\n## [Unreleased]\n\n### Changed\n- Pending\n"
+    generated = (
+        "# Changelog\n\n"
+        "## [Unreleased]\n\n"
+        "## [1.0.0] - 2026-01-01\n\n"
+        "### Added\n"
+        "- First release\n"
+    )
+
+    merged, added = main._merge_missing_release_sections(existing, generated)
+
+    assert added == 1
+    assert "## [1.0.0] - 2026-01-01" in merged
+
+
 def test_ensure_markdownlint_md024_disable_prepends_when_missing():
     text = "# Changelog\n\n## [Unreleased]\n"
 
@@ -1169,6 +1185,58 @@ def test_generate_summaries_concurrently_renders_final_worker_totals(monkeypatch
     )
 
 
+def test_generate_summaries_concurrently_calls_completion_callback_per_commit():
+    prepared = [
+        _build_prepared_commit("a1", "Alice", "feat: one", "+a"),
+        _build_prepared_commit("b2", "Bob", "fix: two", "+b"),
+        _build_prepared_commit("c3", "Cara", "docs: three", "+c"),
+    ]
+
+    class FastProvider:
+        def summarize_diff(self, commit_message, diff, author=None):
+            return f"summary: {commit_message}"
+
+    completed = {"count": 0}
+
+    def _on_done() -> None:
+        completed["count"] += 1
+
+    results = main._generate_summaries_concurrently(
+        cast(main.AIProvider, FastProvider()),
+        prepared,
+        workers=2,
+        on_summary_completed=_on_done,
+    )
+
+    assert len(results) == 3
+    assert completed["count"] == 3
+
+
+def test_generate_summaries_concurrently_defaults_to_non_interactive_without_isatty(
+    monkeypatch,
+):
+    prepared = [_build_prepared_commit("hash0", "X", "feat: x", "+x")]
+    output_chunks: list[str] = []
+
+    monkeypatch.setattr(main.sys, "stdout", SimpleNamespace())
+    monkeypatch.setattr(
+        main.click, "echo", lambda text="", nl=True: output_chunks.append(text)
+    )
+
+    class FastProvider:
+        def summarize_diff(self, commit_message, diff, author=None):
+            return "ok"
+
+    results = main._generate_summaries_concurrently(
+        cast(main.AIProvider, FastProvider()),
+        prepared,
+        workers=1,
+    )
+
+    assert len(results) == 1
+    assert not any("\x1b[" in chunk for chunk in output_chunks)
+
+
 def test_normalize_release_sections_rstrips_before_joining():
     """Rebuilt sections must use rstrip to remove trailing newlines."""
     text = (
@@ -1398,6 +1466,23 @@ def test_normalize_release_sections_includes_prefix_when_sections_exist():
     assert "## [Unreleased]" in result
 
 
+def test_normalize_release_sections_preserves_single_trailing_newline():
+    text = (
+        "# Changelog\n\n"
+        "Intro paragraph.\n\n"
+        "## [Unreleased]\n\n"
+        "## [1.0.0] - 2026-01-01\n\n"
+        "### Added\n"
+        "- Initial\n\n"
+    )
+
+    result = main._normalize_release_sections(text)
+
+    assert result.endswith("\n")
+    assert not result.endswith("\n\n")
+    assert "Intro paragraph." in result
+
+
 def test_ensure_unreleased_insertion_index_points_after_unreleased_section():
     """Insertion index must be AFTER the Unreleased section, not before it.
 
@@ -1496,6 +1581,44 @@ def test_create_semver_tags_continue_past_none_category():
 
     assert created == 1
     assert repo.created_tags[0][0] == "v1.0.0"
+
+
+def test_create_semver_tags_applies_expected_bump_per_category_sequence():
+    commits = [
+        SimpleNamespace(
+            hexsha="c1",
+            committed_datetime=datetime(2026, 1, 1, tzinfo=UTC),
+        ),
+        SimpleNamespace(
+            hexsha="c2",
+            committed_datetime=datetime(2026, 1, 2, tzinfo=UTC),
+        ),
+        SimpleNamespace(
+            hexsha="c3",
+            committed_datetime=datetime(2026, 1, 3, tzinfo=UTC),
+        ),
+    ]
+    notes_by_commit = {
+        "c1": "Category: Added\n\nFirst feature.",
+        "c2": "Category: Changed\n\nBehavior tweak.",
+        "c3": "Category: Removed\n\nDrop legacy mode.",
+    }
+    repo = DummyTagRepo(tags_by_commit={}, notes_by_commit=notes_by_commit)
+
+    created = main._create_semver_tags_if_needed(
+        cast(main.GitRepository, repo),
+        commits,
+        namespace="ai-changelog",
+        create_semver_tags=True,
+        limit=None,
+    )
+
+    assert created == 3
+    assert repo.created_tags == [
+        ("v1.0.0", "c1"),
+        ("v1.0.1", "c2"),
+        ("v2.0.0", "c3"),
+    ]
 
 
 def test_normalize_release_sections_uses_heading_not_block_for_semantic_check():

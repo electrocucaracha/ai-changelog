@@ -121,6 +121,24 @@ def test_get_commit_diff_uses_parent_when_present():
     assert repo.get_commit_diff(commit) == "+added"
 
 
+def test_get_commit_diff_passes_parent_and_commit_hash_in_order():
+    calls: list[tuple[str, str]] = []
+
+    class _TrackingGit(_FakeGit):
+        def diff(self, parent_hash, commit_hash):
+            calls.append((parent_hash, commit_hash))
+            return "+delta"
+
+    repo = _make_repo(fake_git=_TrackingGit())
+    commit = SimpleNamespace(
+        hexsha="childhash",
+        parents=[SimpleNamespace(hexsha="parenthash")],
+    )
+
+    assert repo.get_commit_diff(commit) == "+delta"
+    assert calls == [("parenthash", "childhash")]
+
+
 def test_get_commit_diff_uses_show_for_root_commit_and_returns_error_on_failure():
     repo = _make_repo(fake_git=_FakeGit(show_result="root diff"))
     root_commit = SimpleNamespace(hexsha="abc12345", parents=[])
@@ -131,6 +149,21 @@ def test_get_commit_diff_uses_show_for_root_commit_and_returns_error_on_failure(
         hexsha="abc12345", parents=[SimpleNamespace(hexsha="parent")]
     )
     assert "[Error retrieving diff: bad diff]" == failing_repo.get_commit_diff(commit)
+
+
+def test_get_commit_diff_logs_warning_with_expected_capitalization(caplog):
+    caplog.set_level("WARNING")
+    failing_repo = _make_repo(fake_git=_FakeGit(diff_result=RuntimeError("bad diff")))
+    commit = SimpleNamespace(
+        hexsha="abc12345", parents=[SimpleNamespace(hexsha="parent")]
+    )
+
+    _ = failing_repo.get_commit_diff(commit)
+
+    assert any(
+        record.getMessage().startswith("Could not retrieve diff for abc12345")
+        for record in caplog.records
+    )
 
 
 def test_get_note_returns_none_when_missing():
@@ -217,6 +250,17 @@ def test_clear_notes_raises_runtime_error_when_delete_fails():
         repo.clear_notes("ai-changelog")
 
 
+def test_clear_notes_requires_exact_namespace_match():
+    fake_git = _FakeGit()
+    repo = _make_repo(
+        fake_git=fake_git,
+        refs=[SimpleNamespace(path="refs/notes/ai-changelog-other")],
+    )
+
+    assert repo.clear_notes("ai-changelog") is False
+    assert fake_git.update_ref_calls == []
+
+
 def test_has_commits_false_when_head_commit_access_raises():
     repo = _make_repo()
 
@@ -245,6 +289,21 @@ def test_create_tag_invokes_gitpython_create_tag():
 
     assert repo.create_tag("v1.2.3", "abc123") is True
     assert calls == [("v1.2.3", "abc123")]
+
+
+def test_create_tag_does_not_skip_when_only_other_tags_exist():
+    calls: list[tuple[str, str]] = []
+
+    def _create_tag(name: str, ref: str):
+        calls.append((name, ref))
+
+    repo = _make_repo(
+        tags=[SimpleNamespace(name="v9.9.9")],
+        create_tag=_create_tag,
+    )
+
+    assert repo.create_tag("v1.0.0", "abc123") is True
+    assert calls == [("v1.0.0", "abc123")]
 
 
 def test_create_tag_raises_runtime_error_on_git_command_failure():
@@ -367,6 +426,22 @@ def test_get_note_uses_ref_argument():
     assert len(fake_git.notes_calls) == 1
     call_args = fake_git.notes_calls[0]
     assert call_args[0] == "--ref"
+    assert call_args == ("--ref", "ai-changelog", "show", "abc123")
+
+
+def test_create_tag_does_not_call_backend_when_exact_tag_exists():
+    calls: list[tuple[str, str]] = []
+
+    def _create_tag(name: str, ref: str):
+        calls.append((name, ref))
+
+    repo = _make_repo(
+        tags=[SimpleNamespace(name="v1.0.0")],
+        create_tag=_create_tag,
+    )
+
+    assert repo.create_tag("v1.0.0", "abc123") is False
+    assert calls == []
 
 
 def test_create_tag_error_message_includes_stderr():

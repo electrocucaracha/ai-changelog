@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+from collections.abc import Callable
 from io import BytesIO
 from types import SimpleNamespace
 
@@ -23,11 +24,66 @@ from ai_changelog_msg import ai_provider
 from ai_changelog_msg.ai_provider import AIProvider
 from ai_changelog_msg.config import Config
 
+OLLAMA_MODEL_NAME = "llama3.1:8b-instruct-q4_K_M"
+OLLAMA_MODEL = "ollama/" + OLLAMA_MODEL_NAME
+OLLAMA_PULL_DENIED = "pull access denied for " + OLLAMA_MODEL_NAME
+
 
 def _make_response(content: str) -> SimpleNamespace:
     return SimpleNamespace(
         choices=[SimpleNamespace(message=SimpleNamespace(content=content))]
     )
+
+
+class _SuccessfulOllamaPullResponse:
+    """HTTP response stub for successful Ollama model pull requests."""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def read(self):
+        return b'{"status":"success"}'
+
+
+def _fake_successful_ollama_urlopen(*args, **kwargs):
+    """Return a successful response for mocked `urlopen` pull calls."""
+    return _SuccessfulOllamaPullResponse()
+
+
+def _configure_missing_ollama_model_then_recover(
+    monkeypatch: pytest.MonkeyPatch,
+    on_completion_call: Callable[[dict[str, object]], None] | None = None,
+) -> dict[str, int]:
+    """Patch AI completion to fail once for missing model, then recover.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture used to patch dependencies.
+        on_completion_call: Optional callback invoked with completion kwargs.
+
+    Returns:
+        A mutable call counter dict with key ``count``.
+    """
+    calls = {"count": 0}
+
+    def fake_completion(**kwargs):
+        calls["count"] += 1
+        if on_completion_call is not None:
+            on_completion_call(kwargs)
+        if calls["count"] == 1:
+            raise ValueError(f"model '{OLLAMA_MODEL_NAME}' not found")
+        return _make_response("Recovered after pull.")
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
+    )
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.urllib_request.urlopen",
+        _fake_successful_ollama_urlopen,
+    )
+    return calls
 
 
 def test_summarize_diff_truncates_and_returns_trimmed_content(monkeypatch):
@@ -103,91 +159,72 @@ def test_summarize_diff_retries_timeout_and_succeeds(caplog, monkeypatch):
     assert observed_delays == [1.0, 2.0]
     assert any(
         record.getMessage()
-        == "Transient AI API error on attempt 1/3: litellm.APIConnectionError: OllamaException - litellm.Timeout: Connection timed out after 600.0 seconds.. Retrying in 1.0s"
+        == (
+            "Transient AI API error on attempt 1/3: litellm.APIConnectionError: "
+            "OllamaException - litellm.Timeout: Connection timed out after 600.0 "
+            "seconds.. Retrying in 1.0s"
+        )
         for record in caplog.records
     )
 
 
 def test_completion_with_ollama_auto_pull_forwards_max_tokens(monkeypatch):
-    calls = {
-        "count": 0,
+    captured = {
         "max_tokens": [],
         "messages": [],
         "model": [],
         "temperature": [],
     }
 
-    def fake_completion(**kwargs):
-        calls["count"] += 1
-        calls["max_tokens"].append(kwargs["max_tokens"])
-        calls["messages"].append(kwargs["messages"])
-        calls["model"].append(kwargs["model"])
-        calls["temperature"].append(kwargs["temperature"])
-        if calls["count"] == 1:
-            raise ValueError("model 'llama3.1:8b-instruct-q4_K_M' not found")
-        return _make_response("Recovered after pull.")
+    def _capture_kwargs(kwargs: dict[str, object]) -> None:
+        captured["max_tokens"].append(kwargs["max_tokens"])
+        captured["messages"].append(kwargs["messages"])
+        captured["model"].append(kwargs["model"])
+        captured["temperature"].append(kwargs["temperature"])
 
-    class _Response:
-        def __enter__(self):
-            return self
+    calls = _configure_missing_ollama_model_then_recover(monkeypatch, _capture_kwargs)
 
-        def __exit__(self, exc_type, exc, tb):
-            return False
-
-        def read(self):
-            return b'{"status":"success"}'
-
-    def fake_urlopen(*args, **kwargs):
-        return _Response()
-
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
-    )
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.urllib_request.urlopen", fake_urlopen
-    )
-
-    provider = AIProvider(Config(model="ollama/llama3.1:8b-instruct-q4_K_M"))
+    provider = AIProvider(Config(model=OLLAMA_MODEL))
     summary = provider.summarize_diff("feat: improve defaults", "+change")
 
     assert summary == "Recovered after pull."
     assert calls["count"] == 2
-    assert calls["max_tokens"] == [500, 500]
-    assert calls["messages"][0] == calls["messages"][1]
-    assert calls["model"] == [provider.model, provider.model]
-    assert calls["temperature"] == [0.3, 0.3]
+    assert captured["max_tokens"] == [500, 500]
+    assert captured["messages"][0] == captured["messages"][1]
+    assert captured["model"] == [provider.model, provider.model]
+    assert captured["temperature"] == [0.3, 0.3]
+
+
+def test_completion_with_ollama_auto_pull_forwards_gateway_kwargs_on_retry(monkeypatch):
+    captured_kwargs: list[dict[str, object]] = []
+
+    def _capture_kwargs(kwargs: dict[str, object]) -> None:
+        captured_kwargs.append(kwargs)
+
+    _configure_missing_ollama_model_then_recover(monkeypatch, _capture_kwargs)
+
+    provider = AIProvider(
+        Config(
+            model=OLLAMA_MODEL,
+            litellm_api_base="https://gateway.example",
+            litellm_api_key="token",
+            litellm_extra_headers={"X-Org": "platform"},
+        )
+    )
+    summary = provider.summarize_diff("feat: improve defaults", "+change")
+
+    assert summary == "Recovered after pull."
+    assert len(captured_kwargs) == 2
+    for call_kwargs in captured_kwargs:
+        assert call_kwargs["api_base"] == "https://gateway.example"
+        assert call_kwargs["api_key"] == "token"
+        assert call_kwargs["extra_headers"] == {"X-Org": "platform"}
 
 
 def test_summarize_diff_pulls_missing_ollama_model_then_retries(monkeypatch):
-    calls = {"count": 0}
+    calls = _configure_missing_ollama_model_then_recover(monkeypatch)
 
-    def fake_completion(**kwargs):
-        calls["count"] += 1
-        if calls["count"] == 1:
-            raise ValueError("model 'llama3.1:8b-instruct-q4_K_M' not found")
-        return _make_response("Recovered after pull.")
-
-    class _Response:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb):
-            return False
-
-        def read(self):
-            return b'{"status":"success"}'
-
-    def fake_urlopen(*args, **kwargs):
-        return _Response()
-
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
-    )
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.urllib_request.urlopen", fake_urlopen
-    )
-
-    provider = AIProvider(Config(model="ollama/llama3.1:8b-instruct-q4_K_M"))
+    provider = AIProvider(Config(model=OLLAMA_MODEL))
     summary = provider.summarize_diff("feat: improve defaults", "+change")
 
     assert summary == "Recovered after pull."
@@ -196,7 +233,7 @@ def test_summarize_diff_pulls_missing_ollama_model_then_retries(monkeypatch):
 
 def test_summarize_diff_raises_when_ollama_pull_fails(monkeypatch):
     def fake_completion(**kwargs):
-        raise ValueError("model 'llama3.1:8b-instruct-q4_K_M' not found")
+        raise ValueError(f"model '{OLLAMA_MODEL_NAME}' not found")
 
     def fake_urlopen(*args, **kwargs):
         raise ai_provider.urllib_error.HTTPError(
@@ -204,9 +241,7 @@ def test_summarize_diff_raises_when_ollama_pull_fails(monkeypatch):
             code=500,
             msg="Internal Server Error",
             hdrs=None,
-            fp=BytesIO(
-                b"pull access denied for llama3.1:8b-instruct-q4_K_M"  # gitleaks:allow
-            ),
+            fp=BytesIO(OLLAMA_PULL_DENIED.encode("utf-8")),
         )
 
     monkeypatch.setattr(
@@ -216,7 +251,7 @@ def test_summarize_diff_raises_when_ollama_pull_fails(monkeypatch):
         "ai_changelog_msg.ai_provider.urllib_request.urlopen", fake_urlopen
     )
 
-    provider = AIProvider(Config(model="ollama/llama3.1:8b-instruct-q4_K_M"))
+    provider = AIProvider(Config(model=OLLAMA_MODEL))
 
     with pytest.raises(RuntimeError, match="Failed to pull Ollama model"):
         provider.summarize_diff("feat: improve defaults", "+change")
@@ -247,8 +282,7 @@ def test_pull_ollama_model_uses_post_request_and_utf8_replace(caplog, monkeypatc
 
     provider = AIProvider(
         Config(
-            model="ollama/llama3.1:8b-instruct-q4_K_M",
-            litellm_api_base="https://ollama.example:11434/api/v1",
+            model=OLLAMA_MODEL, litellm_api_base="https://ollama.example:11434/api/v1"
         )
     )
 
@@ -262,7 +296,7 @@ def test_pull_ollama_model_uses_post_request_and_utf8_replace(caplog, monkeypatc
     assert captured["timeout"] == provider.config.api_timeout
     assert any(
         record.getMessage()
-        == "Ollama model 'llama3.1:8b-instruct-q4_K_M' not available locally; pulling"
+        == f"Ollama model '{OLLAMA_MODEL_NAME}' not available locally; pulling"
         for record in caplog.records
     )
 
@@ -274,18 +308,16 @@ def test_pull_ollama_model_decodes_http_error_details_with_utf8_replace(monkeypa
             code=500,
             msg="Internal Server Error",
             hdrs=None,
-            fp=BytesIO(b"pull access denied for llama3.1:8b-instruct-q4_K_M\xff"),
+            fp=BytesIO(OLLAMA_PULL_DENIED.encode("utf-8") + b"\xff"),
         )
 
     monkeypatch.setattr(
         "ai_changelog_msg.ai_provider.urllib_request.urlopen", fake_urlopen
     )
 
-    provider = AIProvider(Config(model="ollama/llama3.1:8b-instruct-q4_K_M"))
+    provider = AIProvider(Config(model=OLLAMA_MODEL))
 
-    with pytest.raises(
-        RuntimeError, match="pull access denied for llama3.1:8b-instruct-q4_K_M"
-    ):
+    with pytest.raises(RuntimeError, match=OLLAMA_PULL_DENIED):
         provider._pull_ollama_model()
 
 
@@ -310,13 +342,38 @@ def test_pull_ollama_model_falls_back_to_localhost_for_malformed_api_base(monkey
         "ai_changelog_msg.ai_provider.urllib_request.urlopen", fake_urlopen
     )
 
-    provider = AIProvider(
-        Config(model="ollama/llama3.1:8b-instruct-q4_K_M", litellm_api_base="http://")
-    )
+    provider = AIProvider(Config(model=OLLAMA_MODEL, litellm_api_base="http://"))
 
     provider._pull_ollama_model()
 
     assert captured["request"].full_url.startswith("http://localhost:11434/api/pull")
+
+
+def test_pull_ollama_model_uses_default_localhost_base_when_not_configured(monkeypatch):
+    captured = {}
+
+    class _Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return b'{"status":"success"}'
+
+    def fake_urlopen(request, timeout):
+        captured["request"] = request
+        return _Response()
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.urllib_request.urlopen", fake_urlopen
+    )
+
+    provider = AIProvider(Config(model=OLLAMA_MODEL, litellm_api_base=None))
+    provider._pull_ollama_model()
+
+    assert captured["request"].full_url == "http://localhost:11434/api/pull"
 
 
 def test_generate_changelog_entry_returns_ai_content(monkeypatch):
@@ -403,6 +460,25 @@ def test_generate_changelog_entry_falls_back_to_note_on_failure(monkeypatch):
     )
 
     assert result == "Refreshed README details."
+
+
+def test_generate_changelog_entry_falls_back_to_commit_message_when_note_blank(
+    monkeypatch,
+):
+    def fake_completion(**kwargs):
+        raise RuntimeError("offline")
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
+    )
+
+    provider = AIProvider(Config())
+
+    result = provider.generate_changelog_entry(
+        "docs: refresh readme", "   ", "Changed", False
+    )
+
+    assert result == "docs: refresh readme"
 
 
 def test_generate_changelog_entry_logs_fallback_reason(caplog, monkeypatch):
@@ -889,6 +965,23 @@ def test_init_headroom_converts_non_list_callbacks_to_list(monkeypatch):
     monkeypatch.setattr(
         "ai_changelog_msg.ai_provider.litellm.callbacks", ("preexisting_item",)
     )
+
+    AIProvider(Config(enable_headroom=True))
+
+    callbacks = ai_provider.litellm.callbacks
+    assert isinstance(callbacks, list)
+    assert any(isinstance(c, FakeHeadroomCallback) for c in callbacks)
+
+
+def test_init_headroom_initializes_missing_callbacks_list(monkeypatch):
+    class FakeHeadroomCallback:
+        pass
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider._HeadroomCallback",
+        FakeHeadroomCallback,
+    )
+    monkeypatch.setattr("ai_changelog_msg.ai_provider.litellm.callbacks", None)
 
     AIProvider(Config(enable_headroom=True))
 

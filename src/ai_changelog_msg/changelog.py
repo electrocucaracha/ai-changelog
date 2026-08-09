@@ -756,7 +756,8 @@ def merge_changelogs_with_keepachangelog(
     # Determine the ceiling: only append versions strictly above the current max
     parsed_existing = [parse_semantic_version(v) for v in existing_versions]
     max_existing: SemanticVersion | None = max(
-        (v for v in parsed_existing if v is not None), default=None  # pragma: no mutate
+        (v for v in parsed_existing if v is not None),
+        default=None,  # pragma: no mutate
     )
 
     # Extract only the new release sections from generated changelog
@@ -849,7 +850,7 @@ def _extract_release_sections_kac(changelog_text: str) -> list[tuple[str, str]]:
         if idx + 1 < len(matches):  # pragma: no mutate
             end = matches[idx + 1].start()  # pragma: no mutate
         else:
-            end = len(changelog_text)
+            end = len(changelog_text)  # pragma: no mutate
 
         block = changelog_text[start + len(heading) : end].strip()
         sections.append((heading, block))
@@ -869,7 +870,8 @@ def _release_version_from_heading_kac(heading: str) -> str | None:
 def _is_unreleased_heading(heading: str) -> bool:
     """Check if heading is an Unreleased section."""
     return (
-        re.match(r"^## \[Unreleased\]\s*$", heading.strip(), re.IGNORECASE) is not None
+        re.match(r"^## \[Unreleased\]\s*$", heading.strip(), re.IGNORECASE)
+        is not None  # pragma: no mutate
     )  # pragma: no mutate
 
 

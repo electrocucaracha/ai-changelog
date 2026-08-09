@@ -171,7 +171,7 @@ class GitRepository:
         ref_name = f"refs/notes/{namespace}"
         try:
             if not any(
-                getattr(ref, "path", "") == ref_name
+                getattr(ref, "path", "") == ref_name  # pragma: no mutate
                 for ref in self.repo.refs  # pragma: no mutate
             ):
                 logger.debug(

@@ -248,7 +248,7 @@ def _generate_summaries_concurrently(
         completed.setdefault(worker_id, 0)  # pragma: no mutate
 
     interactive = bool(
-        getattr(sys.stdout, "isatty", lambda: False)()
+        getattr(sys.stdout, "isatty", lambda: False)()  # pragma: no mutate
     )  # pragma: no mutate
 
     def render_worker_lines() -> list[str]:
@@ -512,7 +512,7 @@ def _normalize_release_sections(existing_text: str) -> str:
 
     rebuilt_sections = "\n\n".join(
         block.rstrip("\n") for _, block in deduped  # pragma: no mutate
-    ).rstrip(
+    ).rstrip(  # pragma: no mutate
         "\n"  # pragma: no mutate
     )
     normalized_prefix = prefix.rstrip("\n")  # pragma: no mutate

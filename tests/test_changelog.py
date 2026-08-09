@@ -754,6 +754,25 @@ def test_diversify_leading_verb_uppercase_word_uses_upper_replacement():
     assert first_word != "RESOLVED"
 
 
+def test_diversify_leading_verb_lowercase_word_uses_lower_replacement():
+    """A lowercase leading power verb must be replaced with a lowercase alternative.
+
+    Kills _diversify_leading_verb mutmut_42:
+    alternative.lower() changed to alternative.upper(), which would produce
+    an UPPERCASE replacement when the original was lowercase.
+    """
+    builder = ChangelogBuilder(namespace="ai-changelog")
+    seen: set[str] = {"resolved"}
+
+    result = builder._diversify_leading_verb("resolved the timeout.", "Fixed", seen)
+
+    first_word = result.split()[0]
+    assert (
+        first_word == first_word.lower()
+    ), f"Expected lowercase replacement, got: {result!r}"
+    assert first_word != "resolved"
+
+
 def test_infer_category_breaking_with_exactly_one_removed_line():
     """is_breaking=True with removed_lines=1 must return 'Removed', not skip.
 
@@ -1099,6 +1118,24 @@ def test_render_no_extra_blank_line_at_end_of_section():
     assert changelog.startswith("<!-- Markdownlint-disable MD024 -->")
 
 
+def test_render_with_empty_sections_keeps_adherence_note():
+    """parts[-1] (not parts[+1]) must gate the trailing-blank-line removal.
+
+    Kills xǁChangelogBuilderǁ_render__mutmut_39:
+    parts[-1] changed to parts[+1]. With no sections the loop never runs,
+    so parts[-1] is the adherence note (non-empty) and the original code
+    does NOT pop it. With the mutation parts[+1] is always '' so it pops
+    the adherence note, producing truncated output.
+    """
+    builder = ChangelogBuilder(namespace="ai-changelog")
+    result = builder._render([])
+
+    assert (
+        "and this project adheres to [Semantic Versioning]"
+        "(https://semver.org/spec/v2.0.0.html)."
+    ) in result
+
+
 def test_build_item_initial_removed_lines_is_zero():
     """When no get_diff is provided, removed_lines must start at 0, not 1.
 
@@ -1406,3 +1443,82 @@ def test_build_item_passes_is_breaking_flag_to_infer_category():
     # The key assertion: is_breaking must be properly passed - verify item tracks breaking flag
     assert item is not None
     assert item.is_breaking is True
+
+
+def test_build_item_passes_is_breaking_to_infer_category():
+    """is_breaking=True must reach infer_category; None produces the wrong category.
+
+    Kills xǁChangelogBuilderǁ_build_item__mutmut_21:
+    parsed.is_breaking changed to None in infer_category call.
+    With is_breaking=None a breaking chore! commit with more removed than added
+    lines falls through to 'Changed' instead of 'Removed'.
+    """
+    # 1 added line, 3 removed lines → removed_lines >= added_lines
+    diff = "+added\n-removed_a\n-removed_b\n-removed_c\n"
+
+    builder = ChangelogBuilder(namespace="test")
+    commit = make_commit(
+        "aabb1122", "chore!: restructure internals", datetime(2026, 1, 1, tzinfo=UTC)
+    )
+
+    item = builder._build_item(
+        commit,
+        get_note=lambda _h, _n: None,
+        generate_entry=None,
+        commit_url_for_hash=None,
+        get_diff=lambda _c: diff,
+    )
+
+    assert item.category == "Removed"
+
+
+def test_build_item_passes_category_and_is_breaking_to_generate_entry():
+    """generate_entry must receive correct note, category, and is_breaking args.
+
+    Kills xǁChangelogBuilderǁ_build_item__mutmut_33 (note → None),
+    xǁChangelogBuilderǁ_build_item__mutmut_34 (category → None),
+    and xǁChangelogBuilderǁ_build_item__mutmut_35 (is_breaking → None).
+    """
+    captured: dict[str, object] = {}
+
+    def recording_generate_entry(
+        message: str, note: str, category: str, is_breaking: bool
+    ) -> str:
+        captured["note"] = note
+        captured["category"] = category
+        captured["is_breaking"] = is_breaking
+        return note
+
+    builder = ChangelogBuilder(namespace="test")
+    commit = make_commit(
+        "deadbeef", "fix!: address critical bug", datetime(2026, 1, 1, tzinfo=UTC)
+    )
+
+    builder._build_item(
+        commit,
+        get_note=lambda _h, _n: "Critical bug fixed.",
+        generate_entry=recording_generate_entry,
+        commit_url_for_hash=None,
+        get_diff=None,
+    )
+
+    assert captured["note"] == "Critical bug fixed."
+    assert captured["category"] == "Fixed"
+    assert captured["is_breaking"] is True
+
+
+def test_merge_with_no_existing_releases_returns_zero_when_merged_parts_empty():
+    """Return count must be 0 when merged_parts stays empty throughout.
+
+    Kills x__merge_with_no_existing_releases__mutmut_20:
+    return generated_text, 0 changed to return generated_text, 1.
+    When existing has no headings and generated has only an Unreleased block,
+    merged_parts never accumulates entries so 0 sections were appended.
+    """
+    existing = "# Changelog\n\nNo releases yet.\n"
+    generated = "## [Unreleased]\n\n- Work in progress\n"
+
+    result, count = _merge_with_no_existing_releases(existing, generated)
+
+    assert count == 0
+    assert result == generated

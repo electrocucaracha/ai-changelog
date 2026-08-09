@@ -869,12 +869,7 @@ def _release_version_from_heading_kac(heading: str) -> str | None:
 
 def _is_unreleased_heading(heading: str) -> bool:
     """Check if heading is an Unreleased section."""
-    return (
-        re.match(
-            r"^## \[Unreleased\]\s*$", heading.strip(), re.IGNORECASE
-        )  # pragma: no mutate
-        is not None  # pragma: no mutate
-    )  # pragma: no mutate
+    return heading.strip().lower() == "## [unreleased]"
 
 
 def _find_insertion_point_kac(existing_text: str) -> int:

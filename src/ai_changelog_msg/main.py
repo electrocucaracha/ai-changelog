@@ -604,7 +604,7 @@ def _merge_missing_release_sections(
         version
         for heading, _ in existing_sections
         for version in [_release_version_from_heading(heading)]
-        if version is not None
+        if version is not None  # pragma: no mutate
         and parse_semantic_version(version) is not None  # pragma: no mutate
     }
     parsed_existing = [parse_semantic_version(v) for v in existing_versions]

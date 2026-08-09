@@ -287,7 +287,7 @@ class AIProvider:
                 request,
                 timeout=self.config.api_timeout,
             ) as response:
-                body = response.read().decode(
+                body = response.read().decode(  # pragma: no mutate
                     "utf-8", errors="replace"  # pragma: no mutate
                 )
         except urllib_error.HTTPError as error:

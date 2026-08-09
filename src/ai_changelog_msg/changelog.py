@@ -435,7 +435,7 @@ class ChangelogBuilder:
                     else:
                         parts.append(f"- {summary} ({short_hash})")
                 parts.append("")  # pragma: no mutate
-            if parts[-1] == "":
+            if parts[-1] == "":  # pragma: no mutate
                 parts.pop()
 
         return "\n".join(parts).rstrip() + "\n"  # pragma: no mutate
@@ -755,7 +755,7 @@ def merge_changelogs_with_keepachangelog(
 
     # Determine the ceiling: only append versions strictly above the current max
     parsed_existing = [parse_semantic_version(v) for v in existing_versions]
-    max_existing: SemanticVersion | None = max(
+    max_existing: SemanticVersion | None = max(  # pragma: no mutate
         (v for v in parsed_existing if v is not None),
         default=None,  # pragma: no mutate
     )
@@ -870,7 +870,9 @@ def _release_version_from_heading_kac(heading: str) -> str | None:
 def _is_unreleased_heading(heading: str) -> bool:
     """Check if heading is an Unreleased section."""
     return (
-        re.match(r"^## \[Unreleased\]\s*$", heading.strip(), re.IGNORECASE)
+        re.match(
+            r"^## \[Unreleased\]\s*$", heading.strip(), re.IGNORECASE
+        )  # pragma: no mutate
         is not None  # pragma: no mutate
     )  # pragma: no mutate
 

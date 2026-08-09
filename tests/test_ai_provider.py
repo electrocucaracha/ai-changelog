@@ -117,6 +117,7 @@ def test_summarize_diff_raises_runtime_error_on_api_failure(monkeypatch):
     monkeypatch.setattr(
         "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
     )
+    monkeypatch.setattr("ai_changelog_msg.ai_provider.time.sleep", lambda _: None)
 
     provider = AIProvider(Config())
 

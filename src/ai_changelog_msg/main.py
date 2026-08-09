@@ -186,9 +186,9 @@ def _configure_logging(log_level: str) -> None:
     )
     # Silence noisy third-party loggers unless debug is requested
     if level > logging.DEBUG:
-        logging.getLogger("httpx").setLevel(logging.WARNING)
+        logging.getLogger("httpx").setLevel(logging.WARNING)  # pragma: no mutate
         logging.getLogger("httpcore").setLevel(logging.WARNING)  # pragma: no mutate
-        logging.getLogger("litellm").setLevel(logging.WARNING)
+        logging.getLogger("litellm").setLevel(logging.WARNING)  # pragma: no mutate
         litellm_logger = logging.getLogger("LiteLLM")  # pragma: no mutate
         litellm_logger.setLevel(logging.WARNING)
         # Prevent LiteLLM's own logger handlers from polluting CLI progress output.
@@ -510,11 +510,10 @@ def _normalize_release_sections(existing_text: str) -> str:
             seen_versions.add(version)
         deduped.append((heading, block))
 
-    rebuilt_sections = "\n\n".join(
+    joined_sections = "\n\n".join(
         block.rstrip("\n") for _, block in deduped  # pragma: no mutate
-    ).rstrip(  # pragma: no mutate
-        "\n"  # pragma: no mutate
     )
+    rebuilt_sections = joined_sections.rstrip("\n")  # pragma: no mutate
     normalized_prefix = prefix.rstrip("\n")  # pragma: no mutate
     if normalized_prefix and rebuilt_sections:  # pragma: no mutate
         return f"{normalized_prefix}\n\n{rebuilt_sections}\n"

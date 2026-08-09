@@ -240,6 +240,19 @@ def test_clear_notes_returns_false_when_namespace_missing():
     assert repo.clear_notes("ai-changelog") is False
 
 
+def test_clear_notes_logs_namespace_name_when_missing(caplog):
+    import logging
+
+    repo = _make_repo()
+
+    with caplog.at_level(logging.DEBUG, logger="ai_changelog_msg.git_helper"):
+        repo.clear_notes("ai-changelog")
+
+    assert "ai-changelog" in caplog.text
+    assert "Notes namespace" in caplog.text
+    assert "does not exist" in caplog.text
+
+
 def test_clear_notes_deletes_existing_namespace():
     ref_name = "refs/notes/ai-changelog"
     fake_git = _FakeGit()

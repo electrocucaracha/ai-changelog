@@ -1,0 +1,3 @@
+Category: Changed
+
+Scripts check_mutation_gate.py and restrict_mutations.py were modified to be executable in CI environments, changing their file modes from 644 to 755. This allows direct invocation without requiring an explicit Python interpreter, but does not alter script logic or behavior. The change ensures scripts can run as intended during continuous integration testing.

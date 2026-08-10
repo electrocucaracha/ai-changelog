@@ -78,11 +78,36 @@ jobs:
       - name: Collect LLMock logs
         if: always()
         run: cat llmock.log || true
+      - name: Collect functional diagnostics
+        if: always()
+        run: |
+          {
+            echo "### Functional diagnostics"
+            if [ -f llmock.pid ]; then
+              pid="$(cat llmock.pid)"
+              if kill -0 "$pid" >/dev/null 2>&1; then
+                echo "- LLMock process status: running (pid=$pid)"
+              else
+                echo "- LLMock process status: not running (pid=$pid)"
+              fi
+            else
+              echo "- LLMock pid file missing"
+            fi
+            echo "- LLMock /ping probe:"
+            curl -iS http://127.0.0.1:8001/ping || true
+          } | tee functional-diagnostics.log
       - name: Publish functional test summary
         if: always()
         env:
           TEST_EXIT_CODE: ${{ steps.run-functional-tests.outputs.exit_code }}
         run: python3 ci/publish_functional_summary.py
+      - name: Show functional test logs on failure
+        if: failure()
+        run: |
+          echo "--- functional-tests.log (tail) ---"
+          tail -n 200 functional-tests.log || true
+          echo "--- functional-diagnostics.log ---"
+          cat functional-diagnostics.log || true
       - name: Show LLMock logs on failure
         if: failure()
         run: cat llmock.log

@@ -66,6 +66,10 @@ def test_cli_generates_note_with_llm_mock_provider(tmp_path: Path) -> None:
             "--changelog-file",
             "CHANGELOG.generated.md",
         ],
+        env={
+            "NO_PROXY": "127.0.0.1,localhost",
+            "no_proxy": "127.0.0.1,localhost",
+        },
     )
 
     assert result.exit_code == 0, result.output

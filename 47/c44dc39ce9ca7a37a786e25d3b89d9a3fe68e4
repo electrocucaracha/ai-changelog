@@ -1,0 +1,3 @@
+Category: Changed
+
+Tests were added to ensure correct handling of leading verb casing, adherence note retention, and argument passing in ChangelogBuilder. These tests target mutations killed by mutmut, verifying that lower/uppercase replacements are preserved and the adherence note is not removed. Additionally, a test was added for merge logic when no releases exist, ensuring the merged section count is accurate. This improves mutation coverage and guards against subtle regressions.

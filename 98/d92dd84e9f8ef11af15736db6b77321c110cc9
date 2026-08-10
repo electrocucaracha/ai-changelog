@@ -1,0 +1,3 @@
+Category: Fixed
+
+The previous approach used sed to modify the only_mutate field in pyproject.toml, which was brittle and failed if the field was missing or formatted differently. This change replaces it with a Python script that reliably updates or inserts the only_mutate setting under [tool.mutmut], ensuring mutmut targets only the current module in the test matrix. The update is now more maintainable and prevents silent misconfiguration of mutation tests, improving overall reliability.

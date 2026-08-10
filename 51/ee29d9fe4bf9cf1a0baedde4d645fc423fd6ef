@@ -1,0 +1,3 @@
+Category: Added
+
+A new GitHub Actions job runs functional tests against a live LLMock server, ensuring compatibility with external LLM providers. The workflow provisions a Node.js container and verifies the mock LLM endpoint's readiness before executing the test suite. A new test validates that the CLI can generate and persist changelog notes using the mock LLM endpoint, improving confidence in integration scenarios and guarding against regressions when interacting with LLM APIs.

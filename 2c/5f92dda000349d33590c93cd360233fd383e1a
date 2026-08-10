@@ -1,0 +1,3 @@
+Category: Changed
+
+The test for the `git_helper` now checks for exact log messages instead of substrings, improving reliability and clarity in failure cases. This ensures that the test only passes when the expected message is logged. The change affects how the test verifies log output, making it more precise and reducing potential false positives from unrelated messages.

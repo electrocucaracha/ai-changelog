@@ -1,0 +1,3 @@
+Category: Added
+
+The test for commit diff logs has been strengthened by adding an assertion to verify that a warning containing "bad diff" is logged, in addition to the existing check for a warning about failing to retrieve a diff. This change ensures that error handling logs all expected messages, improving the robustness of the test. The update does not introduce any breaking behavior or API changes.

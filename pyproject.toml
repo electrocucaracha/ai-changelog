@@ -76,6 +76,9 @@ isolated_build = true
 [testenv]
 description = Run unit tests with pytest
 extras = test
+passenv =
+    CHANGELOG_FUNCTIONAL_LLM_MOCK
+    LLM_MOCK_BASE_URL
 setenv =
     PYTHONPATH = {toxinidir}/src
 commands =

@@ -46,30 +46,63 @@ jobs:
         uses: ./.github/actions/setup-python-env
       - name: Start LLMock server
         run: |
-          docker run -d --rm --name llmock -p 8001:8001 node:20-alpine \
-            sh -lc "npm install -g llmock@3.3.4 && llmock start --foreground --model=chatgpt --port=8001"
+          python tests/mock_llm_server.py --host 127.0.0.1 --port 8001 \
+            > llmock.log 2>&1 &
+          echo "$!" > llmock.pid
       - name: Wait for LLMock readiness
         run: |
           for _ in $(seq 1 60); do
             if curl -fsS http://127.0.0.1:8001/ping >/dev/null; then
               exit 0
             fi
+            if ! kill -0 "$(cat llmock.pid)" >/dev/null 2>&1; then
+              echo "LLMock process exited before readiness"
+              cat llmock.log || true
+              exit 1
+            fi
             sleep 1
           done
           echo "LLMock did not become ready within 60 seconds"
-          docker logs llmock || true
+          cat llmock.log || true
           exit 1
       - name: Run functional tests against LLMock
+        id: run-functional-tests
         env:
           CHANGELOG_FUNCTIONAL_LLM_MOCK: "1"
           LLM_MOCK_BASE_URL: "http://127.0.0.1:8001/chatgpt"
-        run: uvx tox -e py312 -- tests/test_functional_llm_mock.py -m integration
+          NO_PROXY: "127.0.0.1,localhost"
+          no_proxy: "127.0.0.1,localhost"
+        run: |
+          set +e
+          uvx tox -e py312 -- tests/test_functional_llm_mock.py -m integration --junitxml=functional-junit.xml 2>&1 | tee functional-tests.log
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Collect LLMock logs
+        if: always()
+        run: cat llmock.log || true
+      - name: Publish functional test summary
+        if: always()
+        env:
+          TEST_EXIT_CODE: ${{ steps.run-functional-tests.outputs.exit_code }}
+        run: python3 ci/publish_functional_summary.py
       - name: Show LLMock logs on failure
         if: failure()
-        run: docker logs llmock
+        run: cat llmock.log
       - name: Stop LLMock server
         if: always()
-        run: docker rm -f llmock || true
+        run: |
+          if [ -f llmock.pid ]; then
+            kill "$(cat llmock.pid)" || true
+          fi
+      - name: Fail job when functional tests fail
+        if: always()
+        env:
+          TEST_EXIT_CODE: ${{ steps.run-functional-tests.outputs.exit_code }}
+        run: |
+          if [ "${TEST_EXIT_CODE}" != "0" ]; then
+            echo "Functional tests failed with exit code ${TEST_EXIT_CODE}"
+            exit 1
+          fi
   # jscpd:ignore-start
   mutation-tests:
     name: Run mutation tests (${{ matrix.module }})

@@ -71,6 +71,7 @@ def test_cli_generates_note_with_llm_mock_provider(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     assert "Processing complete" in result.output
     assert "Changelog written to:" in result.output
+    assert "Token usage:" in result.output
 
     repo = GitRepository(str(tmp_path))
     generated_note = repo.get_note(commit_hash, "functional-llm-mock")

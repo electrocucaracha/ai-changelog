@@ -1,0 +1,3 @@
+Category: Changed
+
+Config validation and env parsing tests were added to improve coverage and confidence in configuration parsing and validation logic, including boundary conditions and error handling for max_diff_size, api_timeout, retry_attempts, and retry_backoff_seconds. The Config.from_env method now correctly prioritizes overrides and environment variables for all supported fields. Additionally, the 'auto' model value is resolved to platform-specific defaults at initialization and when loaded from the environment.

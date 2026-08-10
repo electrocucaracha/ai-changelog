@@ -1,0 +1,3 @@
+Category: Added
+
+LiteLLM completions now track aggregate token usage, enabling users to monitor and optimize LLM resource consumption. A `TokenUsage` dataclass accumulates prompt, completion, and total tokens across all LiteLLM calls. The AIProvider exposes this usage via a new attribute, and the CLI prints a summary after runs. Tests and mocks are updated to support the new tracking feature.

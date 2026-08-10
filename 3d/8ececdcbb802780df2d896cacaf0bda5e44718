@@ -1,0 +1,3 @@
+Category: Changed
+
+The codebase has undergone several refactorings to improve consistency, tool compatibility, and test coverage. The `pragma: no mutate` comments are now consistently placed on argument lines, improving clarity and tool accuracy. Additionally, new tests have been added for logging and error handling in the Git and AI providers. These changes aim to enhance maintainability and reliability of the codebase.

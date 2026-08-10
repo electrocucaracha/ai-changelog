@@ -1,0 +1,3 @@
+Category: Changed
+
+Expanded test suites were added to cover edge cases for changelog, AI provider, and Git helper behaviors. This includes testing category inference, section rendering, item construction, Ollama model pull logic, diff argument order, tag creation, namespace matching, and note clearing. The additions improve regression detection and clarify expected behaviors for rare or boundary conditions.

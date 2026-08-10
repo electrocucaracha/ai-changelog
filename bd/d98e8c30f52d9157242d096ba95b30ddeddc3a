@@ -1,0 +1,3 @@
+Category: Added
+
+The README file now includes visitor count and code statistics badges, providing quick insights into project activity and codebase metrics for contributors and users. These additions improve transparency without introducing any breaking behavior or requiring migration steps. A markdown-link-check directive was included to prevent false positives on dynamic badge URLs.

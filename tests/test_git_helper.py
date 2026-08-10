@@ -180,6 +180,7 @@ def test_get_commit_diff_logs_warning_with_expected_capitalization(caplog):
         record.getMessage().startswith("Could not retrieve diff for abc12345")
         for record in caplog.records
     )
+    assert any("bad diff" in record.getMessage() for record in caplog.records)
 
 
 def test_get_note_returns_none_when_missing():

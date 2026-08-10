@@ -1,0 +1,3 @@
+Category: Fixed
+
+Functional tests now reliably run regardless of the runner environment, thanks to explicit NO_PROXY settings for localhost and disabled proxy variables during test execution. Curl invocations use --noproxy '*' to ensure direct connections. Additionally, new tests cover CLI behavior when notes already exist and clearing notes, improving edge case coverage.

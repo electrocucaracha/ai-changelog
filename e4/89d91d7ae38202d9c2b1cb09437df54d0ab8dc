@@ -1,0 +1,3 @@
+Category: Changed
+
+This change introduces comprehensive regression tests targeting previously surviving mutations in the `ai_provider`, `changelog`, `git_helper`, and `main` modules. The tests verify correct handling of breaking changes, diff line counting, changelog rendering, semantic versioning, and logging configuration, improving the reliability of mutation testing and increasing confidence in critical changelog and commit analysis logic.

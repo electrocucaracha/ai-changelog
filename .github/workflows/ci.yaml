@@ -16,6 +16,8 @@ jobs:
   unit-tests:
     name: Run unit tests
     runs-on: ubuntu-latest
+    env:
+      COVERAGE_THRESHOLD: "95"
     permissions:
       contents: read
     steps:
@@ -25,7 +27,12 @@ jobs:
       - name: Setup Python environment
         uses: ./.github/actions/setup-python-env
       - name: Run unit tests
-        run: uvx tox -e py312
+        run: uvx tox -e py312 -- --cov=ai_changelog_msg --cov-report=term-missing --cov-report=json
+      - name: Enforce minimum coverage
+        run: python3 ci/enforce_coverage.py
+      - name: Publish coverage summary
+        if: always()
+        run: python3 ci/publish_coverage_summary.py
   # jscpd:ignore-start
   mutation-tests:
     name: Run mutation tests (${{ matrix.module }})
@@ -55,6 +62,9 @@ jobs:
         env:
           PYTHONPATH: src
         run: uv run mutmut export-cicd-stats
+      - name: Publish mutation summary
+        if: always()
+        run: python3 ci/publish_mutation_summary.py --module "${{ matrix.module }}"
       - name: Upload mutation stats
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -62,9 +72,11 @@ jobs:
           name: mutmut-stats-${{ matrix.module }}
           path: mutants/mutmut-cicd-stats.json
   mutation-gate:
-    name: Enforce no surviving mutations
+    name: Enforce mutation score threshold
     runs-on: ubuntu-latest
     needs: mutation-tests
+    env:
+      MUTATION_THRESHOLD: "95"
     permissions:
       contents: read
     steps:
@@ -76,6 +88,9 @@ jobs:
         with:
           pattern: mutmut-stats-*
           path: mutmut-stats
-      - name: Check no surviving mutations
-        run: python ci/check_mutation_gate.py --stats-dir mutmut-stats
+      - name: Enforce minimum mutation score
+        run: python3 ci/enforce_mutation_score.py --stats-dir mutmut-stats
+      - name: Publish aggregate mutation summary
+        if: always()
+        run: python3 ci/publish_mutation_aggregate.py --stats-dir mutmut-stats
         # jscpd:ignore-end

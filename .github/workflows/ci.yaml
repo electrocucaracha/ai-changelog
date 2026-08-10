@@ -38,7 +38,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NO_PROXY: 127.0.0.1,localhost
-      no_proxy: 127.0.0.1,localhost
     permissions:
       contents: read
     steps:
@@ -77,10 +76,13 @@ jobs:
           HTTP_PROXY: ""
           HTTPS_PROXY: ""
           ALL_PROXY: ""
-          http_proxy: ""
-          https_proxy: ""
-          all_proxy: ""
         run: |
+          # Propagate uppercase proxy env vars to lowercase for tools that only
+          # read lowercase keys, while keeping YAML keys unique.
+          export http_proxy="$HTTP_PROXY"
+          export https_proxy="$HTTPS_PROXY"
+          export all_proxy="$ALL_PROXY"
+          export no_proxy="$NO_PROXY"
           set -o pipefail
           uvx tox -e py312 -- tests/test_functional_llm_mock.py -m integration --junitxml=functional-junit.xml 2>&1 | tee functional-tests.log
       - name: Collect LLMock logs
@@ -118,7 +120,7 @@ jobs:
           cat functional-diagnostics.log || true
       - name: Show LLMock logs on failure
         if: ${{ steps.run-functional-tests.outcome != 'success' }}
-        run: cat llmock.log
+        run: cat llmock.log || true
       - name: Stop LLMock server
         if: always()
         run: |

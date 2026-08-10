@@ -1,0 +1,3 @@
+Category: Changed
+
+The Config class now dynamically applies the @dataclass decorator at runtime to avoid issues with static analysis tools, and validation for several parameters is stricter, raising ValueError for empty strings and zero values. The test suite has been expanded to cover these cases and from_env uses default values when environment variables are absent. Mutation testing configuration is updated for finer control, adding pragma comments to prevent mutation of critical error messages.

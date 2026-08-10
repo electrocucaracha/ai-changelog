@@ -1044,6 +1044,14 @@ def cli(
             "Done — processed=%d skipped=%d failed=%d", processed, skipped, failed
         )
 
+        if ai_provider is not None:
+            usage = ai_provider.token_usage
+            click.echo(
+                f"Token usage: prompt={usage.prompt_tokens} "
+                f"completion={usage.completion_tokens} "
+                f"total={usage.total_tokens}"
+            )
+
         if processed == 0 and failed == 0:
             click.echo(
                 "No notes were updated in this run; continuing with changelog "

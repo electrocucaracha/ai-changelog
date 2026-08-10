@@ -22,6 +22,7 @@ import logging
 import os
 import re
 import time
+from dataclasses import dataclass, field
 from json import JSONDecodeError
 from typing import TYPE_CHECKING, Any
 from urllib import error as urllib_error
@@ -93,6 +94,34 @@ RETRYABLE_LLM_ERROR_RE = re.compile(
 )
 
 
+@dataclass
+class TokenUsage:
+    """Accumulated token counts across all LiteLLM completion calls.
+
+    Attributes:
+        prompt_tokens: Total input tokens sent to the model.
+        completion_tokens: Total output tokens received from the model.
+        total_tokens: Sum of prompt and completion tokens.
+    """
+
+    prompt_tokens: int = field(default=0)
+    completion_tokens: int = field(default=0)
+    total_tokens: int = field(default=0)
+
+    def add(self, usage: Any) -> None:
+        """Accumulate token counts from a LiteLLM usage object.
+
+        Args:
+            usage: The ``usage`` attribute of a LiteLLM :class:`ModelResponse`.
+                Silently ignored when ``None`` or missing expected attributes.
+        """
+        if usage is None:
+            return
+        self.prompt_tokens += getattr(usage, "prompt_tokens", 0) or 0
+        self.completion_tokens += getattr(usage, "completion_tokens", 0) or 0
+        self.total_tokens += getattr(usage, "total_tokens", 0) or 0
+
+
 class AIProvider:
     """LiteLLM-backed provider that summarises git commit diffs.
 
@@ -138,6 +167,7 @@ class AIProvider:
         litellm.timeout = config.api_timeout  # pragma: no mutate
         self._max_completion_attempts = config.retry_attempts
         self._base_retry_delay_seconds = config.retry_backoff_seconds
+        self.token_usage = TokenUsage()
         logger.debug(  # pragma: no mutate
             "AIProvider initialised: model=%s timeout=%s retries=%s backoff=%.2fs",
             self.model,
@@ -191,7 +221,7 @@ class AIProvider:
     ) -> Any:
         """Call LiteLLM and auto-pull missing Ollama models when needed."""
         try:
-            return litellm.completion(
+            response = litellm.completion(
                 model=self.model,  # pragma: no mutate
                 messages=messages,  # pragma: no mutate
                 temperature=temperature,  # pragma: no mutate
@@ -203,13 +233,15 @@ class AIProvider:
                 raise
 
             self._pull_ollama_model()
-            return litellm.completion(
+            response = litellm.completion(
                 model=self.model,  # pragma: no mutate
                 messages=messages,  # pragma: no mutate
                 temperature=temperature,  # pragma: no mutate
                 max_tokens=max_tokens,  # pragma: no mutate
                 **self._litellm_kwargs,  # pragma: no mutate
             )
+        self.token_usage.add(getattr(response, "usage", None))
+        return response
 
     def _is_retryable_completion_error(self, error: Exception) -> bool:
         """Return ``True`` when *error* should trigger a retry."""

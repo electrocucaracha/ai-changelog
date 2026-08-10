@@ -135,6 +135,9 @@ def _install_fake_ai_provider(
     class FakeAIProvider:
         def __init__(self, config):
             self.config = config
+            self.token_usage = SimpleNamespace(
+                prompt_tokens=0, completion_tokens=0, total_tokens=0
+            )
 
         def summarize_diff(self, commit_message, diff, author=None):
             if fail_on_summarize:
@@ -927,6 +930,9 @@ def test_cli_skips_existing_notes_and_writes_changelog(tmp_path, monkeypatch):
     class FakeAIProvider:
         def __init__(self, config):
             self.config = config
+            self.token_usage = SimpleNamespace(
+                prompt_tokens=0, completion_tokens=0, total_tokens=0
+            )
 
         def summarize_diff(self, commit_message, diff, author=None):
             return f"Added summary for {commit_message.split(':', 1)[0]}."

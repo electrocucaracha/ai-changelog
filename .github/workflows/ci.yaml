@@ -70,8 +70,6 @@ jobs:
         env:
           CHANGELOG_FUNCTIONAL_LLM_MOCK: "1"
           LLM_MOCK_BASE_URL: "http://127.0.0.1:8001/chatgpt"
-          NO_PROXY: "127.0.0.1,localhost"
-          no_proxy: "127.0.0.1,localhost"
         run: |
           set +e
           uvx tox -e py312 -- tests/test_functional_llm_mock.py -m integration --junitxml=functional-junit.xml 2>&1 | tee functional-tests.log
@@ -137,7 +135,7 @@ jobs:
         run: python3 ci/publish_mutation_summary.py --module "${{ matrix.module }}"
       - name: Upload mutation stats
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: mutmut-stats-${{ matrix.module }}
           path: mutants/mutmut-cicd-stats.json
@@ -154,7 +152,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Download all mutation stats
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: mutmut-stats-*
           path: mutmut-stats

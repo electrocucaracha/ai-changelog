@@ -1,0 +1,3 @@
+Category: Added
+
+AIProvider now logs warnings and info for key events, improving traceability and debuggability. This includes logging for API retries, Ollama model pulls, and fallback to note text when AI generation fails. Tests were added to verify logging output for these scenarios. No changes were made to the core summarization logic or output format.

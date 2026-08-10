@@ -33,6 +33,43 @@ jobs:
       - name: Publish coverage summary
         if: always()
         run: python3 ci/publish_coverage_summary.py
+  functional-tests:
+    name: Run functional tests (LLMock)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Python environment
+        uses: ./.github/actions/setup-python-env
+      - name: Start LLMock server
+        run: |
+          docker run -d --rm --name llmock -p 8001:8001 node:20-alpine \
+            sh -lc "npm install -g llmock@3.3.4 && llmock start --foreground --model=chatgpt --port=8001"
+      - name: Wait for LLMock readiness
+        run: |
+          for _ in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8001/ping >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "LLMock did not become ready within 60 seconds"
+          docker logs llmock || true
+          exit 1
+      - name: Run functional tests against LLMock
+        env:
+          CHANGELOG_FUNCTIONAL_LLM_MOCK: "1"
+          LLM_MOCK_BASE_URL: "http://127.0.0.1:8001/chatgpt"
+        run: uvx tox -e py312 -- tests/test_functional_llm_mock.py -m integration
+      - name: Show LLMock logs on failure
+        if: failure()
+        run: docker logs llmock
+      - name: Stop LLMock server
+        if: always()
+        run: docker rm -f llmock || true
   # jscpd:ignore-start
   mutation-tests:
     name: Run mutation tests (${{ matrix.module }})

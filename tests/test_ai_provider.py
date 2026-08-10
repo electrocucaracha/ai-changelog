@@ -1085,3 +1085,66 @@ def test_clean_identity_preserves_leading_angle_bracket_identity():
     result = provider._clean_identity("<anonymous@example.com>")
 
     assert result == "<anonymous@example.com>"
+
+
+# ---------------------------------------------------------------------------
+# Additional coverage tests
+# ---------------------------------------------------------------------------
+
+
+def test_sanitize_changelog_entry_returns_none_for_none_input():
+    """_sanitize_changelog_entry must return None when content is None."""
+    provider = AIProvider.__new__(AIProvider)
+
+    assert provider._sanitize_changelog_entry(None) is None
+
+
+def test_sanitize_changelog_entry_returns_none_for_blank_lines_only():
+    """_sanitize_changelog_entry must return None when all content lines are blank."""
+    provider = AIProvider.__new__(AIProvider)
+
+    assert provider._sanitize_changelog_entry("\n\n   \n") is None
+
+
+def test_sanitize_changelog_entry_returns_none_for_leading_period_sentence():
+    """_sanitize_changelog_entry returns None when content triggers the prompt-leak check."""
+    provider = AIProvider.__new__(AIProvider)
+
+    # A line matching PROMPT_LEAK_RE should cause return None
+    result = provider._sanitize_changelog_entry("Summary: Added new feature.")
+
+    assert result is None
+
+
+def test_should_pull_missing_ollama_model_returns_false_for_non_ollama_model():
+    """_should_pull_missing_ollama_model must return False for non-ollama models."""
+    config = Config(model="gpt-4o")
+    provider = AIProvider.__new__(AIProvider)
+    provider.model = config.model
+    provider.config = config
+
+    result = provider._should_pull_missing_ollama_model(RuntimeError("model not found"))
+
+    assert result is False
+
+
+def test_pull_ollama_model_raises_runtime_error_for_url_error(monkeypatch):
+    """_pull_ollama_model must raise RuntimeError when the Ollama API is unreachable."""
+    from urllib import error as urllib_error
+
+    import pytest
+
+    def _fail_urlopen(*args, **kwargs):
+        raise urllib_error.URLError("connection refused")
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.urllib_request.urlopen", _fail_urlopen
+    )
+
+    config = Config(model="ollama/llama3.1")
+    provider = AIProvider.__new__(AIProvider)
+    provider.model = config.model
+    provider.config = config
+
+    with pytest.raises(RuntimeError, match="Ollama API is not reachable"):
+        provider._pull_ollama_model()

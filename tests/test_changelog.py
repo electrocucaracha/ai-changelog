@@ -1522,3 +1522,88 @@ def test_merge_with_no_existing_releases_returns_zero_when_merged_parts_empty():
 
     assert count == 0
     assert result == generated
+
+
+# ---------------------------------------------------------------------------
+# Additional coverage tests
+# ---------------------------------------------------------------------------
+
+
+def test_semantic_version_bump_raises_for_unsupported_release_type():
+    """SemanticVersion.bump must raise ValueError for an unrecognised release type."""
+    version = SemanticVersion(1, 0, 0)
+
+    import pytest
+
+    with pytest.raises(ValueError, match="Unsupported release type"):
+        version.bump("hotfix")
+
+
+def test_changelog_item_summary_falls_back_to_description_when_note_is_empty():
+    """ChangelogItem.summary must return description when note and changelog_entry are empty."""
+    item = ChangelogItem(
+        commit_hash="abc12345",
+        committed_at=datetime(2026, 1, 1, tzinfo=UTC),
+        category="Added",
+        release_type="minor",
+        note="",
+        description="fallback description",
+        is_breaking=False,
+    )
+
+    assert item.summary == "fallback description"
+
+
+def test_changelog_item_summary_prepends_breaking_prefix():
+    """ChangelogItem.summary must prepend 'BREAKING:' when is_breaking is True."""
+    item = ChangelogItem(
+        commit_hash="def67890",
+        committed_at=datetime(2026, 1, 1, tzinfo=UTC),
+        category="Removed",
+        release_type="major",
+        note="Dropped legacy API.",
+        description="remove legacy API",
+        is_breaking=True,
+    )
+
+    assert item.summary.startswith("BREAKING:")
+
+
+def test_diversify_leading_verb_returns_original_when_summary_is_empty():
+    """_diversify_leading_verb must return original summary when it is blank."""
+    from ai_changelog_msg.changelog import ChangelogBuilder
+
+    builder = ChangelogBuilder(namespace="ai-changelog")
+    seen: set[str] = set()
+
+    result = builder._diversify_leading_verb("   ", "Added", seen)
+
+    assert result == "   "
+
+
+def test_diversify_leading_verb_returns_original_when_body_has_no_leading_word():
+    """_diversify_leading_verb must return original when body starts with non-alpha char."""
+    from ai_changelog_msg.changelog import ChangelogBuilder
+
+    builder = ChangelogBuilder(namespace="ai-changelog")
+    seen: set[str] = set()
+
+    result = builder._diversify_leading_verb("123 commits updated.", "Added", seen)
+
+    assert result == "123 commits updated."
+
+
+def test_format_note_raises_for_unknown_category():
+    """format_note must raise ValueError for a category not in CATEGORY_ORDER."""
+
+    import pytest
+
+    with pytest.raises(ValueError, match="Unsupported category"):
+        format_note("Unknown", "Some summary text.")
+
+
+def test_release_version_from_heading_kac_returns_none_for_plain_heading():
+    """_release_version_from_heading_kac returns None when heading has no brackets."""
+    result = _release_version_from_heading_kac("## Released")
+
+    assert result is None

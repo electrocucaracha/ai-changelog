@@ -1767,3 +1767,351 @@ def test_generate_summary_for_commit_forwards_diff(monkeypatch):
 
     assert result.summary == "Summary."
     assert captured["diff"] == "+new line"
+
+
+# ---------------------------------------------------------------------------
+# Additional coverage tests
+# ---------------------------------------------------------------------------
+
+
+def test_build_execution_command_includes_litellm_api_base_and_key():
+    """_build_execution_command must append litellm_api_base and litellm_api_key args."""
+    cmd = main._build_execution_command(
+        repo_path="/repo",
+        model="gpt-4o",
+        namespace="ai-changelog",
+        force=False,
+        clear_all=False,
+        create_semver_tags=False,
+        limit=None,
+        log_level="INFO",
+        changelog_file="CHANGELOG.md",
+        litellm_api_base="http://proxy.example.com",
+        litellm_api_key="secret-key",
+        litellm_headers_json=None,
+    )
+    assert "--litellm-api-base" in cmd
+    assert "http://proxy.example.com" in cmd
+    assert "--litellm-api-key" in cmd
+    assert "[REDACTED]" in cmd
+
+
+def test_release_version_from_heading_returns_none_for_plain_heading():
+    """_release_version_from_heading returns None when heading has no brackets."""
+    result = main._release_version_from_heading("## Added")
+    assert result is None
+
+
+def test_is_semantic_release_heading_returns_false_for_plain_heading():
+    """_is_semantic_release_heading returns False for headings without version brackets."""
+    result = main._is_semantic_release_heading("## Added")
+    assert result is False
+
+
+def test_normalize_release_sections_without_leading_prefix():
+    """_normalize_release_sections returns rebuilt sections with newline when no prefix."""
+    text = "## [1.0.0] - 2026-01-01\n\n### Added\n- First release\n"
+
+    result = main._normalize_release_sections(text)
+
+    assert result.endswith("\n")
+    assert "## [1.0.0]" in result
+
+
+def test_ensure_unreleased_adds_header_to_nonempty_text_without_headings():
+    """_ensure_unreleased_and_get_insertion_index appends ## [Unreleased] to non-empty text."""
+    text = "# Changelog\n\nSome intro text."
+
+    updated, index = main._ensure_unreleased_and_get_insertion_index(text)
+
+    assert "## [Unreleased]" in updated
+    assert updated.endswith("## [Unreleased]\n\n")
+    assert index == len(updated)
+
+
+def test_ensure_unreleased_appends_after_non_semantic_only_headings():
+    """_ensure_unreleased_and_get_insertion_index appends when all headings are non-semantic."""
+    text = "## [alpha]\n\nPre-release notes.\n"
+
+    updated, index = main._ensure_unreleased_and_get_insertion_index(text)
+
+    assert "## [Unreleased]" in updated
+    assert index == len(updated)
+
+
+def test_ensure_markdownlint_md024_disable_handles_empty_text():
+    """_ensure_markdownlint_md024_disable inserts the marker for empty input."""
+    updated, inserted = main._ensure_markdownlint_md024_disable("")
+
+    assert inserted is True
+    assert updated.startswith("<!-- Markdownlint-disable MD024 -->")
+
+
+def test_cli_clear_all_reports_no_notes_when_none_found(tmp_path, monkeypatch):
+    """--clear-all must print 'No git notes found' when clear_notes returns False."""
+
+    class _EmptyRepo:
+        def __init__(self, repo_path: str) -> None:
+            self.repo_path = Path(repo_path)
+
+        def clear_notes(self, namespace: str) -> bool:
+            return False
+
+    monkeypatch.setattr(main, "GitRepository", lambda path: _EmptyRepo(path))
+
+    runner = CliRunner()
+    result = runner.invoke(main.cli, [str(tmp_path), "--clear-all"])
+
+    assert result.exit_code == 0
+    assert "No git notes found" in result.output
+
+
+def test_cli_rejects_invalid_json_in_litellm_headers(tmp_path, monkeypatch):
+    """CLI must exit non-zero when --litellm-headers-json is not valid JSON."""
+    repo = DummyRepo(str(tmp_path))
+    monkeypatch.setattr(main, "GitRepository", lambda path: repo)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        main.cli,
+        [str(tmp_path), "--clear-all", "--litellm-headers-json", "not-json"],
+    )
+
+    assert result.exit_code == 1
+    assert "Fatal error" in result.output
+
+
+def test_cli_rejects_non_dict_json_in_litellm_headers(tmp_path, monkeypatch):
+    """CLI must exit non-zero when --litellm-headers-json is a JSON array."""
+    repo = DummyRepo(str(tmp_path))
+    monkeypatch.setattr(main, "GitRepository", lambda path: repo)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        main.cli,
+        [str(tmp_path), "--clear-all", "--litellm-headers-json", '["a", "b"]'],
+    )
+
+    assert result.exit_code == 1
+    assert "Fatal error" in result.output
+
+
+def test_cli_rejects_non_string_values_in_litellm_headers(tmp_path, monkeypatch):
+    """CLI must exit non-zero when --litellm-headers-json values are not strings."""
+    repo = DummyRepo(str(tmp_path))
+    monkeypatch.setattr(main, "GitRepository", lambda path: repo)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        main.cli,
+        [str(tmp_path), "--clear-all", "--litellm-headers-json", '{"key": 123}'],
+    )
+
+    assert result.exit_code == 1
+    assert "Fatal error" in result.output
+
+
+def test_cli_skips_commits_with_empty_diffs(tmp_path, monkeypatch):
+    """Commits with empty diffs must be counted as empty-diff and not processed."""
+    commits = [
+        _build_commit(
+            "aaa00001",
+            "feat: empty diff commit",
+            datetime(2026, 4, 1, tzinfo=UTC),
+            "Alice",
+        )
+    ]
+    repo = _build_processing_repo(
+        tmp_path,
+        commits=commits,
+        diff_by_commit={"aaa00001": "   "},
+    )
+    _patch_processing_repo(monkeypatch, repo)
+    _install_fake_ai_provider(monkeypatch)
+
+    result = _invoke_cli(tmp_path, [])
+
+    assert result.exit_code == 0
+    assert "empty-diff=1" in result.output
+    assert repo.saved_notes == []
+
+
+def test_cli_handles_ai_error_during_commit_processing(tmp_path, monkeypatch):
+    """An AI error for a commit must be caught and counted as failed, not crash the CLI."""
+    commits = [
+        _build_commit(
+            "bbb00001",
+            "feat: some feature",
+            datetime(2026, 4, 1, tzinfo=UTC),
+            "Bob",
+        )
+    ]
+    repo = _build_processing_repo(
+        tmp_path,
+        commits=commits,
+        diff_by_commit={"bbb00001": "+new line"},
+    )
+    _patch_processing_repo(monkeypatch, repo)
+    _install_fake_ai_provider(monkeypatch)
+
+    def _fake_generate_summaries(
+        ai_provider, prepared_commits, workers, on_summary_completed=None
+    ):
+        return {
+            p.commit.hexsha: main._SummaryResult(
+                commit_hash=p.commit.hexsha,
+                error=RuntimeError("AI service unavailable"),
+            )
+            for p in prepared_commits
+        }
+
+    monkeypatch.setattr(
+        main, "_generate_summaries_concurrently", _fake_generate_summaries
+    )
+
+    result = _invoke_cli(tmp_path, [])
+
+    assert result.exit_code == 0
+    assert "Failed:    1" in result.output
+    assert "Error processing" in result.output
+
+
+def test_cli_handles_none_summary_in_commit_processing(tmp_path, monkeypatch):
+    """A None summary result must be caught and counted as failed, not crash the CLI."""
+    commits = [
+        _build_commit(
+            "ccc00001",
+            "feat: feature with no summary",
+            datetime(2026, 4, 1, tzinfo=UTC),
+            "Carol",
+        )
+    ]
+    repo = _build_processing_repo(
+        tmp_path,
+        commits=commits,
+        diff_by_commit={"ccc00001": "+new line"},
+    )
+    _patch_processing_repo(monkeypatch, repo)
+    _install_fake_ai_provider(monkeypatch)
+
+    def _fake_generate_summaries(
+        ai_provider, prepared_commits, workers, on_summary_completed=None
+    ):
+        return {
+            p.commit.hexsha: main._SummaryResult(
+                commit_hash=p.commit.hexsha,
+                summary=None,
+            )
+            for p in prepared_commits
+        }
+
+    monkeypatch.setattr(
+        main, "_generate_summaries_concurrently", _fake_generate_summaries
+    )
+
+    result = _invoke_cli(tmp_path, [])
+
+    assert result.exit_code == 0
+    assert "Failed:    1" in result.output
+
+
+def test_cli_merges_into_existing_changelog_file(tmp_path, monkeypatch):
+    """CLI must merge generated changelog into an existing CHANGELOG.md."""
+    commits = [
+        _build_commit(
+            "ddd00001",
+            "feat: merge test",
+            datetime(2026, 5, 1, tzinfo=UTC),
+            "Dave",
+        )
+    ]
+    repo = _build_processing_repo(
+        tmp_path,
+        commits=commits,
+        diff_by_commit={"ddd00001": "+new line"},
+    )
+    _patch_processing_repo(monkeypatch, repo)
+    _install_fake_ai_provider(monkeypatch)
+
+    existing = "<!-- Markdownlint-disable MD024 -->\n\n# Changelog\n\n## [Unreleased]\n"
+    (tmp_path / "CHANGELOG.md").write_text(existing, encoding="utf-8")
+
+    result = _invoke_cli(tmp_path, ["--changelog-file", "CHANGELOG.md"])
+
+    assert result.exit_code == 0
+    changelog_text = (tmp_path / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "<!-- Markdownlint-disable MD024 -->" in changelog_text
+
+
+def test_cli_reports_changelog_already_up_to_date(tmp_path, monkeypatch):
+    """CLI must report 'already up-to-date' when merged text equals existing text."""
+    commits = [
+        _build_commit(
+            "eee00001",
+            "feat: up-to-date test",
+            datetime(2026, 5, 1, tzinfo=UTC),
+            "Eve",
+        )
+    ]
+    repo = _build_processing_repo(
+        tmp_path,
+        commits=commits,
+        diff_by_commit={"eee00001": "+change"},
+    )
+    _patch_processing_repo(monkeypatch, repo)
+    _install_fake_ai_provider(monkeypatch)
+
+    # First run: write the changelog
+    result1 = _invoke_cli(tmp_path, ["--changelog-file", "CHANGELOG.md"])
+    assert result1.exit_code == 0
+
+    # Second run: nothing new to add, changelog already up-to-date
+    result2 = _invoke_cli(tmp_path, ["--changelog-file", "CHANGELOG.md"])
+    assert result2.exit_code == 0
+    assert "already up-to-date" in result2.output
+
+
+def test_cli_fatal_error_exits_with_code_1(tmp_path, monkeypatch):
+    """CLI must exit with code 1 and print 'Fatal error' on unhandled exceptions."""
+
+    def _fail_repo(path: str):
+        raise RuntimeError("repository init failed")
+
+    monkeypatch.setattr(main, "GitRepository", _fail_repo)
+
+    runner = CliRunner()
+    result = runner.invoke(main.cli, [str(tmp_path)])
+
+    assert result.exit_code == 1
+    assert "Fatal error: repository init failed" in result.output
+
+
+def test_create_semver_tags_skips_commits_with_unrecognized_category(monkeypatch):
+    """_create_semver_tags_if_needed must skip commits whose category has no release type."""
+    from types import SimpleNamespace
+
+    commit = SimpleNamespace(
+        hexsha="aaa11111", committed_datetime=datetime(2026, 1, 1, tzinfo=UTC)
+    )
+
+    class _Repo:
+        def get_semantic_version_tags(self):
+            return {}
+
+        def get_note(self, commit_hash, namespace):
+            return "Category: Security\n\nSome security fix."
+
+        def create_tag(self, tag_name, commit_hash):
+            raise AssertionError(
+                "create_tag must not be called for unrecognized category"
+            )
+
+    created = main._create_semver_tags_if_needed(
+        repo=_Repo(),
+        commits=[commit],
+        namespace="ai-changelog",
+        create_semver_tags=True,
+        limit=None,
+    )
+
+    assert created == 0

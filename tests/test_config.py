@@ -405,3 +405,24 @@ class TestConfig:
         # Should be resolved to default, not "auto"
         assert config.model != "auto"
         assert config.model == Config.get_default_model()
+
+
+# ---------------------------------------------------------------------------
+# Additional coverage tests
+# ---------------------------------------------------------------------------
+
+
+def test_parse_positive_int_raises_for_non_integer_string():
+    """_parse_positive_int must raise ValueError when raw is not a valid integer."""
+    import pytest
+
+    with pytest.raises(ValueError, match="must be a positive integer"):
+        Config._parse_positive_int("not-an-int", "TEST_VAR", default=1)
+
+
+def test_parse_positive_float_raises_for_non_float_string():
+    """_parse_positive_float must raise ValueError when raw is not a valid number."""
+    import pytest
+
+    with pytest.raises(ValueError, match="must be a positive number"):
+        Config._parse_positive_float("not-a-float", "TEST_VAR", default=1.0)

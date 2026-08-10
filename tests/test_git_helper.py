@@ -581,3 +581,52 @@ def test_has_commits_returns_true_when_commits_exist():
 
         # should return True when commits exist
         assert git_repo.has_commits() is True
+
+
+# ---------------------------------------------------------------------------
+# Additional coverage tests
+# ---------------------------------------------------------------------------
+
+
+def test_git_repository_raises_for_non_git_directory(tmp_path):
+    """GitRepository must raise ValueError when the path is not a git repository."""
+    import pytest
+
+    from ai_changelog_msg.git_helper import GitRepository
+
+    with pytest.raises(ValueError, match="Not a git repository"):
+        GitRepository(str(tmp_path))
+
+
+def test_get_repository_web_url_returns_none_for_empty_url():
+    """get_repository_web_url must return None when origin.url is an empty string."""
+    repo = _make_repo(remote_url="dummy")
+    # Override origin.url to be an empty string
+    repo.repo.remotes = SimpleNamespace(origin=SimpleNamespace(url=""))
+
+    assert repo.get_repository_web_url() is None
+
+
+def test_get_repository_web_url_returns_none_for_unrecognized_url_format():
+    """get_repository_web_url returns None for URLs that match no known format."""
+    repo = _make_repo(remote_url="dummy")
+    repo.repo.remotes = SimpleNamespace(
+        origin=SimpleNamespace(url="ftp://example.com/repo")
+    )
+
+    assert repo.get_repository_web_url() is None
+
+
+def test_get_repository_info_toon_raises_when_toon_format_not_installed(monkeypatch):
+    """get_repository_info_toon must raise ImportError when toon_format is not available."""
+    import sys
+
+    import pytest
+
+    repo = _make_repo_with_head_commit(remote_url="git@host:org/repo.git")
+    monkeypatch.delitem(sys.modules, "toon_format", raising=False)
+    # Ensure toon_format cannot be imported
+    monkeypatch.setitem(sys.modules, "toon_format", None)
+
+    with pytest.raises((ImportError, TypeError)):
+        repo.get_repository_info_toon()

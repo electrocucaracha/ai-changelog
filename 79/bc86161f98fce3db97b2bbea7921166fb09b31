@@ -1,0 +1,3 @@
+Category: Fixed
+
+The CI workflow now correctly exports lowercase proxy environment variables for test tools that only recognize these, ensuring consistent network behavior during tests. This change removes the redundant `no_proxy` key and propagates uppercase proxy variables to their lowercase counterparts. The LLMock log display step also ignores missing log files, preventing unnecessary job failures.

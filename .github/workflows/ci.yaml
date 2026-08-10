@@ -129,9 +129,11 @@ jobs:
           fi
       - name: Fail job when functional tests fail
         if: always()
+        env:
+          TEST_OUTCOME: ${{ steps.run-functional-tests.outcome }}
         run: |
-          if [ "${{ steps.run-functional-tests.outcome }}" != "success" ]; then
-            echo "Functional tests failed (outcome=${{ steps.run-functional-tests.outcome }})"
+          if [ "$TEST_OUTCOME" != "success" ]; then
+            echo "Functional tests failed (outcome=$TEST_OUTCOME)"
             exit 1
           fi
   # jscpd:ignore-start

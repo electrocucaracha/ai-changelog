@@ -1,0 +1,3 @@
+Category: Changed
+
+Functional tests now collect diagnostics and logs even on failure, improving reliability and debuggability. The test outcome is determined by the step's outcome property, rather than custom exit code propagation. Additionally, local mock calls bypass proxies due to set environment variables at import time, reducing flakiness from proxy misconfiguration.

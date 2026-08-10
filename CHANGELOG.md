@@ -12,6 +12,204 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.0.0] - 2026-08-10
+
+### Removed
+
+- Simplified the CI pipeline by eliminating non-essential reporting and reducing maintenance overhead without impacting mutation testing or artifact availability. [06c50d22](https://github.com/electrocucaracha/ai-changelog/commit/06c50d22357835a3f339056651e82e44b32c9dc5)
+
+## [6.1.4] - 2026-08-10
+
+### Fixed
+
+- The GitHub Actions CI script was stabilized by using an environment variable for the functional test outcome, which improves script reliability and makes it easier to read and maintain without introducing any breaking behavior or migration requirements. [d14eeee3](https://github.com/electrocucaracha/ai-changelog/commit/d14eeee3b9154d84397f73e48f1574cd11b051ac)
+
+## [6.1.3] - 2026-08-10
+
+### Fixed
+
+- Resolved inconsistent network behavior during tests by propagating uppercase proxy environment variables to their lowercase counterparts and removing the redundant `no_proxy` key, allowing test tools to correctly recognize and utilize these settings. [79bc8616](https://github.com/electrocucaracha/ai-changelog/commit/79bc86161f98fce3db97b2bbea7921166fb09b31)
+
+## [6.1.2] - 2026-08-10
+
+### Fixed
+
+- Functional tests now reliably run regardless of the runner environment due to explicit NO_PROXY settings for localhost and disabled proxy variables during test execution. [6b517c28](https://github.com/electrocucaracha/ai-changelog/commit/6b517c28a86e6e60c711b125b2e479dca05cfa3b)
+
+## [6.1.1] - 2026-08-10
+
+### Changed
+
+- Improved functional test reliability by enabling diagnostics and logs collection on failure, determining test outcome based on step properties, and bypassing proxies through environment variable configuration. [9b9cc194](https://github.com/electrocucaracha/ai-changelog/commit/9b9cc194a3f5465e2c73706b7725f667b49a49c8)
+
+## [6.1.0] - 2026-08-10
+
+### Added
+
+- Enhanced functional test diagnostics and summary output to accelerate root-cause analysis for CI failures by collecting additional diagnostic data, displaying last 200 lines of the functional test log on failure, extracting failed test cases with troubleshooting hints based on log heuristics. [299cb04e](https://github.com/electrocucaracha/ai-changelog/commit/299cb04ebc7de5fff5bdf4022a8280ed05fdcc16)
+
+## [6.0.1] - 2026-08-10
+
+### Changed
+
+- Upgraded dependencies to their latest versions for compatibility and security improvements, including deepeval, gitpython, litellm, platformdirs, posthog, setuptools, and typing-inspection, while removing sentry-sdk as a dependency due to its removal from deepeval and introducing pydantic-settings for litellm. [244cc39e](https://github.com/electrocucaracha/ai-changelog/commit/244cc39ef0a50d3665612187592f02f9b6044295)
+
+## [6.0.0] - 2026-08-10
+
+### Removed
+
+- Simplified workflow configuration by removing redundant environment variables from the LLM mock test job and updating artifact actions to maintain compatibility with GitHub Actions without introducing breaking behavior or security risks. [9d255ada](https://github.com/electrocucaracha/ai-changelog/commit/9d255ada79386979531edf0d88e1e784083598cb)
+
+## [5.9.1] - 2026-08-10
+
+### Changed
+
+- Simplified the CI workflow to reduce external dependencies and improve transparency by replacing the LLMock server with a local Python script that publishes a test summary and captures exit codes for easier debugging. [08de597c](https://github.com/electrocucaracha/ai-changelog/commit/08de597c00724491e32fa59dc5341bb4a97e11bf)
+
+## [5.9.0] - 2026-08-10
+
+### Added
+
+- Optimized LiteLLM completions now track aggregate token usage, enabling users to monitor and optimize LLM resource consumption. [66e6e475](https://github.com/electrocucaracha/ai-changelog/commit/66e6e4758e066c09396329b4e1ad3b4da28a3808)
+
+## [5.8.0] - 2026-08-10
+
+### Added
+
+- Stabilized integration testing for LLM APIs by enabling functional tests against live LLMock servers, ensuring compatibility and guarding against regressions in integration scenarios. [51ee29d9](https://github.com/electrocucaracha/ai-changelog/commit/51ee29d9fe4bf9cf1a0baedde4d645fc423fd6ef)
+
+## [5.7.0] - 2026-08-10
+
+### Added
+
+- Improved robustness of error handling and edge case scenarios across core modules by introducing comprehensive tests for invalid input, unrecognized formats, unreachable APIs, malformed configuration, and unexpected commit data. [a6b61abd](https://github.com/electrocucaracha/ai-changelog/commit/a6b61abdd94e4979df30fc6bf3cac39eac30b7b3)
+
+## [5.6.0] - 2026-08-10
+
+### Added
+
+- Strengthened error handling for commit diff logs by introducing an assertion to verify that warnings about bad diffs are logged in addition to failing to retrieve a diff warnings. [1489c437](https://github.com/electrocucaracha/ai-changelog/commit/1489c43754486f70fd931747e83d1cbe39f4e0b1)
+
+## [5.5.0] - 2026-08-10
+
+### Added
+
+- Enforced explicit minimum code coverage and mutation testing thresholds in the CI workflow to improve visibility and accountability for test quality. [6c4f61b1](https://github.com/electrocucaracha/ai-changelog/commit/6c4f61b1ce7d6e96241d03db1f80d164b4e7a6c1)
+
+## [5.4.1] - 2026-08-09
+
+### Changed
+
+- Improved the `git_helper` test to verify exact log messages instead of substrings, making it more precise and reducing potential false positives from unrelated messages. [2c5f92dd](https://github.com/electrocucaracha/ai-changelog/commit/2c5f92dda000349d33590c93cd360233fd383e1a)
+
+## [5.4.0] - 2026-08-09
+
+### Added
+
+- Enabled debug mode for mutation testing, providing more detailed output that aids in troubleshooting test coverage and mutation operator behavior issues. [439bc3b6](https://github.com/electrocucaracha/ai-changelog/commit/439bc3b6ed63c46180ca23e98150dbb983d81552)
+
+## [5.3.3] - 2026-08-09
+
+### Changed
+
+- Simplified the check for the "Unreleased" heading to improve readability and performance without altering behavior. [bd458e75](https://github.com/electrocucaracha/ai-changelog/commit/bd458e75583829440ed8fb66093378d6462dca65)
+
+## [5.3.2] - 2026-08-09
+
+### Changed
+
+- Improved test accuracy and execution speed by clarifying mutation testing intent through `# pragma: no mutate` comments and optimizing API failure tests to eliminate unnecessary delays. [10741a23](https://github.com/electrocucaracha/ai-changelog/commit/10741a23babf95d59afa21237d86536a9ad3c94f)
+
+## [5.3.1] - 2026-08-09
+
+### Changed
+
+- Improved ChangelogBuilder handling of leading verb casing, adherence notes, and argument passing to ensure accurate mutation coverage and prevent subtle regressions. [47c44dc3](https://github.com/electrocucaracha/ai-changelog/commit/47c44dc39ce9ca7a37a786e25d3b89d9a3fe68e4)
+
+## [5.3.0] - 2026-08-08
+
+### Added
+
+- Enabled quick insights into project activity and codebase metrics for contributors and users by introducing visitor count and code statistics badges to the README without any breaking behavior or migration requirements. [bdd98e8c](https://github.com/electrocucaracha/ai-changelog/commit/bdd98e8c30f52d9157242d096ba95b30ddeddc3a)
+
+## [5.2.2] - 2026-08-08
+
+### Changed
+
+- Improved test coverage and maintainability by introducing additional tests for logging, error handling, and concurrency in the Git and AI providers. [3d8ececd](https://github.com/electrocucaracha/ai-changelog/commit/3d8ececdcbb802780df2d896cacaf0bda5e44718)
+
+## [5.2.1] - 2026-08-08
+
+### Changed
+
+- Clarified expected behaviors for rare edge cases by introducing comprehensive test suites that cover category inference, section rendering, item construction, AI model pull logic, and Git helper operations. [a4f988c4](https://github.com/electrocucaracha/ai-changelog/commit/a4f988c43eeebe19232ebe81192910ec80d03eb1)
+
+## [5.2.0] - 2026-08-08
+
+### Added
+
+- Enabled key event logging for AIProvider to improve traceability and debuggability by recording warnings and info for API retries, Ollama model pulls, and fallback to note text when AI generation fails without altering the core summarization logic or output format. [b616f111](https://github.com/electrocucaracha/ai-changelog/commit/b616f11170f763de5a62d02a1e944cc1a8b92256)
+
+## [5.1.9] - 2026-08-08
+
+### Changed
+
+- Enabled scripts check_mutation_gate.py and restrict_mutations.py to run directly in CI environments without requiring an explicit Python interpreter invocation. [14e4400e](https://github.com/electrocucaracha/ai-changelog/commit/14e4400e59ac7eb2a543ed2cd9dba674704565a1)
+
+## [5.1.8] - 2026-08-08
+
+### Changed
+
+- Simplified parsing logic by extracting helpers to module-level functions allowing for direct imports and improved testability without altering functional behavior. [c5776bfa](https://github.com/electrocucaracha/ai-changelog/commit/c5776bfad105134d9371789cc3d3cf7e420aee8a)
+
+## [5.1.7] - 2026-08-08
+
+### Fixed
+
+- Improved error messages are now provided for unexpected types encountered in stats input, enabling developers to more easily identify and address issues. [edf236dc](https://github.com/electrocucaracha/ai-changelog/commit/edf236dce97dc2f7ba6bcae28cb8c8b4bdb033ef)
+
+## [5.1.6] - 2026-08-08
+
+### Changed
+
+- Enabled static type checking in the test suite by incorporating mypy and its dependencies, along with updating Python resolution markers to support newer versions explicitly. [36b004fb](https://github.com/electrocucaracha/ai-changelog/commit/36b004fbf5a901597564cdb927b4b53834f1117d)
+
+## [5.1.5] - 2026-08-08
+
+### Changed
+
+- Improved mutation testing reliability by introducing comprehensive regression tests targeting previously surviving mutations in the ai_provider, changelog, git_helper, and main modules. [e489d91d](https://github.com/electrocucaracha/ai-changelog/commit/e489d91d7ae38202d9c2b1cb09437df54d0ab8dc)
+
+## [5.1.4] - 2026-08-08
+
+### Changed
+
+- Simplified the CI workflow by externalizing mutation restriction and aggregation logic into reusable scripts that improve maintainability, error reporting, and reproducibility of the mutation test process with no changes to artifact handling. [bb05e670](https://github.com/electrocucaracha/ai-changelog/commit/bb05e670665cbd285030e9203c3465edc94e772d)
+
+## [5.1.3] - 2026-08-07
+
+### Changed
+
+- Improved configuration parsing and validation logic by enabling comprehensive testing of boundary conditions and error handling for key fields, ensuring correct prioritization of overrides and environment variables, and resolving platform-specific defaults for 'auto' model values at initialization and load time. [806d3c72](https://github.com/electrocucaracha/ai-changelog/commit/806d3c72d9e68c355a1a4e49b350e0693f5336a1)
+
+## [5.1.2] - 2026-08-07
+
+### Changed
+
+- Strengthened validation for Config parameters now raises ValueError for empty strings and zero values, improving code robustness and test coverage. [58f573e2](https://github.com/electrocucaracha/ai-changelog/commit/58f573e26ef1e90e2a6df9b7139c3eb8931aca11)
+
+## [5.1.1] - 2026-08-07
+
+### Fixed
+
+- Stabilized mutation test configuration by reliably updating the only_mutate setting under [tool.mutmut] in pyproject.toml to prevent silent misconfiguration and ensure mutmut targets only the current module in the test matrix. [98d92dd8](https://github.com/electrocucaracha/ai-changelog/commit/98d92dd84e9f8ef11af15736db6b77321c110cc9)
+
+## [5.1.0] - 2026-08-07
+
+### Added
+
+- Improved project transparency and user tracking capabilities through detailed changelog entries for versions 4.15.0 to 5.0.0, documenting new features, optimizations, and documentation improvements without introducing breaking behavior or migration requirements. [5a49627f](https://github.com/electrocucaracha/ai-changelog/commit/5a49627f08895f25110849b4432e965626c4ceca)
+
 ## [5.0.0] - 2026-08-07
 
 ### Removed

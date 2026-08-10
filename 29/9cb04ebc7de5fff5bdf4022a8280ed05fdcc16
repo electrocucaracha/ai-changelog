@@ -1,0 +1,3 @@
+Category: Added
+
+The functional test workflow now collects additional diagnostics to aid in debugging failures, including LLMock process status and /ping probe. On test failure, the last 200 lines of the functional test log and full diagnostics are displayed. The summary publisher script extracts failed test cases and provides troubleshooting hints based on log heuristics. This should accelerate root-cause analysis for CI failures.

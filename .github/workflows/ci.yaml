@@ -36,6 +36,9 @@ jobs:
   functional-tests:
     name: Run functional tests (LLMock)
     runs-on: ubuntu-latest
+    env:
+      NO_PROXY: 127.0.0.1,localhost
+      no_proxy: 127.0.0.1,localhost
     permissions:
       contents: read
     steps:
@@ -52,7 +55,7 @@ jobs:
       - name: Wait for LLMock readiness
         run: |
           for _ in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:8001/ping >/dev/null; then
+            if curl --noproxy '*' -fsS http://127.0.0.1:8001/ping >/dev/null; then
               exit 0
             fi
             if ! kill -0 "$(cat llmock.pid)" >/dev/null 2>&1; then
@@ -71,6 +74,12 @@ jobs:
         env:
           CHANGELOG_FUNCTIONAL_LLM_MOCK: "1"
           LLM_MOCK_BASE_URL: "http://127.0.0.1:8001/chatgpt"
+          HTTP_PROXY: ""
+          HTTPS_PROXY: ""
+          ALL_PROXY: ""
+          http_proxy: ""
+          https_proxy: ""
+          all_proxy: ""
         run: |
           set -o pipefail
           uvx tox -e py312 -- tests/test_functional_llm_mock.py -m integration --junitxml=functional-junit.xml 2>&1 | tee functional-tests.log
@@ -93,7 +102,7 @@ jobs:
               echo "- LLMock pid file missing"
             fi
             echo "- LLMock /ping probe:"
-            curl -iS http://127.0.0.1:8001/ping || true
+            curl --noproxy '*' -iS http://127.0.0.1:8001/ping || true
           } | tee functional-diagnostics.log
       - name: Publish functional test summary
         if: always()

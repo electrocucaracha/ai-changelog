@@ -56,11 +56,12 @@ lint: clean
 	@echo "Lint complete!"
 
 .PHONY: fmt
-fmt:
+fmt: clean
 	command -v shfmt > /dev/null || curl -s "https://i.jpillora.com/mvdan/sh!!?as=shfmt" | bash
 	shfmt -l -w -s -i 4 .
 	command -v yamlfmt > /dev/null || curl -s "https://i.jpillora.com/google/yamlfmt!!" | bash
 	yamlfmt -dstar **/*.{yaml,yml}
+	npx --yes textlint . --fix
 	command -v prettier > /dev/null || npm install prettier
 	npx prettier . --write
 	command -v uvx > /dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh

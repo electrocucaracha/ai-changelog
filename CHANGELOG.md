@@ -130,7 +130,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Enabled quick insights into project activity and codebase metrics for contributors and users by introducing visitor count and code statistics badges to the README without any breaking behavior or migration requirements. [bdd98e8c](https://github.com/electrocucaracha/ai-changelog/commit/bdd98e8c30f52d9157242d096ba95b30ddeddc3a)
+- Enabled quick insights into project activity and codebase metrics for contributors and users by introducing visitor count and code statistics badges to the readme without any breaking behavior or migration requirements. [bdd98e8c](https://github.com/electrocucaracha/ai-changelog/commit/bdd98e8c30f52d9157242d096ba95b30ddeddc3a)
 
 ## [5.2.2] - 2026-08-08
 

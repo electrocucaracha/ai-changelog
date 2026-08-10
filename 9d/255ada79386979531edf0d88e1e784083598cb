@@ -1,0 +1,3 @@
+Category: Removed
+
+The upload-artifact and download-artifact actions are updated to v7.0.1 and v8.0.1, respectively, for upstream improvements and GitHub Actions compatibility. Redundant NO_PROXY environment variables are removed from the LLM mock test job, simplifying workflow configuration. This change maintains compatibility with GitHub Actions without introducing breaking behavior or security risks.

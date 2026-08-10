@@ -1,0 +1,3 @@
+Category: Changed
+
+Parsing helpers for headers, booleans, integers, and floats were extracted from the Config class to module-level functions to improve testability and reduce code duplication. This change does not affect functional behavior but simplifies testing by allowing direct imports of the new helpers. The parsing logic remains unchanged, ensuring consistency in error handling and docstrings. Tests were updated accordingly.

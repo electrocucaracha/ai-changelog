@@ -1,0 +1,3 @@
+Category: Removed
+
+The CI pipeline was simplified by removing the publish_mutation_summary.py script and its associated workflow step, which appended per-module mutation statistics to the GitHub Actions job summary. This change eliminates non-essential reporting and reduces maintenance overhead without impacting mutation testing or artifact availability. Mutation statistics are still exported and uploaded as artifacts.

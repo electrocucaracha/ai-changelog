@@ -1,0 +1,3 @@
+Category: Added
+
+Enabling debug mode for mutation testing provides more detailed output, aiding in troubleshooting test coverage and mutation operator behavior issues. This change affects the mutmut tool configuration in pyproject.toml, setting `debug` to true. The impact on users is improved diagnosis of problems during the mutation testing process.

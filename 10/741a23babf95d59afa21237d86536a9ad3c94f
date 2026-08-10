@@ -1,0 +1,3 @@
+Category: Changed
+
+Added `# pragma: no mutate` comments to exclude lines from mutation testing, improving test accuracy by preventing false positives on noisy operations like logging configuration and string joining logic. The tests themselves were also modified with minor changes including a new test for the logger's behavior when clearing a non-existent notes namespace and patching `time.sleep` in an API failure test to speed up execution.

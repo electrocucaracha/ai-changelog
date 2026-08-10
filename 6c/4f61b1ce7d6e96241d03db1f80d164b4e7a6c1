@@ -1,0 +1,3 @@
+Category: Added
+
+The CI workflow now enforces minimum code coverage and mutation testing thresholds, defaulting to 95% for each. Custom Python scripts were added to fail the workflow if these thresholds are not met and publish detailed Markdown summaries in the GitHub Actions job summary. This improves visibility and accountability for test quality by preventing accidental drops in coverage or mutation score.

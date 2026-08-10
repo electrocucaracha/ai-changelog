@@ -1,0 +1,3 @@
+Category: Changed
+
+The CI workflow now starts the LLMock server using a local Python script instead of a Dockerized Node.js process, reducing external dependencies and improving startup reliability. A new step publishes a markdown summary of functional test results and token usage to the GitHub Actions summary using a custom Python script. The functional tests now explicitly capture exit codes and collect logs for easier debugging. These changes improve CI transparency and maintainability.

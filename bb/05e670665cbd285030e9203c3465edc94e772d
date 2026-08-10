@@ -1,0 +1,3 @@
+Category: Changed
+
+The CI workflow now uses standalone scripts for restricting mutmut to a single module and aggregating mutation stats, improving maintainability, error reporting, and reproducibility of the mutation test process. The `ci/restrict_mutations.py` script updates pyproject.toml with the restricted module, while `ci/check_mutation_gate.py` aggregates stats and fails CI if any survived or suspicious mutations remain. Workflow steps now call these scripts directly, with artifact handling unchanged.

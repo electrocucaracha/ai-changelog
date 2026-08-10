@@ -67,14 +67,13 @@ jobs:
           exit 1
       - name: Run functional tests against LLMock
         id: run-functional-tests
+        continue-on-error: true
         env:
           CHANGELOG_FUNCTIONAL_LLM_MOCK: "1"
           LLM_MOCK_BASE_URL: "http://127.0.0.1:8001/chatgpt"
         run: |
-          set +e
+          set -o pipefail
           uvx tox -e py312 -- tests/test_functional_llm_mock.py -m integration --junitxml=functional-junit.xml 2>&1 | tee functional-tests.log
-          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
-          exit 0
       - name: Collect LLMock logs
         if: always()
         run: cat llmock.log || true
@@ -99,17 +98,17 @@ jobs:
       - name: Publish functional test summary
         if: always()
         env:
-          TEST_EXIT_CODE: ${{ steps.run-functional-tests.outputs.exit_code }}
+          TEST_EXIT_CODE: ${{ steps.run-functional-tests.outcome == 'success' && '0' || '1' }}
         run: python3 ci/publish_functional_summary.py
       - name: Show functional test logs on failure
-        if: failure()
+        if: ${{ steps.run-functional-tests.outcome != 'success' }}
         run: |
           echo "--- functional-tests.log (tail) ---"
           tail -n 200 functional-tests.log || true
           echo "--- functional-diagnostics.log ---"
           cat functional-diagnostics.log || true
       - name: Show LLMock logs on failure
-        if: failure()
+        if: ${{ steps.run-functional-tests.outcome != 'success' }}
         run: cat llmock.log
       - name: Stop LLMock server
         if: always()
@@ -119,11 +118,9 @@ jobs:
           fi
       - name: Fail job when functional tests fail
         if: always()
-        env:
-          TEST_EXIT_CODE: ${{ steps.run-functional-tests.outputs.exit_code }}
         run: |
-          if [ "${TEST_EXIT_CODE}" != "0" ]; then
-            echo "Functional tests failed with exit code ${TEST_EXIT_CODE}"
+          if [ "${{ steps.run-functional-tests.outcome }}" != "success" ]; then
+            echo "Functional tests failed (outcome=${{ steps.run-functional-tests.outcome }})"
             exit 1
           fi
   # jscpd:ignore-start

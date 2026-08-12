@@ -11,13 +11,13 @@ uv venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```
 
-2. **Install development dependencies**
+1. **Install development dependencies**
 
 ```bash
 uv sync --extra test --extra eval
 ```
 
-3. **Create a feature branch**
+1. **Create a feature branch**
 
 ```bash
 git checkout -b feature/your-feature-name

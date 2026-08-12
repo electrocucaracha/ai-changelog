@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
@@ -114,6 +115,16 @@ class ParsedCommit:
     scope: str | None
     is_breaking: bool
     release_type: str | None
+
+
+@dataclass(frozen=True)
+class StoredNote:
+    """Versioned changelog metadata persisted in a Git note."""
+
+    category: str
+    summary: str
+    changelog_entry: str | None = None
+    version: int = 1
 
 
 @dataclass(frozen=True)
@@ -244,8 +255,9 @@ class ChangelogBuilder:
     ) -> ChangelogItem:
         parsed = parse_conventional_commit(commit.message)
         raw_note = get_note(commit.hexsha, self.namespace) or parsed.description
-        note_category, note_summary = parse_note_metadata(raw_note)
-        note = note_summary
+        stored_note = parse_stored_note(raw_note)
+        note_category = stored_note.category if stored_note else None
+        note = stored_note.summary if stored_note else raw_note.strip()
         added_lines = 0  # pragma: no mutate
         removed_lines = 0  # pragma: no mutate
         if get_diff is not None:
@@ -258,8 +270,8 @@ class ChangelogBuilder:
             added_lines=added_lines,
             removed_lines=removed_lines,
         )
-        changelog_entry = None
-        if generate_entry is not None:
+        changelog_entry = stored_note.changelog_entry if stored_note else None
+        if changelog_entry is None and generate_entry is not None:
             changelog_entry = generate_entry(
                 commit.message,
                 note,  # pragma: no mutate
@@ -638,8 +650,16 @@ def count_diff_lines(diff_text: str) -> tuple[int, int]:
     return added_lines, removed_lines
 
 
-def format_note(category: str, summary: str) -> str:
-    """Return a git-note payload with explicit changelog category metadata.
+def format_note(
+    category: str,
+    summary: str,
+    changelog_entry: str | None = None,
+) -> str:
+    """Return a Git-note payload with explicit changelog metadata.
+
+    Without *changelog_entry*, the legacy human-readable note format is
+    preserved. New structured notes include a versioned JSON object so
+    finalization can render the precomputed entry without another AI call.
 
     Examples:
         >>> format_note("Added", "Added support for changelog generation.")
@@ -649,7 +669,59 @@ def format_note(category: str, summary: str) -> str:
     if normalized_category not in CATEGORY_ORDER:
         raise ValueError(f"Unsupported category: {category}")
     cleaned_summary = summary.strip() or "No summary available."  # pragma: no mutate
+    if changelog_entry is not None:
+        stored_note = StoredNote(
+            category=normalized_category,
+            summary=cleaned_summary,
+            changelog_entry=changelog_entry.strip() or None,
+        )
+        return json.dumps(
+            {
+                "version": stored_note.version,
+                "category": stored_note.category,
+                "summary": stored_note.summary,
+                "changelog_entry": stored_note.changelog_entry,
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+        )
     return f"Category: {normalized_category}\n\n{cleaned_summary}"
+
+
+def parse_stored_note(note_text: str) -> StoredNote | None:
+    """Parse structured or legacy Git-note content into changelog metadata."""
+    if not note_text:
+        return None
+
+    try:
+        parsed = json.loads(note_text)
+    except json.JSONDecodeError:
+        category, summary = parse_note_metadata(note_text)
+        if category is None:
+            return None
+        return StoredNote(category=category, summary=summary)
+
+    if not isinstance(parsed, dict):
+        return None
+
+    category = parsed.get("category")
+    summary = parsed.get("summary")
+    changelog_entry = parsed.get("changelog_entry")
+    version = parsed.get("version", 1)
+    if (
+        not isinstance(category, str)
+        or category.title() not in CATEGORY_ORDER
+        or not isinstance(summary, str)
+        or not isinstance(version, int)
+        or (changelog_entry is not None and not isinstance(changelog_entry, str))
+    ):
+        return None
+    return StoredNote(
+        category=category.title(),
+        summary=summary.strip() or "No summary available.",
+        changelog_entry=changelog_entry.strip() if changelog_entry else None,
+        version=version,
+    )
 
 
 def parse_note_metadata(note_text: str) -> tuple[str | None, str]:

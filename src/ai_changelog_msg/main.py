@@ -40,8 +40,8 @@ from ai_changelog_msg.changelog import (
     infer_category,
     merge_changelogs_with_keepachangelog,
     parse_conventional_commit,
-    parse_note_metadata,
     parse_semantic_version,
+    parse_stored_note,
 )
 from ai_changelog_msg.config import Config
 from ai_changelog_msg.git_helper import GitRepository
@@ -68,6 +68,7 @@ class _SummaryResult:
 
     commit_hash: str
     summary: str | None = None
+    changelog_entry: str | None = None
     error: Exception | None = None
 
 
@@ -222,10 +223,26 @@ def _generate_summary_for_commit(
                 else None
             ),
         )
+        generate_entry = getattr(ai_provider, "generate_changelog_entry", None)
+        if callable(generate_entry):
+            changelog_entry = generate_entry(
+                commit_message=prepared.commit_message,
+                note=summary,
+                category=prepared.category,
+                is_breaking=parse_conventional_commit(
+                    prepared.commit_message
+                ).is_breaking,
+            )
+        else:
+            changelog_entry = summary
     except Exception as error:  # noqa: BLE001
         return _SummaryResult(commit_hash=prepared.commit.hexsha, error=error)
 
-    return _SummaryResult(commit_hash=prepared.commit.hexsha, summary=summary)
+    return _SummaryResult(
+        commit_hash=prepared.commit.hexsha,
+        summary=summary,
+        changelog_entry=changelog_entry,
+    )
 
 
 def _generate_summaries_concurrently(
@@ -233,8 +250,15 @@ def _generate_summaries_concurrently(
     prepared_commits: list[_PreparedCommit],
     workers: int,
     on_summary_completed: Callable[[], None] | None = None,
+    on_summary_result: Callable[[_SummaryResult], None] | None = None,
 ) -> dict[str, _SummaryResult]:
-    """Generate AI summaries concurrently with per-worker progress output."""
+    """Generate AI summaries concurrently with per-worker progress output.
+
+    Completed results are delivered to *on_summary_result* on the caller's
+    thread before the next completed future is handled. This enables durable
+    checkpointing, such as persisting Git notes, while workers continue
+    generating remaining summaries.
+    """
     if not prepared_commits:
         return {}
 
@@ -289,6 +313,8 @@ def _generate_summaries_concurrently(
         for future in as_completed(futures):
             result = future.result()
             results[result.commit_hash] = result
+            if on_summary_result is not None:
+                on_summary_result(result)
             worker_id = assignments[result.commit_hash]  # pragma: no mutate
             completed[worker_id] = completed.get(worker_id, 0) + 1  # pragma: no mutate
             if on_summary_completed is not None:
@@ -391,7 +417,8 @@ def _create_semver_tags_if_needed(
             continue  # pragma: no mutate
 
         note = repo.get_note(commit.hexsha, namespace)  # pragma: no mutate
-        category, _ = parse_note_metadata(note or "")  # pragma: no mutate
+        stored_note = parse_stored_note(note or "")
+        category = stored_note.category if stored_note is not None else None
         if category is None:
             continue  # pragma: no mutate
 
@@ -964,7 +991,6 @@ def cli(
         failed = 0
 
         if overall_total == 0:
-            summary_results: dict[str, _SummaryResult] = {}
             click.echo(
                 "No commit processing needed: all commits already have categorized "
                 "notes or empty diffs"
@@ -977,7 +1003,46 @@ def cli(
                 label="Overall progress",
                 show_pos=True,
             ) as overall_progress:
-                summary_results = _generate_summaries_concurrently(
+                prepared_by_hash = {
+                    prepared.commit.hexsha: prepared
+                    for prepared in summaries_to_generate
+                }
+
+                def persist_summary_result(summary_result: _SummaryResult) -> None:
+                    """Persist one completed worker result as a Git-note checkpoint."""
+                    nonlocal processed, failed
+                    prepared = prepared_by_hash[summary_result.commit_hash]
+                    commit = prepared.commit
+                    try:
+                        if summary_result.error is not None:
+                            raise summary_result.error
+                        if summary_result.summary is None:
+                            raise RuntimeError(
+                                f"Summary result is empty for {commit.hexsha[:8]}"
+                            )
+
+                        note_payload = format_note(
+                            category=prepared.category,
+                            summary=summary_result.summary,
+                            changelog_entry=summary_result.changelog_entry,
+                        )
+                        repo.set_note(commit.hexsha, note_payload, namespace)
+                        note_cache[commit.hexsha] = note_payload
+                        logger.debug("Stored note for %s", commit.hexsha[:8])
+                        processed += 1
+                    except Exception as error:
+                        logger.error(
+                            "Failed to process %s: %s",
+                            commit.hexsha[:8],
+                            error,
+                            exc_info=logger.isEnabledFor(logging.DEBUG),
+                        )
+                        click.echo(f"\nError processing {commit.hexsha[:8]}: {error}")
+                        failed += 1
+                    finally:
+                        overall_progress.update(1)
+
+                _generate_summaries_concurrently(
                     ai_provider=ai_provider,
                     prepared_commits=summaries_to_generate,
                     workers=effective_workers,
@@ -986,55 +1051,8 @@ def cli(
                         if overall_progress_mode == "work-units"
                         else None
                     ),
+                    on_summary_result=persist_summary_result,
                 )
-
-                with click.progressbar(
-                    actionable_commits, label="Processing commits", show_pos=True
-                ) as process_progress:
-                    for prepared in process_progress:
-                        commit = prepared.commit
-                        try:
-                            logger.debug("Checking commit %s", commit.hexsha[:8])
-                            category = prepared.category
-
-                            logger.debug(
-                                "Reading generated summary for %s", commit.hexsha[:8]
-                            )
-                            summary_result = summary_results.get(commit.hexsha)
-                            if summary_result is None:
-                                raise RuntimeError(
-                                    f"No summary result generated for {commit.hexsha[:8]}"
-                                )
-                            if summary_result.error is not None:
-                                raise summary_result.error
-                            summary = summary_result.summary
-                            if summary is None:
-                                raise RuntimeError(
-                                    f"Summary result is empty for {commit.hexsha[:8]}"
-                                )
-
-                            note_payload = format_note(
-                                category=category, summary=summary
-                            )
-                            repo.set_note(commit.hexsha, note_payload, namespace)
-                            note_cache[commit.hexsha] = note_payload
-                            # Keep per-commit status at DEBUG so the progress bar output
-                            # remains readable at default INFO log level.
-                            logger.debug("Stored note for %s", commit.hexsha[:8])
-                            processed += 1
-                        except Exception as error:
-                            logger.error(
-                                "Failed to process %s: %s",
-                                commit.hexsha[:8],
-                                error,
-                                exc_info=logger.isEnabledFor(logging.DEBUG),
-                            )
-                            click.echo(
-                                f"\nError processing {commit.hexsha[:8]}: {error}"
-                            )
-                            failed += 1
-                        finally:
-                            overall_progress.update(1)
 
         click.echo("\nProcessing complete")
         click.echo(f"   Processed: {processed}")
@@ -1058,10 +1076,6 @@ def cli(
                 "finalization from existing notes"
             )
 
-        # When no notes changed, avoid per-commit AI rewrites and diff hydration.
-        # This keeps finalization fast while preserving deterministic output.
-        use_fast_finalization = processed == 0 and failed == 0
-
         click.echo("Finalizing release metadata and changelog...")
 
         with click.progressbar(
@@ -1078,8 +1092,6 @@ def cli(
 
             logger.debug("Rendering changelog using namespace '%s'", namespace)
             changelog_builder = ChangelogBuilder(namespace=namespace)
-            if not use_fast_finalization and ai_provider is None:
-                ai_provider = AIProvider(config)
 
             def get_note_cached(commit_hash: str, note_namespace: str) -> str | None:
                 if commit_hash in note_cache:
@@ -1092,17 +1104,9 @@ def cli(
                 commits=commits,
                 get_note=get_note_cached,
                 tags_by_commit=repo.get_semantic_version_tags(),
-                generate_entry=(
-                    None
-                    if use_fast_finalization
-                    else (
-                        ai_provider.generate_changelog_entry
-                        if ai_provider is not None
-                        else None
-                    )
-                ),
+                generate_entry=None,
                 commit_url_for_hash=repo.get_commit_web_url,
-                get_diff=None if use_fast_finalization else repo.get_commit_diff,
+                get_diff=None,
             )
             final_progress.update(1)
 

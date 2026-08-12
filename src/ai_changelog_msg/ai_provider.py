@@ -24,6 +24,7 @@ import re
 import time
 from dataclasses import dataclass, field
 from json import JSONDecodeError
+from threading import Lock
 from typing import TYPE_CHECKING, Any
 from urllib import error as urllib_error
 from urllib import parse as urllib_parse
@@ -107,6 +108,7 @@ class TokenUsage:
     prompt_tokens: int = field(default=0)
     completion_tokens: int = field(default=0)
     total_tokens: int = field(default=0)
+    _lock: Lock = field(default_factory=Lock, init=False, repr=False)
 
     def add(self, usage: Any) -> None:
         """Accumulate token counts from a LiteLLM usage object.
@@ -117,9 +119,10 @@ class TokenUsage:
         """
         if usage is None:
             return
-        self.prompt_tokens += getattr(usage, "prompt_tokens", 0) or 0
-        self.completion_tokens += getattr(usage, "completion_tokens", 0) or 0
-        self.total_tokens += getattr(usage, "total_tokens", 0) or 0
+        with self._lock:
+            self.prompt_tokens += getattr(usage, "prompt_tokens", 0) or 0
+            self.completion_tokens += getattr(usage, "completion_tokens", 0) or 0
+            self.total_tokens += getattr(usage, "total_tokens", 0) or 0
 
 
 class AIProvider:

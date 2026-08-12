@@ -948,8 +948,12 @@ def test_cli_skips_existing_notes_and_writes_changelog(tmp_path, monkeypatch):
     )
 
     assert result.exit_code == 0
-    assert any("Category: Added" in note for _, note, _ in repo.saved_notes)
-    assert not any("Category: Fixed" in note for _, note, _ in repo.saved_notes)
+    assert any('"category": "Added"' in note for _, note, _ in repo.saved_notes)
+    assert any(
+        '"changelog_entry": "Added summary for ' in note
+        for _, note, _ in repo.saved_notes
+    )
+    assert not any('"category": "Fixed"' in note for _, note, _ in repo.saved_notes)
     assert repo.created_tags == [("v1.0.0", "a1b2c3d4")]
     changelog_text = (tmp_path / "CHANGELOG.md").read_text(encoding="utf-8")
     assert "## [1.0.0] - 2026-03-01" in changelog_text
@@ -1961,15 +1965,23 @@ def test_cli_handles_ai_error_during_commit_processing(tmp_path, monkeypatch):
     _install_fake_ai_provider(monkeypatch)
 
     def _fake_generate_summaries(
-        ai_provider, prepared_commits, workers, on_summary_completed=None
+        ai_provider,
+        prepared_commits,
+        workers,
+        on_summary_completed=None,
+        on_summary_result=None,
     ):
-        return {
-            p.commit.hexsha: main._SummaryResult(
-                commit_hash=p.commit.hexsha,
+        results = {
+            prepared.commit.hexsha: main._SummaryResult(
+                commit_hash=prepared.commit.hexsha,
                 error=RuntimeError("AI service unavailable"),
             )
-            for p in prepared_commits
+            for prepared in prepared_commits
         }
+        if on_summary_result is not None:
+            for summary_result in results.values():
+                on_summary_result(summary_result)
+        return results
 
     monkeypatch.setattr(
         main, "_generate_summaries_concurrently", _fake_generate_summaries
@@ -2001,15 +2013,23 @@ def test_cli_handles_none_summary_in_commit_processing(tmp_path, monkeypatch):
     _install_fake_ai_provider(monkeypatch)
 
     def _fake_generate_summaries(
-        ai_provider, prepared_commits, workers, on_summary_completed=None
+        ai_provider,
+        prepared_commits,
+        workers,
+        on_summary_completed=None,
+        on_summary_result=None,
     ):
-        return {
-            p.commit.hexsha: main._SummaryResult(
-                commit_hash=p.commit.hexsha,
+        results = {
+            prepared.commit.hexsha: main._SummaryResult(
+                commit_hash=prepared.commit.hexsha,
                 summary=None,
             )
-            for p in prepared_commits
+            for prepared in prepared_commits
         }
+        if on_summary_result is not None:
+            for summary_result in results.values():
+                on_summary_result(summary_result)
+        return results
 
     monkeypatch.setattr(
         main, "_generate_summaries_concurrently", _fake_generate_summaries

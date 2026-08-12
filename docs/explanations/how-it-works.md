@@ -3,10 +3,12 @@
 AI Changelog Generator automates release note creation by combining Git history with an AI model.
 It reads every commit in your repository,
 uses a language model to produce a human-readable summary of the diff,
-stores those summaries as Git notes,
+stores the summary and a precomputed changelog entry as Git notes,
 and then renders them into a structured `CHANGELOG.md` grouped by semantic version release.
 
-The pipeline has six stages that run sequentially each time you invoke the CLI.
+The pipeline has six logical stages.
+Commit preparation and final rendering run in a deterministic order,
+while AI generation runs concurrently and persists each completed result immediately.
 
 ![AI Changelog Generator pipeline diagram](how-it-works.drawio.png)
 
@@ -31,8 +33,6 @@ For each commit the tool fetches a unified diff:
 
 Diffs larger than `max_diff_size` (default 50 000 characters) are truncated before
 being sent to the model to stay within context-window limits.
-This threshold is configurable via the `--max-diff-size` flag or the `CHANGELOG_MAX_DIFF_SIZE`
-environment variable.
 
 ## 3. AI summary generation
 
@@ -41,16 +41,20 @@ Each diff is forwarded to the configured language model through
 which provides a single interface to Ollama, OpenAI, Anthropic, and any other
 LiteLLM-compatible model.
 
-The model produces a one-sentence
-[Keep a Changelog](https://keepachangelog.com/)–style entry and assigns a category:
-`Added`, `Changed`, `Fixed`, or `Removed`.
-The summary is also normalized to start with a domain-specific power verb
-(for example, `Resolved`, `Introduced`, `Optimized`) for consistency.
+For every new commit, the model produces a detailed Git-note summary
+and a one-sentence [Keep a Changelog](https://keepachangelog.com/) entry.
+The tool assigns the entry to `Added`, `Changed`, `Fixed`, or `Removed`.
+Both values are created while the commit is processed,
+so the final rendering stage does not make additional model calls.
 
-Summaries are generated **concurrently** using a `ThreadPoolExecutor`.
+Summaries and entries are generated **concurrently** using a `ThreadPoolExecutor`.
 The number of worker threads defaults to the host's CPU count
 but can be overridden with `--workers`.
 The CLI renders a per-worker progress bar during the run.
+
+The coordinator receives completed worker results as they become available.
+It writes each successful result as a Git note before handling the next completed result,
+so Git updates remain single-threaded while model requests continue in parallel.
 
 Transient failures (timeouts, rate-limit 429s, 5xx errors) are retried with
 exponential back-off controlled by `--retry-attempts` and `--retry-backoff-seconds`.
@@ -61,12 +65,17 @@ This makes incremental runs cheap.
 
 ## 4. Git notes storage
 
-Each generated summary is persisted as a
+Each generated summary and changelog entry are persisted as a
 [Git note](https://git-scm.com/docs/git-notes)
 under a dedicated namespace (default `ai-changelog`).
 
-```text
-refs/notes/ai-changelog  →  <commit-sha>  →  "Category: Fixed\n\nResolved…"
+```json
+{
+  "category": "Fixed",
+  "changelog_entry": "Resolved a failure while building release entries.",
+  "summary": "Resolved an edge case in release entry construction.",
+  "version": 1
+}
 ```
 
 Notes are stored alongside the commit object without rewriting history.
@@ -74,10 +83,15 @@ They survive `git fetch` and `git push` when you include
 `refs/notes/*` in your remote configuration,
 so the summaries can be shared across machines and CI runs.
 
-The stored note format embeds the category on the first line (`Category: Fixed`)
-followed by an empty line and the summary sentence.
-This structured layout lets the rendering stage parse category and text
-from a single note read.
+The versioned JSON payload lets the rendering stage read category,
+summary, and the precomputed changelog entry without contacting the model.
+Existing plaintext notes remain supported and use their first summary sentence
+when no stored changelog entry is available.
+
+Each successfully completed commit is a durable checkpoint.
+If processing stops before finalization,
+a later run reuses stored notes and processes only commits that still need notes,
+unless you explicitly use `--force`.
 
 ## 5. Semantic version tag and release grouping
 
@@ -110,6 +124,15 @@ Commits that already carry a semantic tag are skipped.
 
 The tool builds a
 [Keep a Changelog](https://keepachangelog.com/)–compliant `CHANGELOG.md`.
+Finalization reads the compact Git-note payloads,
+sorts commits by commit time and hash for deterministic output,
+groups entries by release and category,
+and writes the rendered file once.
+It does not resend historical changes to the language model or re-read historical diffs.
+
+As a result, an interrupted run can leave durable Git-note checkpoints without a new
+`CHANGELOG.md`.
+A later successful run completes the local grouping, merge, and file write.
 
 Within each release section,
 entries are sorted into subsections in the canonical order:

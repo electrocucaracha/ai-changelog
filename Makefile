@@ -61,7 +61,8 @@ fmt: clean
 	shfmt -l -w -s -i 4 .
 	command -v yamlfmt > /dev/null || curl -s "https://i.jpillora.com/google/yamlfmt!!" | bash
 	yamlfmt -dstar **/*.{yaml,yml}
-	npx --yes textlint . --fix
+	command -v textlint > /dev/null && npm list --global --depth=0 textlint-rule-terminology > /dev/null 2>&1 || npm install --global textlint textlint-rule-terminology
+	textlint . --fix
 	command -v prettier > /dev/null || npm install prettier
 	npx prettier . --write
 	command -v uvx > /dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh

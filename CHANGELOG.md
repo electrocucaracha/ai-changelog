@@ -12,6 +12,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.4.3] - 2026-08-12
+
+### Fixed
+
+- The Makefile now reliably installs textlint dependencies globally during formatting by prompting for a password on systems with sudo configured if necessary. [c1516a3b](https://github.com/electrocucaracha/ai-changelog/commit/c1516a3bb212362bf51cd9669faf7bd116646930)
+
+## [7.4.2] - 2026-08-12
+
+### Changed
+
+- Clarified the contribution guide setup instructions to ensure accurate step numbering and provide a clear process for new contributors. [a0affb67](https://github.com/electrocucaracha/ai-changelog/commit/a0affb67818e15206238984a2fd490d2f7b6c79d)
+
+## [7.4.1] - 2026-08-12
+
+### Changed
+
+- Simplified summary generation in CLI tests by centralizing logic into a shared helper function. [c1c9ad8b](https://github.com/electrocucaracha/ai-changelog/commit/c1c9ad8b361c86366573657d02d868ec800d95b5)
+
+## [7.4.0] - 2026-08-12
+
+### Added
+
+- Enabled persistent changelog entry rendering for finalization stage by precomputing and storing both detailed summaries and Keep a Changelog entries as versioned JSON payloads in each Git note. [6f46ce60](https://github.com/electrocucaracha/ai-changelog/commit/6f46ce60a60d612581c631df45fc7f91c5cc367b)
+
+## [7.3.1] - 2026-08-12
+
+### Fixed
+
+- Reliably formats code by ensuring textlint and its terminology rule are installed globally before running the formatter with the --fix flag. [c44e09ad](https://github.com/electrocucaracha/ai-changelog/commit/c44e09ad6608395afc33c735eca6481f02f24f95)
+
+## [7.3.0] - 2026-08-10
+
+### Added
+
+- Enabled standardized code formatting across the project by introducing biome.json configuration settings for indentation style. [97e1baa7](https://github.com/electrocucaracha/ai-changelog/commit/97e1baa7317117f94182c04870fb0811eff565d0)
+
+## [7.2.0] - 2026-08-10
+
+### Added
+
+- Enabled autofixing of language issues in formatting workflow through integration with Textlint, ensuring consistent prose style and improved documentation quality across the project. [fe2ef3ce](https://github.com/electrocucaracha/ai-changelog/commit/fe2ef3ce3f65a21b4c086c164abc9c53ad04257b)
+
+## [7.1.0] - 2026-08-10
+
+### Added
+
+- Enabled comprehensive changelog entries for all releases from 5.1.1 through 7.0.0, providing users with a clear history of changes, enhancements, and bugfixes across recent versions. [6b5f283c](https://github.com/electrocucaracha/ai-changelog/commit/6b5f283c314462dbe9bd449241a2c71fbb3a1bfc)
+
 ## [7.0.0] - 2026-08-10
 
 ### Removed

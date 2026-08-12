@@ -704,23 +704,28 @@ def parse_stored_note(note_text: str) -> StoredNote | None:
     if not isinstance(parsed, dict):
         return None
 
-    category = parsed.get("category")
-    summary = parsed.get("summary")
-    changelog_entry = parsed.get("changelog_entry")
-    version = parsed.get("version", 1)
+    stored_category = parsed.get("category")
+    stored_summary = parsed.get("summary")
+    stored_changelog_entry = parsed.get("changelog_entry")
+    stored_version = parsed.get("version", 1)
     if (
-        not isinstance(category, str)
-        or category.title() not in CATEGORY_ORDER
-        or not isinstance(summary, str)
-        or not isinstance(version, int)
-        or (changelog_entry is not None and not isinstance(changelog_entry, str))
+        not isinstance(stored_category, str)
+        or stored_category.title() not in CATEGORY_ORDER
+        or not isinstance(stored_summary, str)
+        or not isinstance(stored_version, int)
+        or (
+            stored_changelog_entry is not None
+            and not isinstance(stored_changelog_entry, str)
+        )
     ):
         return None
     return StoredNote(
-        category=category.title(),
-        summary=summary.strip() or "No summary available.",
-        changelog_entry=changelog_entry.strip() if changelog_entry else None,
-        version=version,
+        category=stored_category.title(),
+        summary=stored_summary.strip() or "No summary available.",
+        changelog_entry=(
+            stored_changelog_entry.strip() if stored_changelog_entry else None
+        ),
+        version=stored_version,
     )
 
 

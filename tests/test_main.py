@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 import shlex
 import sys
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -156,6 +157,30 @@ def _invoke_cli(tmp_path, args: list[str]):
     """Invoke the CLI with a repository path and additional arguments."""
     runner = CliRunner()
     return runner.invoke(main.cli, [str(tmp_path), *args])
+
+
+def _patch_fake_summary_generation(monkeypatch, result_factory: Callable):
+    """Patch concurrent summary generation with a deterministic result factory."""
+
+    def _fake_generate_summaries(
+        ai_provider,
+        prepared_commits,
+        workers,
+        on_summary_completed=None,
+        on_summary_result=None,
+    ):
+        results = {
+            prepared.commit.hexsha: result_factory(prepared)
+            for prepared in prepared_commits
+        }
+        if on_summary_result is not None:
+            for summary_result in results.values():
+                on_summary_result(summary_result)
+        return results
+
+    monkeypatch.setattr(
+        main, "_generate_summaries_concurrently", _fake_generate_summaries
+    )
 
 
 def _setup_single_commit_repo(
@@ -1964,27 +1989,12 @@ def test_cli_handles_ai_error_during_commit_processing(tmp_path, monkeypatch):
     _patch_processing_repo(monkeypatch, repo)
     _install_fake_ai_provider(monkeypatch)
 
-    def _fake_generate_summaries(
-        ai_provider,
-        prepared_commits,
-        workers,
-        on_summary_completed=None,
-        on_summary_result=None,
-    ):
-        results = {
-            prepared.commit.hexsha: main._SummaryResult(
-                commit_hash=prepared.commit.hexsha,
-                error=RuntimeError("AI service unavailable"),
-            )
-            for prepared in prepared_commits
-        }
-        if on_summary_result is not None:
-            for summary_result in results.values():
-                on_summary_result(summary_result)
-        return results
-
-    monkeypatch.setattr(
-        main, "_generate_summaries_concurrently", _fake_generate_summaries
+    _patch_fake_summary_generation(
+        monkeypatch,
+        lambda prepared: main._SummaryResult(
+            commit_hash=prepared.commit.hexsha,
+            error=RuntimeError("AI service unavailable"),
+        ),
     )
 
     result = _invoke_cli(tmp_path, [])
@@ -2012,27 +2022,12 @@ def test_cli_handles_none_summary_in_commit_processing(tmp_path, monkeypatch):
     _patch_processing_repo(monkeypatch, repo)
     _install_fake_ai_provider(monkeypatch)
 
-    def _fake_generate_summaries(
-        ai_provider,
-        prepared_commits,
-        workers,
-        on_summary_completed=None,
-        on_summary_result=None,
-    ):
-        results = {
-            prepared.commit.hexsha: main._SummaryResult(
-                commit_hash=prepared.commit.hexsha,
-                summary=None,
-            )
-            for prepared in prepared_commits
-        }
-        if on_summary_result is not None:
-            for summary_result in results.values():
-                on_summary_result(summary_result)
-        return results
-
-    monkeypatch.setattr(
-        main, "_generate_summaries_concurrently", _fake_generate_summaries
+    _patch_fake_summary_generation(
+        monkeypatch,
+        lambda prepared: main._SummaryResult(
+            commit_hash=prepared.commit.hexsha,
+            summary=None,
+        ),
     )
 
     result = _invoke_cli(tmp_path, [])

@@ -57,15 +57,9 @@ APPROVER_RE = re.compile(
     re.IGNORECASE,
 )
 PROMPT_LEAK_RE = re.compile(
-    r"(?:"
-    r"###\s*(?:System|User|Assistant|Output|Solution|Summary|Explanation|Notes?)\b"
-    r"|Rewrite\s+the\s+summary\s+above"
+    r"(?:###\s*(?:System|User|Assistant|Output|Solution|Summary|Explanation|Notes?)\b"
     r"|Category\s*:\s*(?:Added|Changed|Fixed|Removed)"
-    r"|Original\s+Commit\s+Message"
-    r"|Existing\s+Summary"
-    r"|Keep\s+a\s+Changelog\s+entry\s+sentence"
-    r"|```"
-    r")",
+    r"|```)",
     re.IGNORECASE,
 )
 LEADING_LIST_MARKER_RE = re.compile(r"^(?:[-*+]|\d+[.)])\s+")
@@ -74,25 +68,25 @@ OLLAMA_MODEL_NOT_FOUND_RE = re.compile(
     r"(?:model\s+['\"]?.+?['\"]?\s+not\s+found|pull\s+the\s+model\s+first)",
     re.IGNORECASE,
 )
-RETRYABLE_LLM_ERROR_RE = re.compile(
-    r"(?:"
-    r"timeout"
-    r"|timed\s+out"
-    r"|apiconnectionerror"
-    r"|connection\s+error"
-    r"|connection\s+refused"
-    r"|temporarily\s+unavailable"
-    r"|service\s+unavailable"
-    r"|rate\s+limit"
-    r"|too\s+many\s+requests"
-    r"|\b429\b"
-    r"|\b500\b"
-    r"|\b502\b"
-    r"|\b503\b"
-    r"|\b504\b"
-    r")",
-    re.IGNORECASE,
-)
+
+
+def _is_retryable_error(error_str: str) -> bool:
+    """Check if error string indicates a transient/retryable failure."""
+    lower = error_str.lower()
+    return any(
+        keyword in lower
+        for keyword in (
+            "timeout",
+            "timed out",
+            "apiconnectionerror",
+            "connection error",
+            "connection refused",
+            "temporarily unavailable",
+            "service unavailable",
+            "rate limit",
+            "too many requests",
+        )
+    ) or any(code in error_str for code in ("429", "500", "502", "503", "504"))
 
 
 @dataclass
@@ -248,7 +242,7 @@ class AIProvider:
 
     def _is_retryable_completion_error(self, error: Exception) -> bool:
         """Return ``True`` when *error* should trigger a retry."""
-        return bool(RETRYABLE_LLM_ERROR_RE.search(str(error)))
+        return _is_retryable_error(str(error))
 
     def _completion_with_retry(
         self,

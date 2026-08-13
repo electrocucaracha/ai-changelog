@@ -34,9 +34,7 @@ def _parse_headers_json(raw: str) -> dict[str, str]:
         A ``dict[str, str]`` mapping header names to their values.
 
     Raises:
-        ValueError: If *raw* is not valid JSON.
-        TypeError: If the parsed JSON is not a ``dict`` or contains
-            non-string keys or values.
+        ValueError: If *raw* is not valid JSON or not a dict with string keys/values.
     """
     try:
         parsed: Any = json.loads(raw)
@@ -46,15 +44,11 @@ def _parse_headers_json(raw: str) -> dict[str, str]:
         ) from error
     if not isinstance(parsed, dict):
         raise TypeError("CHANGELOG_LITELLM_HEADERS_JSON must be a JSON object")
-
-    headers: dict[str, str] = {}
-    for key, value in parsed.items():
-        if not isinstance(key, str):
-            raise TypeError("CHANGELOG_LITELLM_HEADERS_JSON keys must be strings")
-        if not isinstance(value, str):
-            raise TypeError("CHANGELOG_LITELLM_HEADERS_JSON values must be strings")
-        headers[key] = value
-    return headers
+    if not all(isinstance(k, str) and isinstance(v, str) for k, v in parsed.items()):
+        raise TypeError(
+            "CHANGELOG_LITELLM_HEADERS_JSON keys and values must be strings"
+        )
+    return parsed
 
 
 def _parse_optional_bool(
@@ -81,9 +75,9 @@ def _parse_optional_bool(
     if raw is None:  # pragma: no mutate
         return default
     normalized = raw.strip().lower()
-    if normalized in {"", "0", "false", "no", "off"}:  # pragma: no mutate
+    if normalized in ("", "0", "false", "no", "off"):  # pragma: no mutate
         return False  # pragma: no mutate
-    if normalized in {"1", "true", "yes", "on"}:  # pragma: no mutate
+    if normalized in ("1", "true", "yes", "on"):  # pragma: no mutate
         return True  # pragma: no mutate
     raise ValueError(
         f"{variable_name} must be one of: 1, true, yes, on, 0, false, no, off"

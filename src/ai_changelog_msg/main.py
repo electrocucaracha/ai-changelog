@@ -26,8 +26,7 @@ import shlex
 import sys
 from collections.abc import Callable, Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
-from typing import Any
+from typing import Any, NamedTuple
 
 import click
 
@@ -51,8 +50,7 @@ RELEASE_SECTION_HEADING_RE = re.compile(r"^## \[[^\]]+\](?: - .*)?$", re.MULTILI
 MARKDOWNLINT_MD024_DISABLE = "<!-- Markdownlint-disable MD024 -->"
 
 
-@dataclass(frozen=True)
-class _PreparedCommit:
+class _PreparedCommit(NamedTuple):
     """Prepared commit payload for processing in the CLI workflow."""
 
     commit: Any
@@ -62,8 +60,7 @@ class _PreparedCommit:
     diff: str
 
 
-@dataclass(frozen=True)
-class _SummaryResult:
+class _SummaryResult(NamedTuple):
     """Result from a single AI summary generation task."""
 
     commit_hash: str
@@ -133,38 +130,6 @@ def _build_execution_command(
     return " ".join(shlex.quote(part) for part in args)
 
 
-def _resolve_worker_count(requested_workers: int | None, item_count: int) -> int:
-    """Resolve worker count using request, CPU availability, and item count.
-
-    Args:
-        requested_workers: Explicit worker override from CLI, or ``None`` to
-            auto-size from ``os.cpu_count()``.
-        item_count: Number of items that could be processed.
-
-    Returns:
-        A positive worker count bounded by ``item_count``.
-    """
-    if item_count <= 0:  # pragma: no mutate
-        return 1
-
-    if requested_workers is None:
-        cpu_count = os.cpu_count() or 1  # pragma: no mutate
-        return max(1, min(cpu_count, item_count))
-
-    return max(1, min(requested_workers, item_count))
-
-
-def _resolve_overall_progress_total(
-    overall_progress_mode: str,
-    prepared_commits_count: int,
-    summaries_to_generate_count: int,
-) -> int:
-    """Return total units for the selected overall progress mode."""
-    if overall_progress_mode == "work-units":
-        return prepared_commits_count + summaries_to_generate_count
-    return prepared_commits_count
-
-
 def _configure_logging(log_level: str) -> None:
     """Configure the root logger for the application.
 
@@ -195,17 +160,6 @@ def _configure_logging(log_level: str) -> None:
         # Prevent LiteLLM's own logger handlers from polluting CLI progress output.
         litellm_logger.handlers.clear()
         litellm_logger.propagate = False  # pragma: no mutate
-
-
-def _render_worker_progress_bar(
-    done: int, total: int, width: int = 20
-) -> str:  # pragma: no mutate
-    """Return a fixed-width progress bar string for worker progress."""
-    if total <= 0:
-        completed = width
-    else:
-        completed = min(width, int((done / total) * width))  # pragma: no mutate
-    return f"[{'#' * completed}{'-' * (width - completed)}]"
 
 
 def _generate_summary_for_commit(
@@ -280,7 +234,11 @@ def _generate_summaries_concurrently(
         for worker_id in range(workers):
             total = totals.get(worker_id, 0)  # pragma: no mutate
             done = completed.get(worker_id, 0)  # pragma: no mutate
-            progress_bar = _render_worker_progress_bar(done, total)
+            width = 20
+            progress_filled = (
+                min(width, int((done / total) * width)) if total > 0 else width
+            )
+            progress_bar = f"[{'#' * progress_filled}{'-' * (width - progress_filled)}]"
             lines.append(f"  Worker {worker_id + 1:>2}: {progress_bar} {done}/{total}")
         return lines
 
@@ -325,24 +283,6 @@ def _generate_summaries_concurrently(
         click.echo()
 
     return results
-
-
-def _commit_message_str(message: Any) -> str:
-    """Return *message* as a plain string, decoding bytes if necessary.
-
-    GitPython may expose ``commit.message`` as either ``str`` or ``bytes``
-    depending on the repository encoding. This helper normalises both cases
-    so callers always receive a ``str``.
-
-    Args:
-        message: A value from ``Commit.message``; either ``str`` or ``bytes``.
-
-    Returns:
-        The message text as a ``str``.
-    """
-    if isinstance(message, bytes):
-        return message.decode("utf-8", errors="replace")  # pragma: no mutate
-    return str(message)
 
 
 def _create_semver_tags_if_needed(
@@ -901,7 +841,7 @@ def cli(
             click.echo("No commits found in repository")
             return
 
-        effective_workers = _resolve_worker_count(workers, total_commits)
+        effective_workers = max(1, min(workers or os.cpu_count() or 1, total_commits))
         logger.debug(
             "Resolved worker count: requested=%s effective=%s",
             workers,
@@ -928,7 +868,11 @@ def cli(
             commits, label="Preparing commits", show_pos=True
         ) as prepare_progress:
             for commit in prepare_progress:
-                commit_message = _commit_message_str(commit.message)
+                commit_message = (
+                    commit.message
+                    if isinstance(commit.message, str)
+                    else commit.message.decode("utf-8", errors="replace")
+                )
                 existing_note = repo.get_note(commit.hexsha, namespace)
                 note_cache[commit.hexsha] = existing_note
 
@@ -980,10 +924,10 @@ def cli(
                 "No AI summaries to generate: all processable commits already have notes"
             )
 
-        overall_total = _resolve_overall_progress_total(
-            overall_progress_mode=overall_progress_mode,
-            prepared_commits_count=len(actionable_commits),
-            summaries_to_generate_count=len(summaries_to_generate),
+        overall_total = (
+            (len(actionable_commits) + len(summaries_to_generate))
+            if overall_progress_mode == "work-units"
+            else len(actionable_commits)
         )
         click.echo(f"Overall progress mode: {overall_progress_mode}")
         processed = 0

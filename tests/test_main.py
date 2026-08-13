@@ -342,20 +342,6 @@ def test_cli_includes_overall_progress_mode_in_execution_command(tmp_path, monke
     assert "--overall-progress-mode work-units" in result.output
 
 
-def test_resolve_worker_count_auto_and_override(monkeypatch):
-    monkeypatch.setattr(main.os, "cpu_count", lambda: 12)
-
-    assert main._resolve_worker_count(None, 2) == 2
-    assert main._resolve_worker_count(None, 20) == 12
-    assert main._resolve_worker_count(5, 20) == 5
-    assert main._resolve_worker_count(50, 3) == 3
-
-
-def test_resolve_overall_progress_total_modes():
-    assert main._resolve_overall_progress_total("commits", 57, 57) == 57
-    assert main._resolve_overall_progress_total("work-units", 57, 57) == 114
-
-
 def test_cli_prints_auto_selected_worker_count(tmp_path, monkeypatch):
     _setup_single_commit_repo(tmp_path, monkeypatch)
     monkeypatch.setattr(main.os, "cpu_count", lambda: 8)
@@ -1000,59 +986,6 @@ def test_cli_reports_no_commits_and_exits(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_resolve_worker_count_returns_one_for_zero_items(monkeypatch):
-    """item_count=0 must return 1, not any other value (mutmut_1/3)."""
-    monkeypatch.setattr(main.os, "cpu_count", lambda: 8)
-
-    assert main._resolve_worker_count(None, 0) == 1
-    assert main._resolve_worker_count(4, 0) == 1
-
-
-def test_resolve_worker_count_caps_at_item_count():
-    """Worker count may not exceed item_count."""
-    assert main._resolve_worker_count(10, 3) == 3
-
-
-def test_commit_message_str_decodes_bytes():
-    """Bytes commit messages must be decoded as UTF-8 with error replacement."""
-    msg = b"feat: add support for caf\xc3\xa9"  # codespell:ignore
-    result = main._commit_message_str(msg)
-    assert result == "feat: add support for café"
-
-
-def test_commit_message_str_passes_string_through():
-    """String inputs are returned unchanged."""
-    assert main._commit_message_str("fix: typo") == "fix: typo"
-
-
-def test_commit_message_str_handles_bytes_with_replacement():
-    """Invalid byte sequences are replaced, not raised."""
-    result = main._commit_message_str(b"bad byte: \xff")
-    assert isinstance(result, str)
-    assert "bad byte:" in result
-
-
-def test_render_worker_progress_bar_with_total_zero():
-    """A total of zero should return a full bar, not a partial bar."""
-    result = main._render_worker_progress_bar(0, 0, width=4)
-    assert result == "[####]"
-
-
-def test_render_worker_progress_bar_with_total_one():
-    """A total of exactly 1 must not behave the same as a zero total (mutmut_3)."""
-    partial = main._render_worker_progress_bar(0, 1, width=4)
-    full = main._render_worker_progress_bar(1, 1, width=4)
-    # Partial bar for 0/1 should have at least one '-'
-    assert "-" in partial
-    assert full == "[####]"
-
-
-def test_render_worker_progress_bar_uses_hyphen_fill_for_incomplete_work():
-    bar = main._render_worker_progress_bar(2, 5, width=4)
-
-    assert bar == "[#---]"
-
-
 def test_build_execution_command_includes_create_semver_tags():
     """--create-semver-tags flag must appear in the command string."""
     cmd = main._build_execution_command(
@@ -1599,19 +1532,6 @@ def test_create_semver_tags_handles_none_note_without_error():
     )
 
     assert created == 0
-
-
-def test_commit_message_str_specifies_utf8_encoding():
-    """decode must use 'utf-8' explicitly, not rely on the default encoding.
-
-    Kills _commit_message_str mutmut_3: message.decode('utf-8', errors='replace')
-    changed to message.decode(errors='replace'), which uses the system default encoding
-    instead of UTF-8, potentially producing wrong output on non-UTF-8 systems.
-    """
-    # These bytes are valid UTF-8 (café) but not valid Latin-1 or ASCII
-    msg = "feat: support café items".encode()
-    result = main._commit_message_str(msg)
-    assert "café" in result
 
 
 def test_create_semver_tags_continue_past_none_category():

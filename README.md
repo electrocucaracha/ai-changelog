@@ -17,13 +17,13 @@ It analyzes commit diffs with an AI model,
 stores per-commit summaries in Git notes,
 and renders a structured CHANGELOG.md.
 
-### What Problem Does It Solve
+![Diagram](docs/assets/diagram.png)
 
-Writing changelogs by hand is repetitive,
-easy to delay,
-and often inconsistent across releases.
-This project solves that by generating changelog content directly from commits,
-so release notes are faster to produce and easier to keep accurate.
+### Reasons to Use AI Changelog Generator
+
+Writing changelogs by hand is repetitive, time-consuming, and easy to put off. It can also lead to inconsistent formatting, missing changes, and release notes that fall out of sync with the actual development history.
+
+AI Changelog Generator automates the process by analyzing your Git commits and turning them into structured, human-readable release notes. It keeps changelog generation close to the source of truth—your repository—making releases faster to document, more consistent, and easier to maintain.
 
 For quickstart, CLI options, provider configuration, and processing details,
 see the GitHub Pages documentation in [docs/](docs/index.md).

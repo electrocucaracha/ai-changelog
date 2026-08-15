@@ -1,4 +1,8 @@
-# How It Works
+---
+title: How it Works
+parent: Explanations
+nav_order: 1
+---
 
 AI Changelog Generator automates release note creation by combining Git history with an AI model.
 It reads every commit in your repository,

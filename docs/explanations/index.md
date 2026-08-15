@@ -1,4 +1,8 @@
-# Explanations
+---
+title: Explanations
+nav_order: 4
+has_children: true
+---
 
 Explanation pages provide conceptual and architectural context.
 Use these to understand why the tool behaves the way it does.

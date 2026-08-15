@@ -1,3 +1,8 @@
+---
+title: Home
+nav_order: 1
+---
+
 # AI Changelog Generator
 
 AI Changelog Generator creates release notes from your Git history using AI.

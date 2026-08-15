@@ -1,4 +1,8 @@
-# CLI Reference
+---
+title: CLI Reference
+parent: References
+nav_order: 1
+---
 
 ## Command
 

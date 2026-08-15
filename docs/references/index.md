@@ -1,4 +1,8 @@
-# References
+---
+title: References
+nav_order: 3
+has_children: true
+---
 
 Reference pages describe commands, options, and configuration details.
 Use these as lookup material while implementing workflows.

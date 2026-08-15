@@ -1,3 +1,9 @@
+---
+title: Generate your first commit message
+parent: Tutorials
+nav_order: 1
+---
+
 # Quickstart
 
 This quickstart gets you to a generated changelog in a few minutes.

@@ -1,4 +1,8 @@
-# GitHub Actions Release Setup
+---
+title: GitHub Actions Release Setup
+parent: How-to guides
+nav_order: 2
+---
 
 This guide shows how to run AI Changelog Generator in GitHub Actions,
 write a new release entry into CHANGELOG.md,

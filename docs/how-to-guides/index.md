@@ -1,4 +1,8 @@
-# How-to Guides
+---
+title: How-to guides
+nav_order: 2
+has_children: true
+---
 
 How-to guides help you complete specific tasks.
 Use these when you already understand the basics and need outcome-focused steps.

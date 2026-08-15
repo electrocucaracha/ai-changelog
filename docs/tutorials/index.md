@@ -1,3 +1,9 @@
+---
+title: Tutorials
+nav_order: 2
+has_children: true
+---
+
 # Tutorials
 
 Tutorials provide guided learning paths.

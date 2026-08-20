@@ -139,4 +139,4 @@ ai-changelog /path/to/repo --log-level DEBUG --model my_provider/my-model
 ## Next
 
 - Review all CLI options in [../references/index.md](../references/index.md)
-- Read how the tool processes model calls in [../explanations/how-it-works.md](how-it-works.md)
+- Read how the tool processes model calls in [../explanations/how-it-works.md](../explanations/how-it-works.md)

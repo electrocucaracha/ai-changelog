@@ -25,6 +25,7 @@ This project solves that by automating changelog generation while keeping data i
 - Changelog generation grouped by semantic version tags
 - Optional semantic version tag creation when tags are missing
 - Support for multiple AI providers through LiteLLM
+- Plugin system for adding custom LLM providers without modifying the project
 
 ## How it works
 

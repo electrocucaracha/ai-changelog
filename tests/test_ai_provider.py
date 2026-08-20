@@ -736,6 +736,117 @@ def test_init_logs_provider_details(caplog):
     assert "5" in msg
 
 
+def test_load_custom_providers_registers_discovered_provider(monkeypatch, caplog):
+    """Entry-point providers must be loaded and added to custom_provider_map."""
+
+    class FakeHandler:
+        pass
+
+    fake_ep = SimpleNamespace(name="my_provider", value="mypkg.llm:FakeHandler")
+    fake_ep.load = lambda: FakeHandler
+
+    monkeypatch.setattr("ai_changelog_msg.ai_provider.litellm.custom_provider_map", [])
+
+    def fake_entry_points(*, group):
+        if group == "ai_changelog.litellm_providers":
+            return [fake_ep]
+        return []
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.entry_points",
+        fake_entry_points,
+        raising=False,
+    )
+
+    with caplog.at_level(logging.INFO, logger="ai_changelog_msg.ai_provider"):
+        AIProvider(Config())
+
+    registered = ai_provider.litellm.custom_provider_map
+    assert any(
+        entry["provider"] == "my_provider"
+        and isinstance(entry["custom_handler"], FakeHandler)
+        for entry in registered
+    )
+    assert any("my_provider" in r.getMessage() for r in caplog.records)
+
+
+def test_load_custom_providers_is_idempotent(monkeypatch):
+    """Calling AIProvider() twice must not register the same provider twice."""
+
+    class FakeHandler:
+        pass
+
+    fake_ep = SimpleNamespace(name="my_provider", value="mypkg.llm:FakeHandler")
+    fake_ep.load = lambda: FakeHandler
+
+    monkeypatch.setattr("ai_changelog_msg.ai_provider.litellm.custom_provider_map", [])
+
+    def fake_entry_points(*, group):
+        if group == "ai_changelog.litellm_providers":
+            return [fake_ep]
+        return []
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.entry_points",
+        fake_entry_points,
+        raising=False,
+    )
+
+    AIProvider(Config())
+    AIProvider(Config())
+
+    count = sum(
+        1
+        for entry in ai_provider.litellm.custom_provider_map
+        if entry.get("provider") == "my_provider"
+    )
+    assert count == 1
+
+
+def test_load_custom_providers_warns_on_load_failure(monkeypatch, caplog):
+    """A broken entry point must log a warning and not raise."""
+
+    fake_ep = SimpleNamespace(name="bad_provider", value="badpkg.llm:Bad")
+    fake_ep.load = lambda: (_ for _ in ()).throw(ImportError("missing dep"))
+
+    monkeypatch.setattr("ai_changelog_msg.ai_provider.litellm.custom_provider_map", [])
+
+    def fake_entry_points(*, group):
+        if group == "ai_changelog.litellm_providers":
+            return [fake_ep]
+        return []
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.entry_points",
+        fake_entry_points,
+        raising=False,
+    )
+
+    with caplog.at_level(logging.WARNING, logger="ai_changelog_msg.ai_provider"):
+        AIProvider(Config())  # must not raise
+
+    assert any("bad_provider" in r.getMessage() for r in caplog.records)
+
+
+def test_load_custom_providers_skips_when_no_entry_points(monkeypatch):
+    """No custom_provider_map mutation when no providers are registered."""
+
+    monkeypatch.setattr("ai_changelog_msg.ai_provider.litellm.custom_provider_map", [])
+
+    def fake_entry_points(*, group):
+        return []
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.entry_points",
+        fake_entry_points,
+        raising=False,
+    )
+
+    AIProvider(Config())
+
+    assert ai_provider.litellm.custom_provider_map == []
+
+
 def test_summarize_diff_sends_correct_completion_params(monkeypatch):
     """Verify max_tokens, temperature, role key, and system prompt content."""
     captured = {}

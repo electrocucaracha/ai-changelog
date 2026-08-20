@@ -23,6 +23,7 @@ import os
 import re
 import time
 from dataclasses import dataclass, field
+from importlib.metadata import entry_points
 from json import JSONDecodeError
 from threading import Lock
 from typing import TYPE_CHECKING, Any
@@ -158,6 +159,7 @@ class AIProvider:
         logging.getLogger("LiteLLM").setLevel(logging.WARNING)  # pragma: no mutate
         logging.getLogger("litellm").setLevel(logging.WARNING)  # pragma: no mutate
         self._enable_headroom_compression_if_requested()
+        self._load_custom_providers()
         # Keep retries in application code so this tool does not depend on
         # optional LiteLLM tenacity extras at runtime.
         litellm.num_retries = 0
@@ -208,6 +210,66 @@ class AIProvider:
         logger.info(
             "Headroom compression enabled for LiteLLM requests"
         )  # pragma: no mutate
+
+    def _load_custom_providers(self) -> None:
+        """Discover and register LiteLLM custom providers via entry points.
+
+        Any installed package that declares an entry point under the
+        ``ai_changelog.litellm_providers`` group is loaded and registered
+        with :attr:`litellm.custom_provider_map`. Registration is idempotent:
+        a provider whose name is already present in the map is skipped.
+
+        Failures to load an individual entry point are logged as warnings and
+        do not abort initialisation so that a broken optional plugin does not
+        prevent the tool from running.
+
+        Third-party packages register a provider by adding to their
+        ``pyproject.toml``::
+
+            [project.entry-points."ai_changelog.litellm_providers"]
+            my_provider = "mypackage.llm:Handler"
+
+        The registered handler is then selected via the model string::
+
+            ai-changelog /repo --model my_provider/model-name
+        """
+        eps = entry_points(group="ai_changelog.litellm_providers")
+        if not eps:
+            return
+
+        if not isinstance(getattr(litellm, "custom_provider_map", None), list):
+            litellm.custom_provider_map = []  # pragma: no mutate
+
+        existing_providers = {
+            entry["provider"]
+            for entry in litellm.custom_provider_map
+            if isinstance(entry, dict) and "provider" in entry
+        }
+
+        for ep in eps:
+            if ep.name in existing_providers:
+                logger.debug(
+                    "LiteLLM custom provider '%s' already registered; skipping",
+                    ep.name,
+                )  # pragma: no mutate
+                continue
+            try:
+                handler_cls = ep.load()
+                litellm.custom_provider_map.append(
+                    {"provider": ep.name, "custom_handler": handler_cls()}
+                )
+                logger.info(
+                    "Registered LiteLLM custom provider '%s' from '%s'",
+                    ep.name,
+                    ep.value,
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Failed to load LiteLLM custom provider '%s' from '%s': %s",
+                    ep.name,
+                    ep.value,
+                    exc,
+                )  # pragma: no mutate
 
     def _completion_with_ollama_auto_pull(
         self,

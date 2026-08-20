@@ -18,11 +18,11 @@ AI Changelog Generator discovers custom LLM providers through the
 When the tool starts, it looks for all packages installed in the active Python environment
 that register an entry point under the `ai_changelog.litellm_providers` group.
 Each discovered entry point is loaded and registered with LiteLLM's
-[custom provider map](https://docs.litellm.ai/docs/providers/custom_provider)
+[custom provider map](https://docs.litellm.ai/docs/providers/custom_llm_server)
 before the first model call.
 
 This means your provider handler lives entirely in your own package.
-No Walmart-specific code, no gateway-specific code, and no credential material
+No project-specific code, no gateway-specific code, and no credential material
 ever needs to touch the upstream repository.
 
 ## Prerequisites
@@ -52,7 +52,7 @@ class Handler(CustomLLM):
 ```
 
 Refer to the
-[LiteLLM custom provider documentation](https://docs.litellm.ai/docs/providers/custom_provider)
+[LiteLLM custom provider documentation](https://docs.litellm.ai/docs/providers/custom_llm_server)
 for the full interface, including async and streaming support.
 
 ### 2. Register the entry point

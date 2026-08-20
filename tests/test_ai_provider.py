@@ -35,6 +35,29 @@ def _make_response(content: str) -> SimpleNamespace:
     )
 
 
+def _configure_custom_provider_entry_point(
+    monkeypatch: pytest.MonkeyPatch,
+    name: str,
+    loader: Callable[[], object],
+) -> None:
+    """Patch LiteLLM and importlib metadata with one custom provider."""
+    fake_ep = SimpleNamespace(name=name, value="mypkg.llm:FakeHandler")
+    fake_ep.load = loader
+
+    monkeypatch.setattr("ai_changelog_msg.ai_provider.litellm.custom_provider_map", [])
+
+    def fake_entry_points(*, group):
+        if group == "ai_changelog.litellm_providers":
+            return [fake_ep]
+        return []
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.entry_points",
+        fake_entry_points,
+        raising=False,
+    )
+
+
 class _SuccessfulOllamaPullResponse:
     """HTTP response stub for successful Ollama model pull requests."""
 
@@ -742,20 +765,8 @@ def test_load_custom_providers_registers_discovered_provider(monkeypatch, caplog
     class FakeHandler:
         pass
 
-    fake_ep = SimpleNamespace(name="my_provider", value="mypkg.llm:FakeHandler")
-    fake_ep.load = lambda: FakeHandler
-
-    monkeypatch.setattr("ai_changelog_msg.ai_provider.litellm.custom_provider_map", [])
-
-    def fake_entry_points(*, group):
-        if group == "ai_changelog.litellm_providers":
-            return [fake_ep]
-        return []
-
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.entry_points",
-        fake_entry_points,
-        raising=False,
+    _configure_custom_provider_entry_point(
+        monkeypatch, "my_provider", lambda: FakeHandler
     )
 
     with caplog.at_level(logging.INFO, logger="ai_changelog_msg.ai_provider"):
@@ -767,33 +778,23 @@ def test_load_custom_providers_registers_discovered_provider(monkeypatch, caplog
         and isinstance(entry["custom_handler"], FakeHandler)
         for entry in registered
     )
-    assert any("my_provider" in r.getMessage() for r in caplog.records)
-
-
-def test_load_custom_providers_is_idempotent(monkeypatch):
-    """Calling AIProvider() twice must not register the same provider twice."""
-
-    class FakeHandler:
-        pass
-
-    fake_ep = SimpleNamespace(name="my_provider", value="mypkg.llm:FakeHandler")
-    fake_ep.load = lambda: FakeHandler
-
-    monkeypatch.setattr("ai_changelog_msg.ai_provider.litellm.custom_provider_map", [])
-
-    def fake_entry_points(*, group):
-        if group == "ai_changelog.litellm_providers":
-            return [fake_ep]
-        return []
-
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.entry_points",
-        fake_entry_points,
-        raising=False,
+    assert any(
+        record.getMessage() == "Registered LiteLLM custom provider 'my_provider' from "
+        "'mypkg.llm:FakeHandler'"
+        for record in caplog.records
     )
 
-    AIProvider(Config())
-    AIProvider(Config())
+
+def test_load_custom_providers_is_idempotent(monkeypatch, caplog):
+    """Calling AIProvider() twice must not register the same provider twice."""
+
+    _configure_custom_provider_entry_point(
+        monkeypatch, "my_provider", lambda: type("FakeHandler", (), {})
+    )
+
+    with caplog.at_level(logging.DEBUG, logger="ai_changelog_msg.ai_provider"):
+        AIProvider(Config())
+        AIProvider(Config())
 
     count = sum(
         1
@@ -801,31 +802,65 @@ def test_load_custom_providers_is_idempotent(monkeypatch):
         if entry.get("provider") == "my_provider"
     )
     assert count == 1
+    assert any(
+        record.getMessage()
+        == "LiteLLM custom provider 'my_provider' already registered; skipping"
+        for record in caplog.records
+    )
+
+
+def test_load_custom_providers_processes_entries_after_existing_provider(
+    monkeypatch,
+):
+    """Continue discovering providers after skipping a duplicate entry point."""
+
+    class FakeHandler:
+        pass
+
+    duplicate_ep = SimpleNamespace(name="my_provider", value="mypkg.llm:FakeHandler")
+    duplicate_ep.load = lambda: FakeHandler
+    new_ep = SimpleNamespace(name="new_provider", value="mypkg.llm:FakeHandler")
+    new_ep.load = lambda: FakeHandler
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.litellm.custom_provider_map",
+        [
+            object(),
+            {"provider": "my_provider", "custom_handler": FakeHandler()},
+        ],
+    )
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.entry_points",
+        lambda *, group: [duplicate_ep, new_ep],
+        raising=False,
+    )
+
+    AIProvider(Config())
+
+    assert any(
+        isinstance(entry, dict) and entry.get("provider") == "new_provider"
+        for entry in ai_provider.litellm.custom_provider_map
+    )
 
 
 def test_load_custom_providers_warns_on_load_failure(monkeypatch, caplog):
     """A broken entry point must log a warning and not raise."""
 
-    fake_ep = SimpleNamespace(name="bad_provider", value="badpkg.llm:Bad")
-    fake_ep.load = lambda: (_ for _ in ()).throw(ImportError("missing dep"))
+    def fail_to_load():
+        """Raise the optional dependency error simulated by this test."""
+        raise ImportError("missing dep")
 
-    monkeypatch.setattr("ai_changelog_msg.ai_provider.litellm.custom_provider_map", [])
-
-    def fake_entry_points(*, group):
-        if group == "ai_changelog.litellm_providers":
-            return [fake_ep]
-        return []
-
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.entry_points",
-        fake_entry_points,
-        raising=False,
-    )
+    _configure_custom_provider_entry_point(monkeypatch, "bad_provider", fail_to_load)
 
     with caplog.at_level(logging.WARNING, logger="ai_changelog_msg.ai_provider"):
         AIProvider(Config())  # must not raise
 
-    assert any("bad_provider" in r.getMessage() for r in caplog.records)
+    assert any(
+        record.getMessage()
+        == "Failed to load LiteLLM custom provider 'bad_provider' from "
+        "'mypkg.llm:FakeHandler': missing dep"
+        for record in caplog.records
+    )
 
 
 def test_load_custom_providers_skips_when_no_entry_points(monkeypatch):

@@ -12,6 +12,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [8.11.0] - 2026-08-21
+
+### Added
+
+- Simplified the changelog to only include the latest three entries before release, reducing the size of release artifacts and improving readability. [bc26321c](https://github.com/electrocucaracha/ai-changelog/commit/bc26321c3e8bf12781e92f03293603cd87284037)
+
+## [8.10.0] - 2026-08-21
+
+### Added
+
+- Enabled comprehensive and accurate release notes for versions 7.5.0 through 8.3.2, providing a detailed history of recent changes, optimizations, and documentation improvements, and enhancing transparency and onboarding for users. [6c5a62de](https://github.com/electrocucaracha/ai-changelog/commit/6c5a62de3007579b7c77193916e35b0655c062a0)
+
+## [8.9.2] - 2026-08-21
+
+### Changed
+
+- Upgraded multiple dependencies to their latest versions, ensuring continued compatibility with upstream packages and incorporating recent bugfixes. [f475693c](https://github.com/electrocucaracha/ai-changelog/commit/f475693c0c187ef6e42f88aa883c2bbb77590367)
+
+## [8.9.1] - 2026-08-21
+
+### Changed
+
+- Updated the CI environment to ensure compatibility with newer dependencies and language features by raising the Go version in linter and update workflows from 1.26 to 1.27 and updating the uv GitHub Action to v10.0.1. [74d74d60](https://github.com/electrocucaracha/ai-changelog/commit/74d74d601735a185bd80e1312243dcc6d8e066ee)
+
+## [8.9.0] - 2026-08-21
+
+### Added
+
+- Enabled write permission for workflows in the release workflow, allowing it to modify or trigger other workflows as needed during automated releases and updates to workflow files. [2e249701](https://github.com/electrocucaracha/ai-changelog/commit/2e2497016bc959b2fac80bc06c1b02af3a393606)
+
+## [8.8.1] - 2026-08-21
+
+### Changed
+
+- Optimized the changelog generation workflow to run locally using the ollama-action and a cached Llama 3.1 8B model, reducing reliance on external APIs and improving reproducibility. [60e2bdaa](https://github.com/electrocucaracha/ai-changelog/commit/60e2bdaa5e01a635d39d984a31687af89b9f18d1)
+
+## [8.8.0] - 2026-08-21
+
+### Added
+
+- Automated release notes are now generated for each version, streamlining the release process and ensuring consistent, informative release notes. [dd215b4b](https://github.com/electrocucaracha/ai-changelog/commit/dd215b4b00ef134841edc4a9f8d22b6258b46815)
+
 ## [8.7.1] - 2026-08-21
 
 ### Fixed

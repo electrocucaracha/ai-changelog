@@ -1,0 +1,1 @@
+{"category": "Changed", "changelog_entry": "Standardized GitHub link capitalization for improved professionalism and clarity.", "summary": "The changelog style was standardized to use consistent capitalization for GitHub links and markdownlint disables were added to align with project documentation style.", "version": 1}

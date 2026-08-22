@@ -21,12 +21,17 @@ jobs:
           fetch-depth: 0
       - run: git fetch origin refs/notes/ai-changelog:refs/notes/ai-changelog || true
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: ai-action/ollama-action@0b0ba51b122d9259d4f0a0118932f6bb719c1006 # v2.0.1
+        with:
+          model: llama3.1:8b
+          prompt: Hi
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.ollama
+          key: ${{ runner.os }}-ollama
       - name: Generate CHANGELOG.md
-        env:
-          CHANGELOG_MODEL: github/Llama3-70b-8192
-          GITHUB_API_KEY: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          uvx --from git+https://github.com/electrocucaracha/ai-changelog.git ai-changelog --create-semver-tags .
+          uvx --from git+https://github.com/electrocucaracha/ai-changelog.git ai-changelog --create-semver-tags --model ollama/llama3.1:8b .
           make fmt
       - name: Commit and push changelog
         uses: actions-js/push@968f4695ca558093eadb24ad83cc5891f47e0cdc # v1.6

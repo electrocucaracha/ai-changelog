@@ -19,21 +19,28 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Configure Git identity
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
       - run: git fetch origin refs/notes/ai-changelog:refs/notes/ai-changelog || true
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: false
       - uses: ai-action/setup-ollama@3f581ee292df757e21de2bcb3b573bd8a44f198d # v2.0.71
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.ollama
-          key: ${{ runner.os }}-ollama
+          key: ${{ runner.os }}-ollama-${{ github.repository }}
       - name: Generate CHANGELOG.md
         run: |
           uvx --from git+https://github.com/electrocucaracha/ai-changelog.git ai-changelog --create-semver-tags .
           make fmt
+      - name: Configure Git authentication
+        run: git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Commit and push changelog
         uses: actions-js/push@968f4695ca558093eadb24ad83cc5891f47e0cdc # v1.6
         continue-on-error: true

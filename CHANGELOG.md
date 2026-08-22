@@ -12,6 +12,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [8.3.2] - 2026-08-21
+
+### Changed
+
+- Optimized GitHub Actions workflows to properly attribute commits with standard bot identity and improved changelog generation performance for larger repositories. [c4813bfb](https://github.com/electrocucaracha/ai-changelog/commit/c4813bfbb31804fd723a1d4ab826745c435ff372)
+
+## [8.3.1] - 2026-08-21
+
+### Changed
+
+- Optimized the changelog generation workflow to use a local Llama 3.1 8B model, reducing reliance on external APIs and improving reproducibility, and enabling faster download times through the addition of a cache step. [60e2bdaa](https://github.com/electrocucaracha/ai-changelog/commit/60e2bdaa5e01a635d39d984a31687af89b9f18d1)
+
+## [8.3.0] - 2026-08-21
+
+### Added
+
+- Automated release processing is now enabled with AI-generated changelogs, streamlining the release process and ensuring consistent, informative release notes for each version. [dd215b4b](https://github.com/electrocucaracha/ai-changelog/commit/dd215b4b00ef134841edc4a9f8d22b6258b46815)
+
+## [8.2.1] - 2026-08-21
+
+### Changed
+
+- Updated dependencies to incorporate bugfixes and compatibility improvements, enabling new commit message preparation features and maintaining compatibility with upstream tools. [81f82a15](https://github.com/electrocucaracha/ai-changelog/commit/81f82a15b2e169575637a41979807305d461fef0)
+
+## [8.2.0] - 2026-08-21
+
+### Added
+
+- Enabled project sponsorship links, allowing users to support ongoing development via GitHub Sponsors and Buy Me a Coffee without affecting application functionality. [7b2df1c1](https://github.com/electrocucaracha/ai-changelog/commit/7b2df1c1ffef3fac6d447ddde9bc9833d70c33e3)
+
+## [8.1.2] - 2026-08-20
+
+### Changed
+
+- The link to the how-it-works explanation in the custom providers guide was updated to point directly to the correct location, ensuring readers can access the explanation without confusion. [14296766](https://github.com/electrocucaracha/ai-changelog/commit/142967667ab2b7f615ad7f0da5369efba71481f7)
+
+## [8.1.1] - 2026-08-20
+
+### Changed
+
+- Refactored custom provider entry point setup to improve test maintainability and reduce duplication, and updated documentation and test URLs to use generic project examples. [3c87c798](https://github.com/electrocucaracha/ai-changelog/commit/3c87c798f81b022883507f4e96dd3afb76dd1d25)
+
+## [8.1.0] - 2026-08-19
+
+### Added
+
+- Enabled users to add custom LLM providers without modifying the upstream project by introducing a plugin system for discovering and registering custom providers via Python entry points. [1e6ddf1d](https://github.com/electrocucaracha/ai-changelog/commit/1e6ddf1d52b1bf87a2acaf3040b1315a398febab)
+
+## [8.0.2] - 2026-08-15
+
+### Changed
+
+- Documentation pages now use YAML front matter to define titles, navigation order, and parent-child relationships, enabling richer navigation menus and consistent page metadata. [135d50c8](https://github.com/electrocucaracha/ai-changelog/commit/135d50c8e9ed92cf5f69edcff20756a164b70cbb)
+
+## [8.0.1] - 2026-08-15
+
+### Changed
+
+- Clarified the tool's value proposition and system architecture, providing new users with a clearer understanding of how the tool works and its benefits, thereby improving onboarding. [a896e39c](https://github.com/electrocucaracha/ai-changelog/commit/a896e39c6e22c1b8a12a3ab0ac7b1fde999a0f7f)
+
+## [8.0.0] - 2026-08-13
+
+### Removed
+
+- Simplified the codebase by inlining trivial helpers and removing redundant tests, resulting in improved maintainability without loss of coverage or functional changes to CLI behavior or output. [3fa8bee6](https://github.com/electrocucaracha/ai-changelog/commit/3fa8bee6bb9807fdc0769dd1581f0e1d0cd57fda)
+
+## [7.5.0] - 2026-08-12
+
+### Added
+
+- Enabled detailed changelog entries for releases 7.1.0 to 7.4.3, providing a clear and comprehensive history of recent changes that makes it easier for users and contributors to track project evolution. [2482cbf5](https://github.com/electrocucaracha/ai-changelog/commit/2482cbf5564880c1350a725bb60493de57d8d7fb)
+
 ## [7.4.3] - 2026-08-12
 
 ### Fixed

@@ -1,0 +1,52 @@
+# SPDX-license-identifier: Apache-2.0
+##############################################################################
+# Copyright (c) 2026
+# All rights reserved. This program and the accompanying materials
+# are made available under the terms of the Apache License, Version 2.0
+# which accompanies this distribution, and is available at
+# http://www.apache.org/licenses/LICENSE-2.0
+##############################################################################
+name: Release with AI Changelog
+# yamllint disable-line rule:truthy
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - run: git fetch origin refs/notes/ai-changelog:refs/notes/ai-changelog || true
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - name: Generate CHANGELOG.md
+        env:
+          CHANGELOG_MODEL: github/Llama3-70b-8192
+          GITHUB_API_KEY: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          uvx --from git+https://github.com/electrocucaracha/ai-changelog.git ai-changelog --create-semver-tags .
+          make fmt
+      - name: Commit and push changelog
+        uses: actions-js/push@968f4695ca558093eadb24ad83cc5891f47e0cdc # v1.6
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.head_ref || github.ref_name }}
+          message: "docs(changelog): update release notes"
+          tags: true
+      - name: Push notes and tags
+        run: git push origin refs/notes/ai-changelog || true
+      - name: Resolve latest semantic tag
+        id: release_tag
+        run: |
+          TAG="$(git tag --sort=-v:refname | head -n 1)"
+          if [ -z "$TAG" ]; then
+              echo "No semantic version tag found after changelog generation"
+              exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+      - uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          tag_name: ${{ steps.release_tag.outputs.tag }}
+          body_path: CHANGELOG.md

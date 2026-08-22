@@ -12,6 +12,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+  workflows: write
 jobs:
   release:
     runs-on: ubuntu-latest

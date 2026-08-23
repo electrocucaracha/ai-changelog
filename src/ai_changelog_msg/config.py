@@ -299,7 +299,8 @@ class Config:
                 "litellm_api_key", litellm_api_key
             ),  # pragma: no mutate
             litellm_extra_headers=overrides.get(
-                "litellm_extra_headers", litellm_extra_headers  # pragma: no mutate
+                "litellm_extra_headers",
+                litellm_extra_headers,  # pragma: no mutate
             ),
             enable_headroom=overrides.get(
                 "enable_headroom",

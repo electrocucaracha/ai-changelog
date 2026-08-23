@@ -317,7 +317,9 @@ def test_pull_ollama_model_uses_post_request_and_utf8_replace(caplog, monkeypatc
     assert request.get_method() == "POST"
     assert request.data is not None
     assert request.headers["Content-type"] == "application/json"
-    assert captured["timeout"] == provider.config.api_timeout
+    assert captured["timeout"] == max(
+        provider.config.api_timeout, ai_provider.OLLAMA_PULL_TIMEOUT_SECONDS
+    )
     assert any(
         record.getMessage()
         == f"Ollama model '{OLLAMA_MODEL_NAME}' not available locally; pulling"
@@ -1294,3 +1296,101 @@ def test_pull_ollama_model_raises_runtime_error_for_url_error(monkeypatch):
 
     with pytest.raises(RuntimeError, match="Ollama API is not reachable"):
         provider._pull_ollama_model()
+
+
+def _make_bare_ollama_provider(model: str = "ollama/llama3.1") -> AIProvider:
+    """Build an AIProvider without running __init__ side effects."""
+    config = Config(model=model)
+    provider = AIProvider.__new__(AIProvider)
+    provider.model = config.model
+    provider.config = config
+    return provider
+
+
+def _patch_tags_response(monkeypatch: pytest.MonkeyPatch, body: bytes) -> None:
+    """Patch urlopen so the Ollama /api/tags call returns *body*."""
+
+    class _Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return body
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.urllib_request.urlopen",
+        lambda request, timeout: _Response(),
+    )
+
+
+def test_ensure_ready_skips_non_ollama_models(monkeypatch):
+    def _fail_urlopen(*args, **kwargs):
+        raise AssertionError("Ollama API must not be contacted for other providers")
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.urllib_request.urlopen", _fail_urlopen
+    )
+
+    provider = _make_bare_ollama_provider(model="openai/gpt-4o-mini")
+
+    provider.ensure_ready()
+
+
+def test_ensure_ready_accepts_implicit_latest_tag(monkeypatch):
+    _patch_tags_response(monkeypatch, b'{"models":[{"name":"llama3.1:latest"}]}')
+
+    provider = _make_bare_ollama_provider()
+    pulled = {"count": 0}
+    monkeypatch.setattr(
+        provider,
+        "_pull_ollama_model",
+        lambda: pulled.__setitem__("count", pulled["count"] + 1),
+    )
+
+    provider.ensure_ready()
+
+    assert pulled["count"] == 0
+
+
+def test_ensure_ready_pulls_missing_model_once(monkeypatch):
+    _patch_tags_response(monkeypatch, b'{"models":[{"name":"qwen2.5:latest"}]}')
+
+    provider = _make_bare_ollama_provider()
+    pulled = {"count": 0}
+    monkeypatch.setattr(
+        provider,
+        "_pull_ollama_model",
+        lambda: pulled.__setitem__("count", pulled["count"] + 1),
+    )
+
+    provider.ensure_ready()
+
+    assert pulled["count"] == 1
+
+
+def test_ensure_ready_raises_when_ollama_unreachable(monkeypatch):
+    from urllib import error as urllib_error
+
+    def _fail_urlopen(*args, **kwargs):
+        raise urllib_error.URLError("connection refused")
+
+    monkeypatch.setattr(
+        "ai_changelog_msg.ai_provider.urllib_request.urlopen", _fail_urlopen
+    )
+
+    provider = _make_bare_ollama_provider()
+
+    with pytest.raises(RuntimeError, match="Ollama API is not reachable"):
+        provider.ensure_ready()
+
+
+def test_ensure_ready_raises_on_malformed_tags_payload(monkeypatch):
+    _patch_tags_response(monkeypatch, b"not-json")
+
+    provider = _make_bare_ollama_provider()
+
+    with pytest.raises(RuntimeError, match="Unexpected response from Ollama API"):
+        provider.ensure_ready()

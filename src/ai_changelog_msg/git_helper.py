@@ -81,12 +81,14 @@ class GitRepository:
             when the git command fails.
         """
         logger.debug(
-            "Fetching diff for commit %s", commit.hexsha[:8]  # pragma: no mutate
+            "Fetching diff for commit %s",
+            commit.hexsha[:8],  # pragma: no mutate
         )
         try:
             if commit.parents:
                 diff_output = self.repo.git.diff(
-                    commit.parents[0].hexsha, commit.hexsha  # pragma: no mutate
+                    commit.parents[0].hexsha,
+                    commit.hexsha,  # pragma: no mutate
                 )
             else:
                 diff_output = self.repo.git.show(commit.hexsha)  # pragma: no mutate
@@ -182,7 +184,8 @@ class GitRepository:
 
             self.repo.git.update_ref("-d", ref_name)
             logger.info(
-                "Deleted git notes namespace '%s'", namespace  # pragma: no mutate
+                "Deleted git notes namespace '%s'",
+                namespace,  # pragma: no mutate
             )
             return True
         except GitCommandError as error:
@@ -234,13 +237,16 @@ class GitRepository:
         try:
             if any(tag.name == tag_name for tag in self.repo.tags):
                 logger.debug(
-                    "Tag '%s' already exists; skipping", tag_name  # pragma: no mutate
+                    "Tag '%s' already exists; skipping",
+                    tag_name,  # pragma: no mutate
                 )
                 return False
 
             self.repo.create_tag(tag_name, ref=commit_hash)
             logger.info(
-                "Created tag '%s' at %s", tag_name, commit_hash[:8]  # pragma: no mutate
+                "Created tag '%s' at %s",
+                tag_name,
+                commit_hash[:8],  # pragma: no mutate
             )
             return True
         except GitCommandError as error:

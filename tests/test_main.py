@@ -145,6 +145,9 @@ def _install_fake_ai_provider(
                 raise AssertionError("summarize_diff should not be called")
             return summary_text
 
+        def ensure_ready(self):
+            return None
+
         def generate_changelog_entry(self, commit_message, note, category, is_breaking):
             if fail_on_generate_entry:
                 raise AssertionError("generate_changelog_entry should not be called")
@@ -351,6 +354,30 @@ def test_cli_prints_auto_selected_worker_count(tmp_path, monkeypatch):
 
     assert result.exit_code == 0
     assert "Using 1 worker(s) (auto-selected from 8 CPU core(s))" in result.output
+
+
+def test_cli_fails_fast_when_provider_is_not_ready(tmp_path, monkeypatch):
+    _setup_single_commit_repo(tmp_path, monkeypatch)
+
+    class UnavailableAIProvider:
+        def __init__(self, config):
+            self.config = config
+            self.token_usage = SimpleNamespace(
+                prompt_tokens=0, completion_tokens=0, total_tokens=0
+            )
+
+        def ensure_ready(self):
+            raise RuntimeError("Ollama API is not reachable")
+
+        def summarize_diff(self, commit_message, diff, author=None):
+            raise AssertionError("summarize_diff must not run when provider is unready")
+
+    monkeypatch.setattr(main, "AIProvider", UnavailableAIProvider)
+
+    result = _invoke_cli(tmp_path, [])
+
+    assert result.exit_code != 0
+    assert "AI provider is not ready: Ollama API is not reachable" in result.output
 
 
 def test_cli_prints_explicit_worker_count(tmp_path, monkeypatch):
@@ -948,6 +975,9 @@ def test_cli_skips_existing_notes_and_writes_changelog(tmp_path, monkeypatch):
         def summarize_diff(self, commit_message, diff, author=None):
             return f"Added summary for {commit_message.split(':', 1)[0]}."
 
+        def ensure_ready(self):
+            return None
+
         def generate_changelog_entry(self, commit_message, note, category, is_breaking):
             return note.splitlines()[0] if note else commit_message
 
@@ -1450,12 +1480,7 @@ def test_normalize_release_sections_includes_prefix_when_sections_exist():
     'if normalized_prefix or rebuilt_sections'. With 'or', a non-empty prefix
     but empty sections would still try to join them, producing incorrect output.
     """
-    text = (
-        "# Changelog\n\n"
-        "Some introductory paragraph.\n\n"
-        "## [Unreleased]\n\n"
-        "- Entry\n"
-    )
+    text = "# Changelog\n\nSome introductory paragraph.\n\n## [Unreleased]\n\n- Entry\n"
 
     result = main._normalize_release_sections(text)
 

@@ -69,6 +69,9 @@ OLLAMA_MODEL_NOT_FOUND_RE = re.compile(
     r"(?:model\s+['\"]?.+?['\"]?\s+not\s+found|pull\s+the\s+model\s+first)",
     re.IGNORECASE,
 )
+OLLAMA_DEFAULT_BASE_URL = "http://localhost:11434"
+# Pulling multi-gigabyte weights takes far longer than a completion call.
+OLLAMA_PULL_TIMEOUT_SECONDS = 1800
 
 
 def _is_retryable_error(error_str: str) -> bool:
@@ -346,6 +349,81 @@ class AIProvider:
             return False  # pragma: no mutate
         return bool(OLLAMA_MODEL_NOT_FOUND_RE.search(str(error)))
 
+    def _ollama_base_url(self) -> str:
+        """Return the Ollama HTTP API root derived from the configured base."""
+        api_base = self.config.litellm_api_base or OLLAMA_DEFAULT_BASE_URL
+        parsed_base = urllib_parse.urlsplit(api_base)
+        if parsed_base.scheme and parsed_base.netloc:
+            return f"{parsed_base.scheme}://{parsed_base.netloc}"
+        return OLLAMA_DEFAULT_BASE_URL  # pragma: no mutate
+
+    def _list_ollama_models(self) -> set[str]:
+        """Return the model tags currently available on the Ollama server.
+
+        Raises:
+            RuntimeError: If the Ollama API cannot be reached or returns an
+                unexpected response.
+        """
+        request = urllib_request.Request(f"{self._ollama_base_url()}/api/tags")
+        try:
+            with urllib_request.urlopen(
+                request,
+                timeout=self.config.api_timeout,
+            ) as response:
+                body = response.read().decode("utf-8", errors="replace")
+        except (urllib_error.URLError, OSError) as error:
+            raise RuntimeError(
+                "Ollama API is not reachable; ensure Ollama is running and accessible"
+            ) from error
+
+        try:
+            payload_data = json.loads(body)
+            models = payload_data["models"]
+        except (JSONDecodeError, TypeError, KeyError) as error:
+            raise RuntimeError(
+                "Unexpected response from Ollama API while listing models"
+            ) from error
+
+        return {
+            str(entry["name"])
+            for entry in models
+            if isinstance(entry, dict) and entry.get("name")
+        }
+
+    def ensure_ready(self) -> None:
+        """Validate that the configured provider is usable before processing.
+
+        For Ollama models this verifies the server is reachable and pulls the
+        requested model once when it is missing, so concurrent workers never
+        race on the same download. Other providers are validated lazily by
+        their first completion call.
+
+        Raises:
+            RuntimeError: If the provider is unreachable or the model cannot
+                be made available.
+        """
+        if not self.model.startswith("ollama/"):
+            return
+
+        model_name = self.model.removeprefix("ollama/")  # pragma: no mutate
+        available = self._list_ollama_models()
+        logger.debug(
+            "Ollama models available locally: %s", sorted(available)
+        )  # pragma: no mutate
+
+        # Ollama reports untagged models with an implicit ':latest' tag.
+        candidates = {model_name}
+        if ":" not in model_name:
+            candidates.add(f"{model_name}:latest")
+
+        if candidates & available:
+            logger.info(
+                "Ollama model '%s' is available locally", model_name
+            )  # pragma: no mutate
+            return
+
+        self._pull_ollama_model()
+
     def _pull_ollama_model(self) -> None:
         """Pull the configured Ollama model through the Ollama HTTP API.
 
@@ -357,12 +435,7 @@ class AIProvider:
             "Ollama model '%s' not available locally; pulling", model_name
         )  # pragma: no mutate
 
-        api_base = self.config.litellm_api_base or "http://localhost:11434"
-        parsed_base = urllib_parse.urlsplit(api_base)
-        if parsed_base.scheme and parsed_base.netloc:
-            pull_base = f"{parsed_base.scheme}://{parsed_base.netloc}"
-        else:
-            pull_base = "http://localhost:11434"  # pragma: no mutate
+        pull_base = self._ollama_base_url()
 
         payload = json.dumps({"name": model_name, "stream": False}).encode(
             "utf-8"  # pragma: no mutate
@@ -376,10 +449,11 @@ class AIProvider:
         try:
             with urllib_request.urlopen(
                 request,
-                timeout=self.config.api_timeout,
+                timeout=max(self.config.api_timeout, OLLAMA_PULL_TIMEOUT_SECONDS),
             ) as response:
                 body = response.read().decode(  # pragma: no mutate
-                    "utf-8", errors="replace"  # pragma: no mutate
+                    "utf-8",
+                    errors="replace",  # pragma: no mutate
                 )
         except urllib_error.HTTPError as error:
             details = error.read().decode(  # pragma: no mutate

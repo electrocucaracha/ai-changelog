@@ -1233,7 +1233,7 @@ def test_count_diff_lines_excludes_hunk_header_lines():
     """
     from ai_changelog_msg.changelog import count_diff_lines
 
-    diff = "@@ -1,3 +1,3 @@\n" "-old line\n" "+new line\n" " context line\n"
+    diff = "@@ -1,3 +1,3 @@\n-old line\n+new line\n context line\n"
 
     added, removed = count_diff_lines(diff)
 

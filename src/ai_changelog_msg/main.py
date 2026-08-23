@@ -942,6 +942,13 @@ def cli(
         else:
             if ai_provider is None:
                 ai_provider = AIProvider(config)
+            click.echo("Validating AI provider readiness")
+            try:
+                ai_provider.ensure_ready()
+            except RuntimeError as exc:
+                logger.error("AI provider is not ready: %s", exc)
+                raise click.ClickException(f"AI provider is not ready: {exc}") from exc
+            click.echo("AI provider ready")
             with click.progressbar(
                 length=overall_total,
                 label="Overall progress",

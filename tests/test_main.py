@@ -1112,6 +1112,44 @@ def test_generate_summary_for_commit_handles_missing_author():
     assert captured["author"] is None
 
 
+def test_generate_summary_for_commit_generates_changelog_entry():
+    """Generated entries receive the commit context and are returned."""
+    captured = {}
+
+    class FakeProvider:
+        def summarize_diff(self, commit_message, diff, author=None):
+            return "Summary."
+
+        def generate_changelog_entry(self, commit_message, note, category, is_breaking):
+            captured.update(
+                commit_message=commit_message,
+                note=note,
+                category=category,
+                is_breaking=is_breaking,
+            )
+            return "Generated entry."
+
+    prepared = main._PreparedCommit(
+        commit=SimpleNamespace(hexsha="abc123", author=SimpleNamespace(name="Carol")),
+        commit_message="feat!: something",
+        category="Added",
+        existing_note=None,
+        diff="+line",
+    )
+
+    result = main._generate_summary_for_commit(
+        cast(main.AIProvider, FakeProvider()), prepared
+    )
+
+    assert result.changelog_entry == "Generated entry."
+    assert captured == {
+        "commit_message": "feat!: something",
+        "note": "Summary.",
+        "category": "Added",
+        "is_breaking": True,
+    }
+
+
 def test_generate_summaries_concurrently_returns_empty_dict_for_no_commits():
     """Empty input must produce an empty result without errors."""
 
@@ -1183,6 +1221,38 @@ def test_generate_summaries_concurrently_renders_final_worker_totals(monkeypatch
     )
     assert any(
         "Worker  2: [####################] 1/1" in chunk for chunk in output_chunks
+    )
+
+
+def test_generate_summaries_concurrently_preserves_result_callback_value():
+    """The result map must retain each completed summary result."""
+    prepared = [_build_prepared_commit("hash0", "X", "feat: x", "+x")]
+
+    results = main._generate_summaries_concurrently(
+        cast(main.AIProvider, _FastProvider()), prepared, workers=1
+    )
+
+    assert results["hash0"].summary == "ok"
+
+
+def test_generate_summaries_concurrently_renders_empty_single_worker_progress(
+    monkeypatch,
+):
+    """A single worker starts with an empty, not full, progress bar."""
+    output_chunks: list[str] = []
+    monkeypatch.setattr(main.sys.stdout, "isatty", lambda: False)
+    monkeypatch.setattr(
+        main.click, "echo", lambda text="", nl=True: output_chunks.append(text)
+    )
+
+    main._generate_summaries_concurrently(
+        cast(main.AIProvider, _FastProvider()),
+        [_build_prepared_commit("hash0", "X", "feat: x", "+x")],
+        workers=1,
+    )
+
+    assert any(
+        "Worker  1: [--------------------] 0/1" in chunk for chunk in output_chunks
     )
 
 

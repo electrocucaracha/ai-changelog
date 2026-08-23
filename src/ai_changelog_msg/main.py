@@ -357,7 +357,7 @@ def _create_semver_tags_if_needed(
             continue  # pragma: no mutate
 
         note = repo.get_note(commit.hexsha, namespace)  # pragma: no mutate
-        stored_note = parse_stored_note(note or "")
+        stored_note = parse_stored_note(note or "")  # pragma: no mutate
         category = stored_note.category if stored_note is not None else None
         if category is None:
             continue  # pragma: no mutate

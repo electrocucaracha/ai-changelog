@@ -24,8 +24,8 @@ import pytest
 from click.testing import CliRunner
 from git import Repo
 
-from ai_changelog_msg.git_helper import GitRepository
-from ai_changelog_msg.main import cli
+from ai_changelog.git_helper import GitRepository
+from ai_changelog.main import cli
 
 pytestmark = pytest.mark.integration
 

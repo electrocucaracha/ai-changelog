@@ -12,7 +12,7 @@ from typing import cast
 
 from click.testing import CliRunner
 
-from ai_changelog_msg import main
+from ai_changelog import main
 
 
 class DummyRepo:

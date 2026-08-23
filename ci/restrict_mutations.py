@@ -17,7 +17,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--module",
         required=True,
-        help="Module name under src/ai_changelog_msg (without .py).",
+        help="Module name under src/ai_changelog (without .py).",
     )
     parser.add_argument(
         "--pyproject",
@@ -52,7 +52,7 @@ def update_mutmut_target(pyproject_path: Path, module: str) -> str:
     if not pyproject_path.exists():
         raise FileNotFoundError(f"Could not find {pyproject_path}")
 
-    target_path = f"src/ai_changelog_msg/{module}.py"
+    target_path = f"src/ai_changelog/{module}.py"
     if not Path(target_path).exists():
         raise FileNotFoundError(f"Could not find target module file: {target_path}")
 

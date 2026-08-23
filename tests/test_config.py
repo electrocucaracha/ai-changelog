@@ -15,7 +15,7 @@
 
 import pytest
 
-from ai_changelog_msg.config import Config, _parse_optional_bool
+from ai_changelog.config import Config, _parse_optional_bool
 
 
 class TestConfig:
@@ -43,8 +43,8 @@ class TestConfig:
 
     def test_config_default_model_for_apple_silicon(self, monkeypatch):
         """Test Apple Silicon default model resolver."""
-        monkeypatch.setattr("ai_changelog_msg.config.platform.system", lambda: "Darwin")
-        monkeypatch.setattr("ai_changelog_msg.config.platform.machine", lambda: "arm64")
+        monkeypatch.setattr("ai_changelog.config.platform.system", lambda: "Darwin")
+        monkeypatch.setattr("ai_changelog.config.platform.machine", lambda: "arm64")
 
         assert Config.get_default_model() == "ollama/llama3.1:8b-instruct-q4_K_M"
 
@@ -162,10 +162,8 @@ class TestConfig:
 
     def test_config_get_default_model_for_non_apple(self, monkeypatch):
         """Test non-Apple Silicon default model resolver."""
-        monkeypatch.setattr("ai_changelog_msg.config.platform.system", lambda: "Linux")
-        monkeypatch.setattr(
-            "ai_changelog_msg.config.platform.machine", lambda: "x86_64"
-        )
+        monkeypatch.setattr("ai_changelog.config.platform.system", lambda: "Linux")
+        monkeypatch.setattr("ai_changelog.config.platform.machine", lambda: "x86_64")
 
         assert Config.get_default_model() == "ollama/llama3.1"
 

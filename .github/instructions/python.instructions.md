@@ -19,7 +19,7 @@ Target Python 3.9+ and keep code aligned with this project's `src/` layout, CLI 
 
 ## Project Conventions
 
-- Keep source code under `src/ai_changelog_msg` and tests under `tests`.
+- Keep source code under `src/ai_changelog` and tests under `tests`.
 - Preserve the existing public API and CLI behavior unless the task requires a change.
 - Follow the project's formatting and linting conventions: Black-style formatting, isort-compatible imports, Ruff-clean code, and 88 character line length.
 - Prefer double quotes to match the existing formatter configuration.

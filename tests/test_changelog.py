@@ -16,7 +16,7 @@
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
-from ai_changelog_msg.changelog import (
+from ai_changelog.changelog import (
     ChangelogBuilder,
     ChangelogItem,
     ReleaseSection,
@@ -646,7 +646,7 @@ def test_highest_release_type_major_beats_minor():
             "b", datetime(2026, 1, 2, tzinfo=UTC), "Changed", "major", "", "", True
         ),
     ]
-    from ai_changelog_msg.changelog import highest_release_type
+    from ai_changelog.changelog import highest_release_type
 
     assert highest_release_type(items) == "major"
 
@@ -657,7 +657,7 @@ def test_highest_release_type_returns_lowercase_major():
     Kills x_highest_release_type mutmut_9: priorities key changed from 'major' to 'MAJOR',
     which would cause a KeyError when looking up 'major' release_type.
     """
-    from ai_changelog_msg.changelog import highest_release_type
+    from ai_changelog.changelog import highest_release_type
 
     items = [
         ChangelogItem(
@@ -674,7 +674,7 @@ def test_highest_release_type_skips_none_release_type_items():
     Kills x_highest_release_type mutmut_15: 'continue' changed to 'break'.
     With 'break', encountering a None-typed item after a major item stops processing.
     """
-    from ai_changelog_msg.changelog import highest_release_type
+    from ai_changelog.changelog import highest_release_type
 
     # If 'break' is used, the second item (None) stops processing before patch is considered.
     # But we want to verify 'major' is returned, not None (which would happen if the
@@ -779,7 +779,7 @@ def test_infer_category_breaking_with_exactly_one_removed_line():
     Kills x_infer_category mutmut_35: removed_lines > 0 changed to > 1.
     With > 1, a single removed line would not match the early-return condition.
     """
-    from ai_changelog_msg.changelog import infer_category
+    from ai_changelog.changelog import infer_category
 
     result = infer_category(
         "chore", "update config", is_breaking=True, added_lines=0, removed_lines=1
@@ -792,7 +792,7 @@ def test_infer_category_added_lines_returns_exactly_added():
 
     Kills x_infer_category mutmut_54: return 'Added' changed to return 'added'.
     """
-    from ai_changelog_msg.changelog import infer_category
+    from ai_changelog.changelog import infer_category
 
     result = infer_category(
         None, "some description", is_breaking=False, added_lines=5, removed_lines=0
@@ -1189,7 +1189,7 @@ def test_infer_category_drop_keyword_returns_removed():
 
     Kills x_infer_category mutmut_11: 'drop' changed to 'XXdropXX' in the tuple.
     """
-    from ai_changelog_msg.changelog import infer_category
+    from ai_changelog.changelog import infer_category
 
     result = infer_category(None, "drop Python 2 support", is_breaking=False)
     assert result == "Removed"
@@ -1201,7 +1201,7 @@ def test_infer_category_no_false_positive_for_zero_removed_breaking():
     Kills x_infer_category mutmut_34: removed_lines > 0 changed to >= 0.
     With >= 0, breaking commits with 0 removed lines would be categorized as 'Removed'.
     """
-    from ai_changelog_msg.changelog import infer_category
+    from ai_changelog.changelog import infer_category
 
     result = infer_category(
         "feat", "new feature", is_breaking=True, added_lines=5, removed_lines=0
@@ -1216,7 +1216,7 @@ def test_infer_category_no_false_positive_for_zero_added():
     Kills x_infer_category mutmut_49: added_lines > 0 changed to >= 0.
     With >= 0, any commit would qualify as 'Added' even with no additions.
     """
-    from ai_changelog_msg.changelog import infer_category
+    from ai_changelog.changelog import infer_category
 
     result = infer_category(
         None, "generic change", is_breaking=False, added_lines=0, removed_lines=0
@@ -1231,7 +1231,7 @@ def test_count_diff_lines_excludes_hunk_header_lines():
     Kills x_count_diff_lines mutmut_8: '@@' changed to 'XX@@XX' in startswith check.
     With 'XX@@XX', hunk headers would be counted as removed lines (starting with '@').
     """
-    from ai_changelog_msg.changelog import count_diff_lines
+    from ai_changelog.changelog import count_diff_lines
 
     diff = "@@ -1,3 +1,3 @@\n-old line\n+new line\n context line\n"
 
@@ -1247,7 +1247,7 @@ def test_highest_release_type_patch_only_items_return_patch():
     Kills x_highest_release_type mutmut_13: highest_priority = 0 changed to = 1.
     With initial priority = 1, 'patch' (priority 1) would never exceed it, returning None.
     """
-    from ai_changelog_msg.changelog import highest_release_type
+    from ai_changelog.changelog import highest_release_type
 
     items = [
         ChangelogItem(
@@ -1344,7 +1344,7 @@ def test_count_diff_lines_accumulates_added_count():
     added_lines += 1 changed to added_lines = 1.
     With multiple added lines, += must give count > 1, not exactly 1.
     """
-    from ai_changelog_msg.changelog import count_diff_lines
+    from ai_changelog.changelog import count_diff_lines
 
     diff = """--- a/file.py
 +++ b/file.py
@@ -1369,7 +1369,7 @@ def test_parse_note_metadata_skips_category_line_and_blank():
     When note has no blank line between category and summary, lines[2:] would skip
     the actual first summary line, while lines[1:] would include it.
     """
-    from ai_changelog_msg.changelog import parse_note_metadata
+    from ai_changelog.changelog import parse_note_metadata
 
     # No blank line - just category followed immediately by summary content.
     # lines[0] = "Category: Added"
@@ -1393,7 +1393,7 @@ def test_build_item_added_lines_default_is_zero():
     added_lines = 1 replaces added_lines = 0. When processing zero-added-line diffs,
     the count must remain 0, not start at 1.
     """
-    from ai_changelog_msg.changelog import count_diff_lines
+    from ai_changelog.changelog import count_diff_lines
 
     # Create a change with no added lines, only removed lines.
     diff = """--- a/file.py
@@ -1418,7 +1418,7 @@ def test_build_item_passes_is_breaking_flag_to_infer_category():
     A breaking commit must be classified as Removed, not as another category.
     When is_breaking=None instead of True, the category inference may produce wrong result.
     """
-    from ai_changelog_msg.changelog import ChangelogBuilder
+    from ai_changelog.changelog import ChangelogBuilder
 
     commit = type(
         "Commit",
@@ -1571,7 +1571,7 @@ def test_changelog_item_summary_prepends_breaking_prefix():
 
 def test_diversify_leading_verb_returns_original_when_summary_is_empty():
     """_diversify_leading_verb must return original summary when it is blank."""
-    from ai_changelog_msg.changelog import ChangelogBuilder
+    from ai_changelog.changelog import ChangelogBuilder
 
     builder = ChangelogBuilder(namespace="ai-changelog")
     seen: set[str] = set()
@@ -1583,7 +1583,7 @@ def test_diversify_leading_verb_returns_original_when_summary_is_empty():
 
 def test_diversify_leading_verb_returns_original_when_body_has_no_leading_word():
     """_diversify_leading_verb must return original when body starts with non-alpha char."""
-    from ai_changelog_msg.changelog import ChangelogBuilder
+    from ai_changelog.changelog import ChangelogBuilder
 
     builder = ChangelogBuilder(namespace="ai-changelog")
     seen: set[str] = set()

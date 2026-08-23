@@ -20,9 +20,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from ai_changelog_msg import ai_provider
-from ai_changelog_msg.ai_provider import AIProvider
-from ai_changelog_msg.config import Config
+from ai_changelog import ai_provider
+from ai_changelog.ai_provider import AIProvider
+from ai_changelog.config import Config
 
 OLLAMA_MODEL_NAME = "llama3.1:8b-instruct-q4_K_M"
 OLLAMA_MODEL = "ollama/" + OLLAMA_MODEL_NAME
@@ -44,7 +44,7 @@ def _configure_custom_provider_entry_point(
     fake_ep = SimpleNamespace(name=name, value="mypkg.llm:FakeHandler")
     fake_ep.load = loader
 
-    monkeypatch.setattr("ai_changelog_msg.ai_provider.litellm.custom_provider_map", [])
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.custom_provider_map", [])
 
     def fake_entry_points(*, group):
         if group == "ai_changelog.litellm_providers":
@@ -52,7 +52,7 @@ def _configure_custom_provider_entry_point(
         return []
 
     monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.entry_points",
+        "ai_changelog.ai_provider.entry_points",
         fake_entry_points,
         raising=False,
     )
@@ -99,11 +99,9 @@ def _configure_missing_ollama_model_then_recover(
             raise ValueError(f"model '{OLLAMA_MODEL_NAME}' not found")
         return _make_response("Recovered after pull.")
 
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.completion", fake_completion)
     monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
-    )
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.urllib_request.urlopen",
+        "ai_changelog.ai_provider.urllib_request.urlopen",
         _fake_successful_ollama_urlopen,
     )
     return calls
@@ -116,9 +114,7 @@ def test_summarize_diff_truncates_and_returns_trimmed_content(monkeypatch):
         captured.update(kwargs)
         return _make_response("  Added support for summaries.  ")
 
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
-    )
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.completion", fake_completion)
 
     provider = AIProvider(Config(max_diff_size=5))
 
@@ -137,10 +133,8 @@ def test_summarize_diff_raises_runtime_error_on_api_failure(monkeypatch):
         calls["count"] += 1
         raise ValueError("boom")
 
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
-    )
-    monkeypatch.setattr("ai_changelog_msg.ai_provider.time.sleep", lambda _: None)
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.completion", fake_completion)
+    monkeypatch.setattr("ai_changelog.ai_provider.time.sleep", lambda _: None)
 
     provider = AIProvider(Config())
 
@@ -150,7 +144,7 @@ def test_summarize_diff_raises_runtime_error_on_api_failure(monkeypatch):
 
 
 def test_summarize_diff_retries_timeout_and_succeeds(caplog, monkeypatch):
-    caplog.set_level(logging.WARNING, logger="ai_changelog_msg.ai_provider")
+    caplog.set_level(logging.WARNING, logger="ai_changelog.ai_provider")
     calls = {"count": 0}
     observed_delays = []
 
@@ -163,15 +157,13 @@ def test_summarize_diff_retries_timeout_and_succeeds(caplog, monkeypatch):
             )
         return _make_response("Recovered after retry.")
 
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
-    )
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.completion", fake_completion)
 
     def _record_delay(delay: float) -> None:
         observed_delays.append(delay)
 
     monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.time.sleep",
+        "ai_changelog.ai_provider.time.sleep",
         _record_delay,
     )
 
@@ -268,12 +260,8 @@ def test_summarize_diff_raises_when_ollama_pull_fails(monkeypatch):
             fp=BytesIO(OLLAMA_PULL_DENIED.encode("utf-8")),
         )
 
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
-    )
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.urllib_request.urlopen", fake_urlopen
-    )
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.completion", fake_completion)
+    monkeypatch.setattr("ai_changelog.ai_provider.urllib_request.urlopen", fake_urlopen)
 
     provider = AIProvider(Config(model=OLLAMA_MODEL))
 
@@ -282,7 +270,7 @@ def test_summarize_diff_raises_when_ollama_pull_fails(monkeypatch):
 
 
 def test_pull_ollama_model_uses_post_request_and_utf8_replace(caplog, monkeypatch):
-    caplog.set_level(logging.INFO, logger="ai_changelog_msg.ai_provider")
+    caplog.set_level(logging.INFO, logger="ai_changelog.ai_provider")
     captured = {}
 
     class _Response:
@@ -300,9 +288,7 @@ def test_pull_ollama_model_uses_post_request_and_utf8_replace(caplog, monkeypatc
         captured["timeout"] = timeout
         return _Response()
 
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.urllib_request.urlopen", fake_urlopen
-    )
+    monkeypatch.setattr("ai_changelog.ai_provider.urllib_request.urlopen", fake_urlopen)
 
     provider = AIProvider(
         Config(
@@ -337,9 +323,7 @@ def test_pull_ollama_model_decodes_http_error_details_with_utf8_replace(monkeypa
             fp=BytesIO(OLLAMA_PULL_DENIED.encode("utf-8") + b"\xff"),
         )
 
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.urllib_request.urlopen", fake_urlopen
-    )
+    monkeypatch.setattr("ai_changelog.ai_provider.urllib_request.urlopen", fake_urlopen)
 
     provider = AIProvider(Config(model=OLLAMA_MODEL))
 
@@ -365,9 +349,7 @@ def _patch_ollama_urlopen(monkeypatch: pytest.MonkeyPatch) -> dict:
         captured["request"] = request
         return _Response()
 
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.urllib_request.urlopen", fake_urlopen
-    )
+    monkeypatch.setattr("ai_changelog.ai_provider.urllib_request.urlopen", fake_urlopen)
     return captured
 
 
@@ -427,9 +409,7 @@ def test_pull_ollama_model_detects_error_key_in_response(monkeypatch):
     def fake_urlopen(request, timeout):
         return _ErrorResponse()
 
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.urllib_request.urlopen", fake_urlopen
-    )
+    monkeypatch.setattr("ai_changelog.ai_provider.urllib_request.urlopen", fake_urlopen)
 
     provider = AIProvider(Config(model=OLLAMA_MODEL))
 
@@ -443,9 +423,7 @@ def test_generate_changelog_entry_returns_ai_content(monkeypatch):
     def fake_completion(**kwargs):
         return _make_response("Changed the CLI workflow.")
 
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
-    )
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.completion", fake_completion)
 
     provider = AIProvider(Config())
 
@@ -466,9 +444,7 @@ def test_generate_changelog_entry_rejects_prompt_leak_and_falls_back(monkeypatch
             "Keep a Changelog entry sentence written for a technical audience."
         )
 
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
-    )
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.completion", fake_completion)
 
     provider = AIProvider(Config())
 
@@ -489,9 +465,7 @@ def test_generate_changelog_entry_returns_first_valid_sentence(monkeypatch):
             "Additional implementation details are intentionally omitted."
         )
 
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
-    )
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.completion", fake_completion)
 
     provider = AIProvider(Config())
 
@@ -509,9 +483,7 @@ def test_generate_changelog_entry_falls_back_to_note_on_failure(monkeypatch):
     def fake_completion(**kwargs):
         raise RuntimeError("offline")
 
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
-    )
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.completion", fake_completion)
 
     provider = AIProvider(Config())
 
@@ -531,9 +503,7 @@ def test_generate_changelog_entry_falls_back_to_commit_message_when_note_blank(
     def fake_completion(**kwargs):
         raise RuntimeError("offline")
 
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
-    )
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.completion", fake_completion)
 
     provider = AIProvider(Config())
 
@@ -545,14 +515,12 @@ def test_generate_changelog_entry_falls_back_to_commit_message_when_note_blank(
 
 
 def test_generate_changelog_entry_logs_fallback_reason(caplog, monkeypatch):
-    caplog.set_level(logging.WARNING, logger="ai_changelog_msg.ai_provider")
+    caplog.set_level(logging.WARNING, logger="ai_changelog.ai_provider")
 
     def fake_completion(**kwargs):
         raise RuntimeError("offline")
 
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
-    )
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.completion", fake_completion)
 
     provider = AIProvider(Config())
 
@@ -577,9 +545,7 @@ def test_summarize_diff_passes_litellm_gateway_kwargs(monkeypatch):
         captured.update(kwargs)
         return _make_response("Added gateway support.")
 
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
-    )
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.completion", fake_completion)
 
     provider = AIProvider(
         Config(
@@ -598,14 +564,12 @@ def test_summarize_diff_passes_litellm_gateway_kwargs(monkeypatch):
 
 
 def test_summarize_diff_logs_truncation_and_failure(caplog, monkeypatch):
-    caplog.set_level(logging.DEBUG, logger="ai_changelog_msg.ai_provider")
+    caplog.set_level(logging.DEBUG, logger="ai_changelog.ai_provider")
 
     def fake_completion(**kwargs):
         raise RuntimeError("offline")
 
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
-    )
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.completion", fake_completion)
 
     provider = AIProvider(Config(max_diff_size=4))
 
@@ -618,14 +582,12 @@ def test_summarize_diff_logs_truncation_and_failure(caplog, monkeypatch):
 
 
 def test_summarize_diff_logs_model_response(caplog, monkeypatch):
-    caplog.set_level(logging.DEBUG, logger="ai_changelog_msg.ai_provider")
+    caplog.set_level(logging.DEBUG, logger="ai_changelog.ai_provider")
 
     def fake_completion(**kwargs):
         return _make_response("Response content.")
 
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
-    )
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.completion", fake_completion)
 
     provider = AIProvider(Config())
 
@@ -645,9 +607,7 @@ def test_summarize_diff_includes_pr_author_and_approver_when_present(monkeypatch
         captured.update(kwargs)
         return _make_response("Streamlined release note quality.")
 
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
-    )
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.completion", fake_completion)
 
     provider = AIProvider(Config())
 
@@ -692,12 +652,12 @@ def test_init_enables_headroom_callback_once(caplog, monkeypatch):
         pass
 
     monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider._HeadroomCallback",
+        "ai_changelog.ai_provider._HeadroomCallback",
         FakeHeadroomCallback,
     )
-    monkeypatch.setattr("ai_changelog_msg.ai_provider.litellm.callbacks", [])
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.callbacks", [])
 
-    caplog.set_level(logging.INFO, logger="ai_changelog_msg.ai_provider")
+    caplog.set_level(logging.INFO, logger="ai_changelog.ai_provider")
 
     AIProvider(Config(enable_headroom=True))
     AIProvider(Config(enable_headroom=True))
@@ -715,7 +675,7 @@ def test_init_enables_headroom_callback_once(caplog, monkeypatch):
 
 
 def test_init_raises_when_headroom_enabled_but_not_installed(monkeypatch):
-    monkeypatch.setattr("ai_changelog_msg.ai_provider._HeadroomCallback", None)
+    monkeypatch.setattr("ai_changelog.ai_provider._HeadroomCallback", None)
 
     with pytest.raises(RuntimeError, match="Headroom is enabled but not installed"):
         AIProvider(Config(enable_headroom=True))
@@ -723,7 +683,7 @@ def test_init_raises_when_headroom_enabled_but_not_installed(monkeypatch):
 
 def test_init_sets_litellm_num_retries_to_zero(monkeypatch):
     """litellm.num_retries must be set to 0 to disable LiteLLM's own retry loop."""
-    monkeypatch.setattr("ai_changelog_msg.ai_provider.litellm.num_retries", 999)
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.num_retries", 999)
 
     AIProvider(Config())
 
@@ -740,9 +700,7 @@ def test_init_suppresses_litellm_loggers(monkeypatch):
 
 def test_init_sets_suppress_debug_info_when_available(monkeypatch):
     """litellm.suppress_debug_info must be set to True when the attribute exists."""
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.litellm.suppress_debug_info", False
-    )
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.suppress_debug_info", False)
 
     AIProvider(Config())
 
@@ -751,7 +709,7 @@ def test_init_sets_suppress_debug_info_when_available(monkeypatch):
 
 def test_init_logs_provider_details(caplog):
     """Init must log model, timeout, retries, and backoff at DEBUG level."""
-    with caplog.at_level(logging.DEBUG, logger="ai_changelog_msg.ai_provider"):
+    with caplog.at_level(logging.DEBUG, logger="ai_changelog.ai_provider"):
         AIProvider(Config(model="test-model", retry_attempts=5))
 
     init_records = [r for r in caplog.records if "initialised" in r.getMessage()]
@@ -771,7 +729,7 @@ def test_load_custom_providers_registers_discovered_provider(monkeypatch, caplog
         monkeypatch, "my_provider", lambda: FakeHandler
     )
 
-    with caplog.at_level(logging.INFO, logger="ai_changelog_msg.ai_provider"):
+    with caplog.at_level(logging.INFO, logger="ai_changelog.ai_provider"):
         AIProvider(Config())
 
     registered = ai_provider.litellm.custom_provider_map
@@ -794,7 +752,7 @@ def test_load_custom_providers_is_idempotent(monkeypatch, caplog):
         monkeypatch, "my_provider", lambda: type("FakeHandler", (), {})
     )
 
-    with caplog.at_level(logging.DEBUG, logger="ai_changelog_msg.ai_provider"):
+    with caplog.at_level(logging.DEBUG, logger="ai_changelog.ai_provider"):
         AIProvider(Config())
         AIProvider(Config())
 
@@ -825,14 +783,14 @@ def test_load_custom_providers_processes_entries_after_existing_provider(
     new_ep.load = lambda: FakeHandler
 
     monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.litellm.custom_provider_map",
+        "ai_changelog.ai_provider.litellm.custom_provider_map",
         [
             object(),
             {"provider": "my_provider", "custom_handler": FakeHandler()},
         ],
     )
     monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.entry_points",
+        "ai_changelog.ai_provider.entry_points",
         lambda *, group: [duplicate_ep, new_ep],
         raising=False,
     )
@@ -854,7 +812,7 @@ def test_load_custom_providers_warns_on_load_failure(monkeypatch, caplog):
 
     _configure_custom_provider_entry_point(monkeypatch, "bad_provider", fail_to_load)
 
-    with caplog.at_level(logging.WARNING, logger="ai_changelog_msg.ai_provider"):
+    with caplog.at_level(logging.WARNING, logger="ai_changelog.ai_provider"):
         AIProvider(Config())  # must not raise
 
     assert any(
@@ -868,13 +826,13 @@ def test_load_custom_providers_warns_on_load_failure(monkeypatch, caplog):
 def test_load_custom_providers_skips_when_no_entry_points(monkeypatch):
     """No custom_provider_map mutation when no providers are registered."""
 
-    monkeypatch.setattr("ai_changelog_msg.ai_provider.litellm.custom_provider_map", [])
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.custom_provider_map", [])
 
     def fake_entry_points(*, group):
         return []
 
     monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.entry_points",
+        "ai_changelog.ai_provider.entry_points",
         fake_entry_points,
         raising=False,
     )
@@ -892,9 +850,7 @@ def test_summarize_diff_sends_correct_completion_params(monkeypatch):
         captured.update(kwargs)
         return _make_response("Summary.")
 
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
-    )
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.completion", fake_completion)
 
     provider = AIProvider(Config())
     provider.summarize_diff("feat: add feature", "+new code")
@@ -934,9 +890,7 @@ def test_generate_changelog_entry_sends_correct_completion_params(monkeypatch):
         captured.update(kwargs)
         return _make_response("Streamlined the CLI workflow.")
 
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
-    )
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.completion", fake_completion)
 
     provider = AIProvider(Config())
     provider.generate_changelog_entry(
@@ -1008,10 +962,8 @@ def test_completion_with_retry_stops_after_exact_max_attempts(monkeypatch):
         calls["count"] += 1
         raise ValueError("timeout")
 
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
-    )
-    monkeypatch.setattr("ai_changelog_msg.ai_provider.time.sleep", lambda _: None)
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.completion", fake_completion)
+    monkeypatch.setattr("ai_changelog.ai_provider.time.sleep", lambda _: None)
 
     provider = AIProvider(Config(retry_attempts=3))
 
@@ -1028,9 +980,7 @@ def test_summarize_diff_returns_placeholder_when_model_returns_empty(monkeypatch
     def fake_completion(**kwargs):
         return _make_response(None)
 
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
-    )
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.completion", fake_completion)
 
     provider = AIProvider(Config())
     result = provider.summarize_diff("fix: typo", "+tiny fix")
@@ -1044,12 +994,10 @@ def test_summarize_diff_logs_truncation_message(monkeypatch, caplog):
     def fake_completion(**kwargs):
         return _make_response("Summary.")
 
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
-    )
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.completion", fake_completion)
 
     provider = AIProvider(Config(max_diff_size=5))
-    with caplog.at_level(logging.DEBUG, logger="ai_changelog_msg.ai_provider"):
+    with caplog.at_level(logging.DEBUG, logger="ai_changelog.ai_provider"):
         provider.summarize_diff("feat: test", "abcdefghij")
 
     assert "Truncating diff" in caplog.text
@@ -1062,12 +1010,10 @@ def test_summarize_diff_logs_model_name_in_request_message(monkeypatch, caplog):
     def fake_completion(**kwargs):
         return _make_response("Summary.")
 
-    monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.litellm.completion", fake_completion
-    )
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.completion", fake_completion)
 
     provider = AIProvider(Config(model="gpt-4o-test"))
-    with caplog.at_level(logging.DEBUG, logger="ai_changelog_msg.ai_provider"):
+    with caplog.at_level(logging.DEBUG, logger="ai_changelog.ai_provider"):
         provider.summarize_diff("feat: test", "+change")
 
     # Verify the 'Sending request' log uses the actual model name, not None
@@ -1116,11 +1062,11 @@ def test_init_headroom_preserves_existing_callbacks(monkeypatch):
         pass
 
     monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider._HeadroomCallback",
+        "ai_changelog.ai_provider._HeadroomCallback",
         FakeHeadroomCallback,
     )
     existing = ExistingCallback()
-    monkeypatch.setattr("ai_changelog_msg.ai_provider.litellm.callbacks", [existing])
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.callbacks", [existing])
 
     AIProvider(Config(enable_headroom=True))
 
@@ -1144,12 +1090,12 @@ def test_init_headroom_converts_non_list_callbacks_to_list(monkeypatch):
         pass
 
     monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider._HeadroomCallback",
+        "ai_changelog.ai_provider._HeadroomCallback",
         FakeHeadroomCallback,
     )
     # A tuple is not a list; must be converted
     monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.litellm.callbacks", ("preexisting_item",)
+        "ai_changelog.ai_provider.litellm.callbacks", ("preexisting_item",)
     )
 
     AIProvider(Config(enable_headroom=True))
@@ -1164,10 +1110,10 @@ def test_init_headroom_initializes_missing_callbacks_list(monkeypatch):
         pass
 
     monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider._HeadroomCallback",
+        "ai_changelog.ai_provider._HeadroomCallback",
         FakeHeadroomCallback,
     )
-    monkeypatch.setattr("ai_changelog_msg.ai_provider.litellm.callbacks", None)
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.callbacks", None)
 
     AIProvider(Config(enable_headroom=True))
 
@@ -1286,7 +1232,7 @@ def test_pull_ollama_model_raises_runtime_error_for_url_error(monkeypatch):
         raise urllib_error.URLError("connection refused")
 
     monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.urllib_request.urlopen", _fail_urlopen
+        "ai_changelog.ai_provider.urllib_request.urlopen", _fail_urlopen
     )
 
     config = Config(model="ollama/llama3.1")
@@ -1321,7 +1267,7 @@ def _patch_tags_response(monkeypatch: pytest.MonkeyPatch, body: bytes) -> None:
             return body
 
     monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.urllib_request.urlopen",
+        "ai_changelog.ai_provider.urllib_request.urlopen",
         lambda request, timeout: _Response(),
     )
 
@@ -1331,7 +1277,7 @@ def test_ensure_ready_skips_non_ollama_models(monkeypatch):
         raise AssertionError("Ollama API must not be contacted for other providers")
 
     monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.urllib_request.urlopen", _fail_urlopen
+        "ai_changelog.ai_provider.urllib_request.urlopen", _fail_urlopen
     )
 
     provider = _make_bare_ollama_provider(model="openai/gpt-4o-mini")
@@ -1378,7 +1324,7 @@ def test_ensure_ready_raises_when_ollama_unreachable(monkeypatch):
         raise urllib_error.URLError("connection refused")
 
     monkeypatch.setattr(
-        "ai_changelog_msg.ai_provider.urllib_request.urlopen", _fail_urlopen
+        "ai_changelog.ai_provider.urllib_request.urlopen", _fail_urlopen
     )
 
     provider = _make_bare_ollama_provider()

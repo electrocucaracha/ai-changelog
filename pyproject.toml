@@ -58,13 +58,10 @@ constraint-dependencies = [
 ]
 
 [project.scripts]
-ai-changelog = "ai_changelog_msg.main:cli"
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/ai_changelog_msg"]
+ai-changelog = "ai_changelog.main:cli"
 
 [tool.hatch.build.targets.wheel.force-include]
-"src/ai_changelog_msg/py.typed" = "ai_changelog_msg/py.typed"
+"src/ai_changelog/py.typed" = "ai_changelog/py.typed"
 
 [tool.tox]
 legacy_tox_ini = """
@@ -88,7 +85,7 @@ commands =
 description = Run tests with coverage reporting
 extras = test
 commands =
-    pytest --cov=ai_changelog_msg --cov-report=html --cov-report=term-missing tests/
+    pytest --cov=ai_changelog --cov-report=html --cov-report=term-missing tests/
 
 [testenv:lint]
 description = Fix code style
@@ -117,8 +114,8 @@ commands =
 
 [tool.mutmut]
 debug = true
-source_paths = ["src/ai_changelog_msg/"]
-do_not_mutate = ["src/ai_changelog_msg/__init__.py"]
+source_paths = ["src/ai_changelog/"]
+do_not_mutate = ["src/ai_changelog/__init__.py"]
 do_not_mutate_patterns = [
     "raise [A-Za-z]",
     "pragma: no mutate",
@@ -132,7 +129,7 @@ target-version = ["py39"]
 profile = "black"
 line_length = 88
 src_paths = ["src"]
-known_first_party = ["ai_changelog_msg"]
+known_first_party = ["ai_changelog"]
 
 [tool.ruff]
 line-length = 88
@@ -177,8 +174,8 @@ minversion = "7.0"
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --strict-markers --tb=short --cov=ai_changelog_msg --cov-report=html --cov-report=term-missing --doctest-modules"
-testpaths = ["tests", "src/ai_changelog_msg"]
+addopts = "-v --strict-markers --tb=short --cov=ai_changelog --cov-report=html --cov-report=term-missing --doctest-modules"
+testpaths = ["tests", "src/ai_changelog"]
 markers = [
     "unit: Unit tests for individual modules",
     "integration: Integration tests",

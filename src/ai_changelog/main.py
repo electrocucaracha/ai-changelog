@@ -30,8 +30,8 @@ from typing import Any, NamedTuple
 
 import click
 
-from ai_changelog_msg.ai_provider import AIProvider
-from ai_changelog_msg.changelog import (
+from ai_changelog.ai_provider import AIProvider
+from ai_changelog.changelog import (
     ChangelogBuilder,
     SemanticVersion,
     count_diff_lines,
@@ -42,8 +42,8 @@ from ai_changelog_msg.changelog import (
     parse_semantic_version,
     parse_stored_note,
 )
-from ai_changelog_msg.config import Config
-from ai_changelog_msg.git_helper import GitRepository
+from ai_changelog.config import Config
+from ai_changelog.git_helper import GitRepository
 
 logger = logging.getLogger(__name__)
 RELEASE_SECTION_HEADING_RE = re.compile(r"^## \[[^\]]+\](?: - .*)?$", re.MULTILINE)

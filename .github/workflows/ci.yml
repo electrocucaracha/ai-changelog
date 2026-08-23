@@ -27,7 +27,7 @@ jobs:
       - name: Setup Python environment
         uses: ./.github/actions/setup-python-env
       - name: Run unit tests
-        run: uvx tox -e py312 -- --cov=ai_changelog_msg --cov-report=term-missing --cov-report=json
+        run: uvx tox -e py312 -- --cov=ai_changelog --cov-report=term-missing --cov-report=json
       - name: Enforce minimum coverage
         run: python3 ci/enforce_coverage.py
       - name: Publish coverage summary

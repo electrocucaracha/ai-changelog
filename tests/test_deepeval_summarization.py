@@ -21,8 +21,8 @@ from urllib.request import urlopen
 
 import pytest
 
-from ai_changelog_msg.ai_provider import AIProvider
-from ai_changelog_msg.config import Config
+from ai_changelog.ai_provider import AIProvider
+from ai_changelog.config import Config
 
 
 def _enabled() -> bool:
@@ -54,10 +54,10 @@ EVAL_CASES = (
         commit_message="feat(cli): support custom changelog output path",
         author="Alice",
         diff="""
-diff --git a/src/ai_changelog_msg/main.py b/src/ai_changelog_msg/main.py
+diff --git a/src/ai_changelog/main.py b/src/ai_changelog/main.py
 index 1111111..2222222 100644
---- a/src/ai_changelog_msg/main.py
-+++ b/src/ai_changelog_msg/main.py
+--- a/src/ai_changelog/main.py
++++ b/src/ai_changelog/main.py
 @@
 +@click.option(
 +    \"--changelog-file\",
@@ -78,10 +78,10 @@ index 1111111..2222222 100644
         commit_message="fix(ai): avoid calling the model for empty diffs",
         author="Bob",
         diff="""
-diff --git a/src/ai_changelog_msg/ai_provider.py b/src/ai_changelog_msg/ai_provider.py
+diff --git a/src/ai_changelog/ai_provider.py b/src/ai_changelog/ai_provider.py
 index 3333333..4444444 100644
---- a/src/ai_changelog_msg/ai_provider.py
-+++ b/src/ai_changelog_msg/ai_provider.py
+--- a/src/ai_changelog/ai_provider.py
++++ b/src/ai_changelog/ai_provider.py
 @@
 +        if not diff.strip():
 +            return \"[No changes to summarize]\"
@@ -99,10 +99,10 @@ index 3333333..4444444 100644
         commit_message="fix(changelog): normalize legacy notes before rendering",
         author="Carol",
         diff="""
-diff --git a/src/ai_changelog_msg/main.py b/src/ai_changelog_msg/main.py
+diff --git a/src/ai_changelog/main.py b/src/ai_changelog/main.py
 index 5555555..6666666 100644
---- a/src/ai_changelog_msg/main.py
-+++ b/src/ai_changelog_msg/main.py
+--- a/src/ai_changelog/main.py
++++ b/src/ai_changelog/main.py
 @@
 -        note_text = existing_note
 +        normalized_category = category or "Changed"

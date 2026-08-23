@@ -20,7 +20,7 @@ from types import ModuleType, SimpleNamespace
 import pytest
 from git.exc import GitCommandError
 
-from ai_changelog_msg.git_helper import GitRepository
+from ai_changelog.git_helper import GitRepository
 
 
 class _FakeGit:
@@ -160,7 +160,7 @@ def test_get_commit_diff_logs_fetching_with_8char_hexsha(caplog):
         hexsha="abc12345longerhash", parents=[SimpleNamespace(hexsha="parent")]
     )
 
-    with caplog.at_level(logging.DEBUG, logger="ai_changelog_msg.git_helper"):
+    with caplog.at_level(logging.DEBUG, logger="ai_changelog.git_helper"):
         repo.get_commit_diff(commit)
 
     assert "Fetching diff for commit abc12345" in caplog.text
@@ -246,7 +246,7 @@ def test_clear_notes_logs_namespace_name_when_missing(caplog):
 
     repo = _make_repo()
 
-    with caplog.at_level(logging.DEBUG, logger="ai_changelog_msg.git_helper"):
+    with caplog.at_level(logging.DEBUG, logger="ai_changelog.git_helper"):
         repo.clear_notes("ai-changelog")
 
     assert any(
@@ -275,7 +275,7 @@ def test_clear_notes_logs_deletion_message(caplog):
         refs=[SimpleNamespace(path=ref_name)],
     )
 
-    with caplog.at_level(logging.INFO, logger="ai_changelog_msg.git_helper"):
+    with caplog.at_level(logging.INFO, logger="ai_changelog.git_helper"):
         repo.clear_notes("ai-changelog")
 
     assert "Deleted git notes namespace" in caplog.text
@@ -342,7 +342,7 @@ def test_create_tag_logs_created_message(caplog):
 
     repo = _make_repo()
 
-    with caplog.at_level(logging.INFO, logger="ai_changelog_msg.git_helper"):
+    with caplog.at_level(logging.INFO, logger="ai_changelog.git_helper"):
         repo.create_tag("v1.2.3", "abc12345longerhash")
 
     assert "Created tag 'v1.2.3' at abc12345" in caplog.text
@@ -353,7 +353,7 @@ def test_create_tag_logs_skipped_message_when_exists(caplog):
 
     repo = _make_repo(tags=[SimpleNamespace(name="v1.0.0")])
 
-    with caplog.at_level(logging.DEBUG, logger="ai_changelog_msg.git_helper"):
+    with caplog.at_level(logging.DEBUG, logger="ai_changelog.git_helper"):
         repo.create_tag("v1.0.0", "abc12345")
 
     assert "already exists" in caplog.text
@@ -575,7 +575,7 @@ def test_has_commits_returns_true_when_commits_exist():
         repo.index.add(["test.txt"])
         repo.index.commit("Initial commit")
 
-        from ai_changelog_msg.git_helper import GitRepository
+        from ai_changelog.git_helper import GitRepository
 
         git_repo = GitRepository(tmpdir)
 
@@ -592,7 +592,7 @@ def test_git_repository_raises_for_non_git_directory(tmp_path):
     """GitRepository must raise ValueError when the path is not a git repository."""
     import pytest
 
-    from ai_changelog_msg.git_helper import GitRepository
+    from ai_changelog.git_helper import GitRepository
 
     with pytest.raises(ValueError, match="Not a git repository"):
         GitRepository(str(tmp_path))

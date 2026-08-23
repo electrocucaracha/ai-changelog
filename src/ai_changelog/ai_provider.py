@@ -45,7 +45,7 @@ else:
     except ImportError:  # pragma: no cover - optional dependency
         _HeadroomCallback = None  # type: ignore[assignment]
 
-from ai_changelog_msg.config import Config
+from ai_changelog.config import Config
 
 logger = logging.getLogger(__name__)
 

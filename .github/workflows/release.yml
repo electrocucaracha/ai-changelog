@@ -20,33 +20,26 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Configure Git identity
+      - name: Configure Git identity and authentication
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: git fetch origin refs/notes/ai-changelog:refs/notes/ai-changelog || true
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: false
       - uses: ai-action/setup-ollama@3f581ee292df757e21de2bcb3b573bd8a44f198d # v2.0.71
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.ollama
+          key: ${{ runner.os }}-ollama-${{ github.repository }}
       - name: Generate CHANGELOG.md
         run: |
           uvx --from git+https://github.com/electrocucaracha/ai-changelog.git ai-changelog --create-semver-tags .
           make fmt
-      - name: Configure Git authentication
-        run: git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Commit and push changelog
-        uses: actions-js/push@968f4695ca558093eadb24ad83cc5891f47e0cdc # v1.6
-        continue-on-error: true
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ github.head_ref || github.ref_name }}
-          message: "docs(changelog): update release notes"
-          tags: true
-      - name: Push notes and tags
-        run: git push origin refs/notes/ai-changelog || true
       - name: Resolve latest semantic tag
         id: release_tag
         run: |
@@ -56,9 +49,17 @@ jobs:
               exit 1
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          awk '/^## / { count++ } count == 3 { exit } { print }' CHANGELOG.md > notes.md
-      - name: Create GitHub release
+          awk '/^## / { count++ } count == 3 { exit } { print }' CHANGELOG.md > body.md
+      - name: Commit and push changelog, tags and notes
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
           TAG: ${{ steps.release_tag.outputs.tag }}
-        run: gh release create "$TAG" --title "$TAG" --notes-file notes.md
+        run: |
+          git add CHANGELOG.md
+          git diff --staged --quiet || git commit -m "docs(changelog): update release notes for ${TAG}"
+          git push origin "HEAD:${BRANCH}" --follow-tags
+          git push origin refs/notes/ai-changelog
+      - uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          tag_name: ${{ steps.release_tag.outputs.tag }}
+          body_path: body.md

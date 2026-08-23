@@ -102,9 +102,7 @@ def main() -> int:
         total_survived += survived
         total_suspicious += suspicious
 
-    print(
-        "Mutation totals:" f" survived={total_survived}, suspicious={total_suspicious}"
-    )
+    print(f"Mutation totals: survived={total_survived}, suspicious={total_suspicious}")
 
     if total_survived or total_suspicious:
         print(

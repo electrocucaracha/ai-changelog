@@ -186,6 +186,18 @@ def _patch_fake_summary_generation(monkeypatch, result_factory: Callable):
     )
 
 
+def _capture_non_interactive_output(monkeypatch) -> list[str]:
+    """Capture click output while forcing non-interactive rendering mode."""
+    output_chunks: list[str] = []
+    monkeypatch.setattr(main.sys.stdout, "isatty", lambda: False)
+    monkeypatch.setattr(
+        main.click,
+        "echo",
+        lambda text="", nl=True: output_chunks.append(text),
+    )
+    return output_chunks
+
+
 def _setup_single_commit_repo(
     tmp_path,
     monkeypatch,
@@ -1199,11 +1211,7 @@ def test_generate_summaries_concurrently_renders_final_worker_totals(monkeypatch
         def summarize_diff(self, *a, **kw):
             return "ok"
 
-    output_chunks: list[str] = []
-    monkeypatch.setattr(main.sys.stdout, "isatty", lambda: False)
-    monkeypatch.setattr(
-        main.click, "echo", lambda text="", nl=True: output_chunks.append(text)
-    )
+    output_chunks = _capture_non_interactive_output(monkeypatch)
 
     prepared = [
         _build_prepared_commit(f"hash{i}", "X", "feat: x", "+x") for i in range(3)
@@ -1239,11 +1247,7 @@ def test_generate_summaries_concurrently_renders_empty_single_worker_progress(
     monkeypatch,
 ):
     """A single worker starts with an empty, not full, progress bar."""
-    output_chunks: list[str] = []
-    monkeypatch.setattr(main.sys.stdout, "isatty", lambda: False)
-    monkeypatch.setattr(
-        main.click, "echo", lambda text="", nl=True: output_chunks.append(text)
-    )
+    output_chunks = _capture_non_interactive_output(monkeypatch)
 
     main._generate_summaries_concurrently(
         cast(main.AIProvider, _FastProvider()),

@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import hashlib
 import logging
 from collections.abc import Callable
 from io import BytesIO
@@ -1285,8 +1286,19 @@ def test_ensure_ready_skips_non_ollama_models(monkeypatch):
     provider.ensure_ready()
 
 
-def test_ensure_ready_accepts_implicit_latest_tag(monkeypatch):
-    _patch_tags_response(monkeypatch, b'{"models":[{"name":"llama3.1:latest"}]}')
+@pytest.mark.parametrize(
+    ("tags_payload", "expected_pull_count"),
+    [
+        (b'{"models":[{"name":"llama3.1:latest"}]}', 0),
+        (b'{"models":[{"name":"qwen2.5:latest"}]}', 1),
+    ],
+)
+def test_ensure_ready_pulls_model_only_when_missing(
+    monkeypatch,
+    tags_payload: bytes,
+    expected_pull_count: int,
+):
+    _patch_tags_response(monkeypatch, tags_payload)
 
     provider = _make_bare_ollama_provider()
     pulled = {"count": 0}
@@ -1298,23 +1310,7 @@ def test_ensure_ready_accepts_implicit_latest_tag(monkeypatch):
 
     provider.ensure_ready()
 
-    assert pulled["count"] == 0
-
-
-def test_ensure_ready_pulls_missing_model_once(monkeypatch):
-    _patch_tags_response(monkeypatch, b'{"models":[{"name":"qwen2.5:latest"}]}')
-
-    provider = _make_bare_ollama_provider()
-    pulled = {"count": 0}
-    monkeypatch.setattr(
-        provider,
-        "_pull_ollama_model",
-        lambda: pulled.__setitem__("count", pulled["count"] + 1),
-    )
-
-    provider.ensure_ready()
-
-    assert pulled["count"] == 1
+    assert pulled["count"] == expected_pull_count
 
 
 def test_ensure_ready_raises_when_ollama_unreachable(monkeypatch):
@@ -1340,3 +1336,168 @@ def test_ensure_ready_raises_on_malformed_tags_payload(monkeypatch):
 
     with pytest.raises(RuntimeError, match="Unexpected response from Ollama API"):
         provider.ensure_ready()
+
+
+@pytest.mark.parametrize(
+    "error_text",
+    [
+        "Operation timed out while contacting provider",
+        "litellm.APIConnectionError: connection error during request",
+        "rate limit exceeded by upstream API",
+        "too many requests for this endpoint",
+        "Server failed with HTTP 500",
+    ],
+)
+def test_is_retryable_error_returns_true_for_all_retry_signals(error_text):
+    """Retry detector must keep all transient keyword and code checks active."""
+    assert ai_provider._is_retryable_error(error_text) is True
+
+
+def test_completion_with_ollama_auto_pull_records_usage_tokens(monkeypatch):
+    """_completion_with_ollama_auto_pull must add response usage to token totals."""
+    usage = SimpleNamespace(prompt_tokens=7, completion_tokens=5, total_tokens=12)
+
+    def fake_completion(**kwargs):
+        return SimpleNamespace(
+            usage=usage,
+            choices=[SimpleNamespace(message=SimpleNamespace(content="ok"))],
+        )
+
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.completion", fake_completion)
+
+    provider = AIProvider(Config())
+    initial_prompt = provider.token_usage.prompt_tokens
+    initial_completion = provider.token_usage.completion_tokens
+    initial_total = provider.token_usage.total_tokens
+
+    response = provider._completion_with_ollama_auto_pull(
+        messages=[{"role": "user", "content": "ping"}],
+        temperature=0.2,
+        max_tokens=8,
+    )
+
+    assert response.choices[0].message.content == "ok"
+    assert provider.token_usage.prompt_tokens == initial_prompt + 7
+    assert provider.token_usage.completion_tokens == initial_completion + 5
+    assert provider.token_usage.total_tokens == initial_total + 12
+
+
+def test_is_retryable_error_detects_apiconnectionerror_token_only():
+    """The exact apiconnectionerror token must remain retryable."""
+    assert ai_provider._is_retryable_error("litellm.APIConnectionError") is True
+
+
+def test_is_retryable_error_detects_connection_error_token_only():
+    """The exact 'connection error' token must remain retryable."""
+    assert ai_provider._is_retryable_error("connection error") is True
+
+
+def test_is_retryable_error_detects_connection_refused_token_only():
+    """The exact 'connection refused' token must remain retryable."""
+    assert ai_provider._is_retryable_error("connection refused") is True
+
+
+@pytest.mark.parametrize("status_code", ["429", "502"])
+def test_is_retryable_error_detects_retryable_http_codes(status_code):
+    """Retryable status-code detection must include 429 and 502."""
+    assert ai_provider._is_retryable_error(f"HTTP {status_code} from provider") is True
+
+
+def test_ensure_ready_logs_available_models_with_expected_capitalization(
+    caplog,
+    monkeypatch,
+):
+    """ensure_ready debug log text must keep canonical capitalization."""
+    caplog.set_level(logging.DEBUG, logger="ai_changelog.ai_provider")
+    _patch_tags_response(monkeypatch, b'{"models":[{"name":"llama3.1:latest"}]}')
+
+    provider = _make_bare_ollama_provider()
+    provider.ensure_ready()
+
+    assert any(
+        record.getMessage() == "Ollama models available locally: ['llama3.1:latest']"
+        for record in caplog.records
+    )
+
+
+def test_ollama_base_url_uses_scheme_and_netloc_from_configured_api_base():
+    """_ollama_base_url must strip path/query parts and keep scheme+netloc."""
+    provider = _make_bare_ollama_provider()
+    provider.config = Config(
+        model="ollama/llama3.1",
+        litellm_api_base="https://ollama.internal:11434/api/v1?x=1",
+    )
+
+    assert provider._ollama_base_url() == "https://ollama.internal:11434"
+
+
+def test_list_ollama_models_uses_tags_endpoint_timeout_and_filters_names(monkeypatch):
+    """_list_ollama_models must hit /api/tags and keep only named dict entries."""
+    captured: dict[str, object] = {}
+
+    class _Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return (
+                b'{"models":[{"name":"llama3.1"},{"id":1},"oops",'
+                b'{"name":"qwen2.5:latest"}]}'
+            )
+
+    def fake_urlopen(request, timeout):
+        captured["request"] = request
+        captured["timeout"] = timeout
+        return _Response()
+
+    monkeypatch.setattr(
+        "ai_changelog.ai_provider.urllib_request.urlopen",
+        fake_urlopen,
+    )
+
+    provider = _make_bare_ollama_provider()
+    provider.config = Config(model="ollama/llama3.1", api_timeout=123)
+    models = provider._list_ollama_models()
+
+    request = captured["request"]
+    assert request is not None
+    assert request.full_url == "http://localhost:11434/api/tags"
+    assert captured["timeout"] == 123
+    assert models == {"llama3.1", "qwen2.5:latest"}
+
+
+def test_summarize_diff_system_prompt_sha256_stays_stable(monkeypatch):
+    """Protect system prompt text from subtle mutations that alter behavior."""
+    captured: dict[str, object] = {}
+
+    def fake_completion(**kwargs):
+        captured.update(kwargs)
+        return _make_response("Summary.")
+
+    monkeypatch.setattr("ai_changelog.ai_provider.litellm.completion", fake_completion)
+
+    provider = AIProvider(Config())
+    provider.summarize_diff("feat: improve reliability", "+new behavior")
+
+    system_prompt = captured["messages"][0]["content"]
+    assert hashlib.sha256(system_prompt.encode("utf-8")).hexdigest() == (
+        "901929fc1940f4af6e49e733d4cf3b76aa27fedb7c1c28eae1c4e1abe60e5425"
+    )
+
+
+def test_extract_review_metadata_without_merge_header_keeps_pr_author_none():
+    """Commit trailers alone must not synthesize a PR author value."""
+    provider = AIProvider.__new__(AIProvider)
+    commit_message = (
+        "feat: tighten validation\n\n"
+        "Reviewed-by: Jane Reviewer <jane@example.com>\n"
+        "Approved-by: John Approver <john@example.com>\n"
+    )
+
+    pr_author, approver = provider._extract_review_metadata(commit_message)
+
+    assert pr_author is None
+    assert approver == "Jane Reviewer, John Approver"

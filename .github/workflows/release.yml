@@ -54,6 +54,18 @@ jobs:
           git add CHANGELOG.md
           git diff --staged --quiet || git commit -m "docs(changelog): update release notes for ${TAG}"
           git push origin "HEAD:${BRANCH}" --follow-tags
+
+          # Best-effort push of all tags: ignore errors for tags that already exist remotely.
+          git push origin --tags || true
+
+          # Ensure the release tag is present on origin (ignore if it already exists).
+          git push origin "refs/tags/${TAG}:refs/tags/${TAG}" || true
+
+          # Validate the release tag exists remotely before creating the GitHub release.
+          if ! git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null; then
+              echo "Release tag ${TAG} is not available on origin"
+              exit 1
+          fi
           git push origin refs/notes/ai-changelog
       - name: Create GitHub release
         env:

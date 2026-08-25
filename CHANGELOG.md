@@ -12,6 +12,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.0.3] - 2026-08-24
+
+### Changed
+
+- Optimized test coverage for AI provider functionality by adding parameterized tests for model pull behavior, retry logic, and token usage accounting, and by verifying ollama base URL parsing, tags endpoint filtering, and debug log capitalization, while also protecting the summarize_diff system prompt hash against subtle mutations and refactoring main tests to share non-interactive output capture logic. [54901b8e](https://x-access-token:ghs_15368_eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRobmQiLCJjdHgiOiJGcFBlS0U2UzFYN0VtTG02alhpWjdJaUJSRGR2bXZfdVloNXV2cnA4Q3lOMFRkM1hWdEItUXZFIiwiZXhwIjoxNzg3NjI5MzQ2LCJpYXQiOjE3ODc2MjU3NDYsImlzcyI6ImdpdGh1YiIsImp0aSI6IjgyMDhmMWUwLWUwMTEtNGM0MS1hZDU0LTM5Zjg1ODQwMDQxZSIsInZlciI6M30.Td_FhSIj5DR5ZDew_AqApOrTAWSCq3HCd5YWIIfQOG0u9wj7BguuKRS6E-yWoElI8j9nX0cKrqBChk-hfQxqDQ@github.com/electrocucaracha/ai-changelog/commit/54901b8e8bc79262ee2a60f39442b9c84f6c8fa4)
+
+## [10.0.2] - 2026-08-22
+
+### Changed
+
+- Renamed the package ai_changelog_msg to ai_changelog throughout the codebase, including source, tests, configuration, and documentation, to improve clarity and align the package name with the CLI entry point. [ff3d0079](https://x-access-token:ghs_15368_eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRobmQiLCJjdHgiOiJGcFBlS0U2UzFYN0VtTG02alhpWjdJaUJSRGR2bXZfdVloNXV2cnA4Q3lOMFRkM1hWdEItUXZFIiwiZXhwIjoxNzg3NjI5MzQ2LCJpYXQiOjE3ODc2MjU3NDYsImlzcyI6ImdpdGh1YiIsImp0aSI6IjgyMDhmMWUwLWUwMTEtNGM0MS1hZDU0LTM5Zjg1ODQwMDQxZSIsInZlciI6M30.Td_FhSIj5DR5ZDew_AqApOrTAWSCq3HCd5YWIIfQOG0u9wj7BguuKRS6E-yWoElI8j9nX0cKrqBChk-hfQxqDQ@github.com/electrocucaracha/ai-changelog/commit/ff3d007930eb7a30455f60eda4ed439636d9f871)
+
+## [10.0.1] - 2026-08-22
+
+### Changed
+
+- Improved changelog entry generation and result preservation in concurrent summary generation, ensuring correct commit context application and result retention in all execution scenarios. [25930412](https://x-access-token:ghs_15368_eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRobmQiLCJjdHgiOiJGcFBlS0U2UzFYN0VtTG02alhpWjdJaUJSRGR2bXZfdVloNXV2cnA4Q3lOMFRkM1hWdEItUXZFIiwiZXhwIjoxNzg3NjI5MzQ2LCJpYXQiOjE3ODc2MjU3NDYsImlzcyI6ImdpdGh1YiIsImp0aSI6IjgyMDhmMWUwLWUwMTEtNGM0MS1hZDU0LTM5Zjg1ODQwMDQxZSIsInZlciI6M30.Td_FhSIj5DR5ZDew_AqApOrTAWSCq3HCd5YWIIfQOG0u9wj7BguuKRS6E-yWoElI8j9nX0cKrqBChk-hfQxqDQ@github.com/electrocucaracha/ai-changelog/commit/25930412688890eb738ade3f2e5939568f04598c)
+
+## [10.0.0] - 2026-08-22
+
+### Removed
+
+- Simplified the release process by removing the ollama cache and switching to the GitHub CLI for releases, ensuring fresh model downloads and improving overall reliability. [aee20372](https://x-access-token:ghs_15368_eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRobmQiLCJjdHgiOiJGcFBlS0U2UzFYN0VtTG02alhpWjdJaUJSRGR2bXZfdVloNXV2cnA4Q3lOMFRkM1hWdEItUXZFIiwiZXhwIjoxNzg3NjI5MzQ2LCJpYXQiOjE3ODc2MjU3NDYsImlzcyI6ImdpdGh1YiIsImp0aSI6IjgyMDhmMWUwLWUwMTEtNGM0MS1hZDU0LTM5Zjg1ODQwMDQxZSIsInZlciI6M30.Td_FhSIj5DR5ZDew_AqApOrTAWSCq3HCd5YWIIfQOG0u9wj7BguuKRS6E-yWoElI8j9nX0cKrqBChk-hfQxqDQ@github.com/electrocucaracha/ai-changelog/commit/aee203722d4eab2a54778ab74b96f173a2fc5ae6)
+
+## [9.2.3] - 2026-08-22
+
+### Changed
+
+- Streamlined the changelog entries for versions 8.11.0 through 8.4.0, providing a clear and comprehensive history of recent changes that improves readability, accuracy, and consistency for users and contributors. [0e257df4](https://x-access-token:ghs_15368_eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRobmQiLCJjdHgiOiJGcFBlS0U2UzFYN0VtTG02alhpWjdJaUJSRGR2bXZfdVloNXV2cnA4Q3lOMFRkM1hWdEItUXZFIiwiZXhwIjoxNzg3NjI5MzQ2LCJpYXQiOjE3ODc2MjU3NDYsImlzcyI6ImdpdGh1YiIsImp0aSI6IjgyMDhmMWUwLWUwMTEtNGM0MS1hZDU0LTM5Zjg1ODQwMDQxZSIsInZlciI6M30.Td_FhSIj5DR5ZDew_AqApOrTAWSCq3HCd5YWIIfQOG0u9wj7BguuKRS6E-yWoElI8j9nX0cKrqBChk-hfQxqDQ@github.com/electrocucaracha/ai-changelog/commit/0e257df48cd78744805d59215856b144e4bfad86)
+
 ## [9.2.2] - 2026-08-22
 
 ### Changed

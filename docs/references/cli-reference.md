@@ -19,6 +19,7 @@ It must point to the Git repository you want to analyze.
 | ------------------------- | --------------------------------- | ---------------------- | ------------------------------------------------------- |
 | `--model`                 | `CHANGELOG_MODEL`                 | `ollama/llama3.1`      | AI model name passed to LiteLLM.                        |
 | `--namespace`             | `CHANGELOG_NAMESPACE`             | `ai-changelog`         | Git notes namespace used to store per-commit summaries. |
+| `--remote`                | `CHANGELOG_REMOTE`                | `origin`               | Git remote used for repository references.              |
 | `--force`                 | `CHANGELOG_FORCE`                 | `false`                | Regenerate summaries even when notes already exist.     |
 | `--clear-all`             | `CHANGELOG_CLEAR_ALL`             | `false`                | Delete all notes in the selected namespace and exit.    |
 | `--create-semver-tags`    | `CHANGELOG_CREATE_SEMVER_TAGS`    | `false`                | Create semantic version tags when missing.              |
@@ -50,6 +51,7 @@ CLI arguments and flags still take precedence over environment values.
 
 - `--model` -> `CHANGELOG_MODEL`
 - `--namespace` -> `CHANGELOG_NAMESPACE`
+- `--remote` -> `CHANGELOG_REMOTE`
 - `--force` -> `CHANGELOG_FORCE`
 - `--clear-all` -> `CHANGELOG_CLEAR_ALL`
 - `--create-semver-tags` -> `CHANGELOG_CREATE_SEMVER_TAGS`

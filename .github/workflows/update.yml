@@ -45,16 +45,9 @@ jobs:
           COMMIT_NAME: "electrocucaracha bot"
           PR_BRANCH_NAME: "versions-update-${PR_ID}"
           PR_TITLE: "Upgrade versions files"
-  check-dockerfile:
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: update Dockerfile
-        uses: ludeeus/dockerfile-updater@eaf8ea79220d076eb46c127fa9895e3de3e0a512 # 21.01.0
-        with:
-          token: ${{ secrets.WORKFLOW_TOKEN }}
-          pr_title: "chore: update Dockerfile"
+          # Default body embeds full COMMANDS_OUTPUT, which can exceed GitHub's
+          # 65536-character PR body limit when uv.lock changes are large.
+          PR_BODY: |
+            Automated update of managed version files.
+
+            ${FILES_SUMMARY}

@@ -82,7 +82,7 @@ class DummyTagRepo:
 
 def _invoke_cli_with_dummy_repo(tmp_path, monkeypatch, args: list[str]):
     repo = DummyRepo(str(tmp_path))
-    monkeypatch.setattr(main, "GitRepository", lambda repo_path: repo)
+    monkeypatch.setattr(main, "GitRepository", lambda repo_path, remote="origin": repo)
 
     runner = CliRunner()
     result = runner.invoke(main.cli, [str(tmp_path), *args])
@@ -121,7 +121,7 @@ def _build_processing_repo(
 
 def _patch_processing_repo(monkeypatch, repo) -> None:
     """Patch GitRepository constructor to return the provided dummy repo."""
-    monkeypatch.setattr(main, "GitRepository", lambda repo_path: repo)
+    monkeypatch.setattr(main, "GitRepository", lambda repo_path, remote="origin": repo)
 
 
 def _install_fake_ai_provider(
@@ -268,7 +268,7 @@ def _run_summary_generation_with_output_capture(
 def test_cli_clear_all_removes_namespace_notes_and_exits(tmp_path, monkeypatch):
     repo = DummyRepo(str(tmp_path))
 
-    monkeypatch.setattr(main, "GitRepository", lambda repo_path: repo)
+    monkeypatch.setattr(main, "GitRepository", lambda repo_path, remote="origin": repo)
 
     def fail_ai_provider(config):
         raise AssertionError("AIProvider should not be constructed for --clear-all")
@@ -287,10 +287,11 @@ def test_cli_clear_all_removes_namespace_notes_and_exits(tmp_path, monkeypatch):
 
 def test_cli_reads_options_from_environment_variables(tmp_path, monkeypatch):
     repo = DummyRepo(str(tmp_path))
-    monkeypatch.setattr(main, "GitRepository", lambda repo_path: repo)
+    monkeypatch.setattr(main, "GitRepository", lambda repo_path, remote="origin": repo)
 
     monkeypatch.setenv("CHANGELOG_MODEL", "gpt-4o-mini")
     monkeypatch.setenv("CHANGELOG_NAMESPACE", "env-notes")
+    monkeypatch.setenv("CHANGELOG_REMOTE", "upstream")
     monkeypatch.setenv("CHANGELOG_FORCE", "1")
     monkeypatch.setenv("CHANGELOG_CLEAR_ALL", "1")
     monkeypatch.setenv("CHANGELOG_CREATE_SEMVER_TAGS", "1")
@@ -308,6 +309,7 @@ def test_cli_reads_options_from_environment_variables(tmp_path, monkeypatch):
     assert repo.cleared_namespace == "env-notes"
     assert "--model gpt-4o-mini" in result.output
     assert "--namespace env-notes" in result.output
+    assert "--remote upstream" in result.output
     assert "--force" in result.output
     assert "--clear-all" in result.output
     assert "--create-semver-tags" in result.output

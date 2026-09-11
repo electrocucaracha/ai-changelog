@@ -87,6 +87,7 @@ def _build_execution_command(
     retry_attempts: int | None = None,
     retry_backoff_seconds: float | None = None,
     overall_progress_mode: str | None = None,
+    remote: str = "origin",
 ) -> str:  # jscpd:ignore-end
     """Build a shell-safe command summary of the current CLI execution.
 
@@ -99,6 +100,8 @@ def _build_execution_command(
         model,
         "--namespace",
         namespace,
+        "--remote",
+        remote,
     ]
 
     if force:
@@ -638,6 +641,13 @@ def _ensure_markdownlint_md024_disable(changelog_text: str) -> tuple[str, bool]:
     help="Git notes namespace (default: ai-changelog)",
 )
 @click.option(
+    "--remote",
+    default="origin",
+    envvar="CHANGELOG_REMOTE",
+    help="Git remote used for repository references",
+    show_default=True,
+)
+@click.option(
     "--force",
     is_flag=True,
     envvar="CHANGELOG_FORCE",
@@ -739,6 +749,7 @@ def cli(
     repo_path: str,
     model: str,
     namespace: str,
+    remote: str,
     force: bool,
     clear_all: bool,
     create_semver_tags: bool,
@@ -798,7 +809,7 @@ def cli(
         config = Config.from_env(**config_overrides)
 
         logger.debug("Opening repository at %s", repo_path)
-        repo = GitRepository(repo_path)
+        repo = GitRepository(repo_path, remote=remote)
         click.echo(f"Repository: {repo.repo_path}")
         click.echo(
             "Execution command: "
@@ -806,6 +817,7 @@ def cli(
                 repo_path=repo_path,
                 model=config.model,
                 namespace=namespace,
+                remote=remote,
                 force=force,
                 clear_all=clear_all,
                 create_semver_tags=create_semver_tags,

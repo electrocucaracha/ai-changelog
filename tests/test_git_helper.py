@@ -63,7 +63,13 @@ class _FakeGit:
 
 
 def _make_repo(
-    fake_git=None, tags=None, remote_url=None, refs=None, create_tag=None
+    fake_git=None,
+    tags=None,
+    remote_url=None,
+    refs=None,
+    create_tag=None,
+    remote="origin",
+    remotes=None,
 ) -> GitRepository:
     repo = GitRepository.__new__(GitRepository)
     repo.repo_path = Path("/tmp/repo")
@@ -73,13 +79,15 @@ def _make_repo(
         tags=tags or [],
         refs=refs or [],
         create_tag=create_tag or (lambda name, ref: None),
-        remotes=(
-            SimpleNamespace(origin=SimpleNamespace(url=remote_url))
+        remotes=remotes
+        or (
+            SimpleNamespace(**{remote: SimpleNamespace(url=remote_url)})
             if remote_url is not None
             else SimpleNamespace()
         ),
         head=SimpleNamespace(commit=object()),
     )
+    repo.remote = remote
     return repo
 
 
@@ -417,6 +425,18 @@ def test_get_repository_web_url_formats_supported_remotes(remote_url, expected):
 
     assert repo.get_repository_web_url() == expected
     assert repo.get_commit_web_url("abc123") == f"{expected}/commit/abc123"
+
+
+def test_get_repository_web_url_uses_selected_remote():
+    repo = _make_repo(
+        remote="upstream",
+        remotes=SimpleNamespace(
+            origin=SimpleNamespace(url="git@host:fork/repo.git"),
+            upstream=SimpleNamespace(url="git@host:canonical/repo.git"),
+        ),
+    )
+
+    assert repo.get_repository_web_url() == "https://host/canonical/repo"
 
 
 def test_get_repository_web_url_returns_none_without_remote():

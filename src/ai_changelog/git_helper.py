@@ -36,8 +36,15 @@ class GitRepository:
         ValueError: Repository path does not exist: /nonexistent/path
     """
 
-    def __init__(self, repo_path: str) -> None:
+    def __init__(self, repo_path: str, remote: str = "origin") -> None:
+        """Open a repository and select the remote used for repository links.
+
+        Args:
+            repo_path: Filesystem path to the root of a git repository.
+            remote: Name of the git remote used for repository URLs.
+        """
         self.repo_path = Path(repo_path)
+        self.remote = remote
         logger.debug("Validating repository path: %s", repo_path)  # pragma: no mutate
 
         if not self.repo_path.exists():
@@ -265,7 +272,7 @@ class GitRepository:
         return path if path.is_absolute() else self.repo_path / path
 
     def get_repository_web_url(self) -> str | None:
-        """Return the best-effort web URL for the repository origin remote.
+        """Return the best-effort web URL for the selected repository remote.
 
         Supports common remote URL forms such as:
         - ``https://host/org/repo.git``
@@ -277,7 +284,7 @@ class GitRepository:
             the URL cannot be resolved.
         """
         try:
-            remote_url = self.repo.remotes.origin.url
+            remote_url = getattr(self.repo.remotes, self.remote).url
         except Exception:  # noqa: BLE001
             return None
 
@@ -301,7 +308,7 @@ class GitRepository:
         return None
 
     def get_commit_web_url(self, commit_hash: str) -> str | None:
-        """Return the web URL to view *commit_hash* in the origin repository.
+        """Return the web URL to view *commit_hash* in the selected repository.
 
         Args:
             commit_hash: Full commit SHA.
@@ -344,7 +351,7 @@ class GitRepository:
             "branch": branch_name,
             "head_commit": head_commit,
             "remote_url": getattr(
-                getattr(self.repo.remotes, "origin", None), "url", None
+                getattr(self.repo.remotes, self.remote, None), "url", None
             ),
             "repository_web_url": self.get_repository_web_url(),
             "semantic_version_tags": self.get_semantic_version_tags(),

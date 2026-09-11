@@ -1907,13 +1907,13 @@ def test_cli_clear_all_reports_no_notes_when_none_found(tmp_path, monkeypatch):
     """--clear-all must print 'No git notes found' when clear_notes returns False."""
 
     class _EmptyRepo:
-        def __init__(self, repo_path: str) -> None:
+        def __init__(self, repo_path: str, remote: str = "origin") -> None:
             self.repo_path = Path(repo_path)
 
         def clear_notes(self, namespace: str) -> bool:
             return False
 
-    monkeypatch.setattr(main, "GitRepository", lambda path: _EmptyRepo(path))
+    monkeypatch.setattr(main, "GitRepository", _EmptyRepo)
 
     runner = CliRunner()
     result = runner.invoke(main.cli, [str(tmp_path), "--clear-all"])
@@ -2116,7 +2116,7 @@ def test_cli_reports_changelog_already_up_to_date(tmp_path, monkeypatch):
 def test_cli_fatal_error_exits_with_code_1(tmp_path, monkeypatch):
     """CLI must exit with code 1 and print 'Fatal error' on unhandled exceptions."""
 
-    def _fail_repo(path: str):
+    def _fail_repo(path: str, remote: str = "origin"):
         raise RuntimeError("repository init failed")
 
     monkeypatch.setattr(main, "GitRepository", _fail_repo)

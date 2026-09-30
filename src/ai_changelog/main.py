@@ -88,6 +88,7 @@ def _build_execution_command(
     retry_backoff_seconds: float | None = None,
     overall_progress_mode: str | None = None,
     remote: str = "origin",
+    fetch_tags: bool = True,
 ) -> str:  # jscpd:ignore-end
     """Build a shell-safe command summary of the current CLI execution.
 
@@ -110,6 +111,8 @@ def _build_execution_command(
         args.append("--clear-all")  # pragma: no mutate
     if create_semver_tags:
         args.append("--create-semver-tags")
+    if not fetch_tags:
+        args.append("--no-fetch-tags")
     if limit is not None:
         args.extend(["--limit", str(limit)])
     if workers is not None:
@@ -644,8 +647,14 @@ def _ensure_markdownlint_md024_disable(changelog_text: str) -> tuple[str, bool]:
     "--remote",
     default="origin",
     envvar="CHANGELOG_REMOTE",
-    help="Git remote used for repository references",
+    help="Git remote used for repository references and tag fetching",
     show_default=True,
+)
+@click.option(
+    "--fetch-tags/--no-fetch-tags",
+    default=True,
+    envvar="CHANGELOG_FETCH_TAGS",
+    help="Fetch all tags from the selected remote before processing (default: enabled)",
 )
 @click.option(
     "--force",
@@ -750,6 +759,7 @@ def cli(
     model: str,
     namespace: str,
     remote: str,
+    fetch_tags: bool,
     force: bool,
     clear_all: bool,
     create_semver_tags: bool,
@@ -818,6 +828,7 @@ def cli(
                 model=config.model,
                 namespace=namespace,
                 remote=remote,
+                fetch_tags=fetch_tags,
                 force=force,
                 clear_all=clear_all,
                 create_semver_tags=create_semver_tags,
@@ -842,6 +853,9 @@ def cli(
             else:
                 click.echo(f"No git notes found for namespace: {namespace}")
             return
+
+        if fetch_tags:
+            repo.fetch_tags()
 
         ai_provider: AIProvider | None = None
         commits = repo.get_all_commits(limit=limit)

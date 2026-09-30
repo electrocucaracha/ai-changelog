@@ -56,6 +56,7 @@ def test_cli_generates_note_with_llm_mock_provider(tmp_path: Path) -> None:
         cli,
         [
             str(tmp_path),
+            "--no-fetch-tags",
             "--model",
             "openai/gpt-4o-mini",
             "--namespace",
@@ -98,6 +99,7 @@ def test_cli_skips_ai_generation_when_note_already_exists(tmp_path: Path) -> Non
         cli,
         [
             str(tmp_path),
+            "--no-fetch-tags",
             "--namespace",
             "functional-preseeded",
             "--workers",

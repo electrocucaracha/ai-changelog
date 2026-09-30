@@ -18,6 +18,7 @@ from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
 import pytest
+from git import Repo
 from git.exc import GitCommandError
 
 from ai_changelog.git_helper import GitRepository
@@ -410,6 +411,56 @@ def test_get_semantic_version_tags_and_resolve_output_path():
     assert repo.get_semantic_version_tags() == {"a1": ["v1.0.0", "v1.0.1"]}
     assert repo.resolve_output_path("CHANGELOG.md") == Path("/tmp/repo/CHANGELOG.md")
     assert repo.resolve_output_path("/tmp/custom.md") == Path("/tmp/custom.md")
+
+
+def test_fetch_tags_uses_selected_remote(monkeypatch):
+    """Fetch tags only from the selected remote."""
+    repo = _make_repo(remote="upstream")
+    calls = []
+    monkeypatch.setattr(
+        repo.repo.git, "fetch", lambda *args: calls.append(args), raising=False
+    )
+
+    repo.fetch_tags()
+
+    assert calls == [("upstream", "--tags")]
+
+
+def test_fetch_tags_reports_git_failure(monkeypatch):
+    """Surface Git fetch failures with the selected remote name."""
+    repo = _make_repo()
+
+    def fail_fetch(*args):
+        """Simulate a failed Git fetch."""
+        raise GitCommandError(["git", "fetch", *args], 1, stderr="offline")
+
+    monkeypatch.setattr(repo.repo.git, "fetch", fail_fetch, raising=False)
+
+    with pytest.raises(RuntimeError, match="Failed to fetch tags from remote origin"):
+        repo.fetch_tags()
+
+
+def test_fetch_tags_imports_tags_added_after_clone(tmp_path):
+    """Read tags published to a remote after a repository was cloned."""
+    source = Repo.init(tmp_path / "source")
+    with source.config_writer() as writer:
+        writer.set_value("user", "name", "Test")
+        writer.set_value("user", "email", "test@example.com")
+    file_path = tmp_path / "source" / "README.md"
+    file_path.write_text("first commit\n", encoding="utf-8")
+    source.index.add(["README.md"])
+    commit = source.index.commit("initial commit")
+
+    cloned_path = tmp_path / "clone"
+    Repo.clone_from(source.working_tree_dir, cloned_path)
+    source.create_tag("v1.2.3", ref=commit)
+
+    clone = GitRepository(str(cloned_path))
+    assert not clone.get_semantic_version_tags()
+
+    clone.fetch_tags()
+
+    assert clone.get_semantic_version_tags() == {commit.hexsha: ["v1.2.3"]}
 
 
 @pytest.mark.parametrize(

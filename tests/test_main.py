@@ -35,6 +35,11 @@ class DummyProcessingRepo:
         self.diff_by_commit = diff_by_commit or {}
         self.saved_notes: list[tuple[str, str, str]] = []
         self.created_tags: list[tuple[str, str]] = []
+        self.fetch_calls = 0
+
+    def fetch_tags(self):
+        """Record tag fetches for CLI assertions."""
+        self.fetch_calls += 1
 
     def get_all_commits(self, limit=None):
         return self._commits[:limit] if limit else self._commits
@@ -357,6 +362,54 @@ def test_cli_includes_overall_progress_mode_in_execution_command(tmp_path, monke
 
     assert result.exit_code == 0
     assert "--overall-progress-mode work-units" in result.output
+
+
+def test_cli_fetches_tags_before_reading_commits_by_default(tmp_path, monkeypatch):
+    """Fetch remote tags before reading commits during normal startup."""
+    repo = _build_processing_repo(tmp_path, commits=[])
+
+    def check_fetch_before_commits(limit=None):
+        """Assert the fetch has happened when commits are requested."""
+        assert repo.fetch_calls == 1
+        assert limit is None
+        return []
+
+    repo.get_all_commits = check_fetch_before_commits
+    _patch_processing_repo(monkeypatch, repo)
+
+    result = _invoke_cli(tmp_path, [])
+
+    assert result.exit_code == 0
+    assert repo.fetch_calls == 1
+
+
+def test_cli_can_skip_tag_fetch(tmp_path, monkeypatch):
+    """Allow offline runs to skip the default tag fetch."""
+    repo = _build_processing_repo(tmp_path, commits=[])
+    _patch_processing_repo(monkeypatch, repo)
+
+    result = _invoke_cli(tmp_path, ["--no-fetch-tags"])
+
+    assert result.exit_code == 0
+    assert repo.fetch_calls == 0
+    assert "--no-fetch-tags" in result.output
+
+
+def test_cli_stops_on_tag_fetch_failure(tmp_path, monkeypatch):
+    """Abort processing when the default remote tag fetch fails."""
+    repo = _build_processing_repo(tmp_path, commits=[])
+    _patch_processing_repo(monkeypatch, repo)
+
+    def fail_fetch():
+        """Simulate a Git remote fetch failure."""
+        raise RuntimeError("Failed to fetch tags from remote origin")
+
+    repo.fetch_tags = fail_fetch
+
+    result = _invoke_cli(tmp_path, [])
+
+    assert result.exit_code != 0
+    assert "Failed to fetch tags from remote origin" in result.output
 
 
 def test_cli_prints_auto_selected_worker_count(tmp_path, monkeypatch):

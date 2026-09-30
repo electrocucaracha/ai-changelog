@@ -15,21 +15,22 @@ It must point to the Git repository you want to analyze.
 
 ## Common Options
 
-| Option                    | Env var                           | Default                | Description                                             |
-| ------------------------- | --------------------------------- | ---------------------- | ------------------------------------------------------- |
-| `--model`                 | `CHANGELOG_MODEL`                 | `ollama/llama3.1`      | AI model name passed to LiteLLM.                        |
-| `--namespace`             | `CHANGELOG_NAMESPACE`             | `ai-changelog`         | Git notes namespace used to store per-commit summaries. |
-| `--remote`                | `CHANGELOG_REMOTE`                | `origin`               | Git remote used for repository references.              |
-| `--force`                 | `CHANGELOG_FORCE`                 | `false`                | Regenerate summaries even when notes already exist.     |
-| `--clear-all`             | `CHANGELOG_CLEAR_ALL`             | `false`                | Delete all notes in the selected namespace and exit.    |
-| `--create-semver-tags`    | `CHANGELOG_CREATE_SEMVER_TAGS`    | `false`                | Create semantic version tags when missing.              |
-| `--limit`                 | `CHANGELOG_LIMIT`                 | unset                  | Process only the most recent `N` commits.               |
-| `--workers`               | `CHANGELOG_WORKERS`               | implementation-defined | Maximum worker threads for AI summarization.            |
-| `--retry-attempts`        | `CHANGELOG_RETRY_ATTEMPTS`        | `3`                    | Retry attempts for transient AI API failures.           |
-| `--retry-backoff-seconds` | `CHANGELOG_RETRY_BACKOFF_SECONDS` | `1.0`                  | Base retry delay in seconds.                            |
-| `--overall-progress-mode` | `CHANGELOG_OVERALL_PROGRESS_MODE` | `commits`              | Overall progress counting mode.                         |
-| `--log-level`             | `CHANGELOG_LOG_LEVEL`             | implementation-defined | Log verbosity level.                                    |
-| `--changelog-file`        | `CHANGELOG_CHANGELOG_FILE`        | `CHANGELOG.md`         | Output path for generated changelog content.            |
+| Option                         | Env var                           | Default                | Description                                                 |
+| ------------------------------ | --------------------------------- | ---------------------- | ----------------------------------------------------------- |
+| `--model`                      | `CHANGELOG_MODEL`                 | `ollama/llama3.1`      | AI model name passed to LiteLLM.                            |
+| `--namespace`                  | `CHANGELOG_NAMESPACE`             | `ai-changelog`         | Git notes namespace used to store per-commit summaries.     |
+| `--remote`                     | `CHANGELOG_REMOTE`                | `origin`               | Git remote used for repository references and tags.         |
+| `--fetch-tags/--no-fetch-tags` | `CHANGELOG_FETCH_TAGS`            | `true`                 | Fetch all tags before processing; disable for offline runs. |
+| `--force`                      | `CHANGELOG_FORCE`                 | `false`                | Regenerate summaries even when notes already exist.         |
+| `--clear-all`                  | `CHANGELOG_CLEAR_ALL`             | `false`                | Delete all notes in the selected namespace and exit.        |
+| `--create-semver-tags`         | `CHANGELOG_CREATE_SEMVER_TAGS`    | `false`                | Create semantic version tags when missing.                  |
+| `--limit`                      | `CHANGELOG_LIMIT`                 | unset                  | Process only the most recent `N` commits.                   |
+| `--workers`                    | `CHANGELOG_WORKERS`               | implementation-defined | Maximum worker threads for AI summarization.                |
+| `--retry-attempts`             | `CHANGELOG_RETRY_ATTEMPTS`        | `3`                    | Retry attempts for transient AI API failures.               |
+| `--retry-backoff-seconds`      | `CHANGELOG_RETRY_BACKOFF_SECONDS` | `1.0`                  | Base retry delay in seconds.                                |
+| `--overall-progress-mode`      | `CHANGELOG_OVERALL_PROGRESS_MODE` | `commits`              | Overall progress counting mode.                             |
+| `--log-level`                  | `CHANGELOG_LOG_LEVEL`             | implementation-defined | Log verbosity level.                                        |
+| `--changelog-file`             | `CHANGELOG_CHANGELOG_FILE`        | `CHANGELOG.md`         | Output path for generated changelog content.                |
 
 ### Progress Mode Values
 
@@ -52,6 +53,7 @@ CLI arguments and flags still take precedence over environment values.
 - `--model` -> `CHANGELOG_MODEL`
 - `--namespace` -> `CHANGELOG_NAMESPACE`
 - `--remote` -> `CHANGELOG_REMOTE`
+- `--fetch-tags/--no-fetch-tags` -> `CHANGELOG_FETCH_TAGS`
 - `--force` -> `CHANGELOG_FORCE`
 - `--clear-all` -> `CHANGELOG_CLEAR_ALL`
 - `--create-semver-tags` -> `CHANGELOG_CREATE_SEMVER_TAGS`

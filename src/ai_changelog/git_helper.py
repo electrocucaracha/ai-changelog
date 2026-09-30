@@ -56,6 +56,19 @@ class GitRepository:
         self.repo = Repo(self.repo_path)
         logger.debug("Repository opened: %s", self.repo_path)  # pragma: no mutate
 
+    def fetch_tags(self) -> None:
+        """Fetch all tags from the selected remote before reading local tags.
+
+        Raises:
+            RuntimeError: If fetching tags from the remote fails.
+        """
+        try:
+            self.repo.git.fetch(self.remote, "--tags")
+        except GitCommandError as error:
+            raise RuntimeError(
+                f"Failed to fetch tags from remote {self.remote}: {error}"
+            ) from error
+
     def get_all_commits(self, limit: int | None = None) -> list[Commit]:
         """Return commits reachable from ``HEAD``, newest first.
 

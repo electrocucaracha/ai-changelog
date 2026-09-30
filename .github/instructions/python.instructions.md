@@ -1,5 +1,5 @@
 ---
-description: "Python development standards for this project: apply Python best practices, follow the Zen of Python, use typing, and always provide docstrings for modules, classes, and functions."
+description: "Python development standards for this project: typing, docstrings, and Black, Ruff, isort, Pylint, and Mypy checks."
 applyTo: "**/*.py"
 ---
 
@@ -24,6 +24,12 @@ Target Python 3.9+ and keep code aligned with this project's `src/` layout, CLI 
 - Follow the project's formatting and linting conventions: Black-style formatting, isort-compatible imports, Ruff-clean code, and 88 character line length.
 - Prefer double quotes to match the existing formatter configuration.
 - Reuse existing dependencies and patterns before introducing new packages or architectural layers.
+
+## Linting And Type Checks
+
+- Run Black, Ruff, isort, Pylint, and Mypy on changed Python files before finishing.
+- Fix findings introduced by the change; report any pre-existing findings that prevent a check from passing.
+- Use the settings in `pyproject.toml` for tools configured by this project.
 
 ## Typing And Signatures
 

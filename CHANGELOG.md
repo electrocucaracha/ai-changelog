@@ -12,6 +12,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.6.0] - 2026-09-29
+
+### Added
+
+- Enabled a new CLI option to fetch all tags from the selected remote by default, improving detection of remote tags added after cloning and allowing users to disable tag fetching in offline or restricted environments. [a0f3e448](https://github.com/electrocucaracha/ai-changelog/commit/a0f3e448c96c4393eb343385d289e78d3cba467d)
+
+## [10.5.2] - 2026-09-29
+
+### Changed
+
+- Enabled consistent code quality for Python files by requiring users to run Black, Ruff, isort, Pylint, and Mypy checks before finishing, with instructions to fix findings and reference configuration in pyproject.toml. [33bf3cf6](https://github.com/electrocucaracha/ai-changelog/commit/33bf3cf677d0af63104adaf61ca7b41b9287800f)
+
+## [10.5.1] - 2026-09-29
+
+### Changed
+
+- Updated the CI workflow to utilize the latest features and bugfixes from upstream GitHub Actions and pre-commit hooks, ensuring no breaking changes occur. [b1925901](https://github.com/electrocucaracha/ai-changelog/commit/b19259014f8b0ffcbe0d45212ddbaacbc3c488a7)
+
+## [10.5.0] - 2026-09-11
+
+### Added
+
+- Dependabot now enforces a default cooldown period of 7 days to prevent frequent pull requests and reduce noise in the workflow, thereby improving workflow stability for maintainers. [425aa003](https://github.com/electrocucaracha/ai-changelog/commit/425aa003c61eda7b684f5c8bfc1ff09a7a44ef84)
+
+## [10.4.2] - 2026-09-11
+
+### Changed
+
+- Modernized GitRepository mocks in tests to accept an optional remote argument, preventing TypeError exceptions when the CLI invokes GitRepository with two arguments. [f6ad1270](https://github.com/electrocucaracha/ai-changelog/commit/f6ad1270f03a64b9589a7d2e5da335ab43b58940)
+
+## [10.4.1] - 2026-09-10
+
+### Changed
+
+- Dependabot is now configured to monitor the Dockerfile's base image and open pull requests for updates weekly on Fridays, streamlining maintenance responsibilities and reducing duplicate requests. [9f9a0634](https://github.com/electrocucaracha/ai-changelog/commit/9f9a06349c7b4b5dd25aa6a84e36edac97ee68ff)
+
+## [10.4.0] - 2026-09-10
+
+### Added
+
+- Enabled users to specify the Git remote for repository references through the --remote flag and CHANGELOG_REMOTE environment variable. [a40def59](https://github.com/electrocucaracha/ai-changelog/commit/a40def594c2be8bd8aee0a3b39e6cacd7b02ee7d)
+
+## [10.3.0] - 2026-09-10
+
+### Added
+
+- Enabled users to select a Git remote when generating repository and commit web URLs, allowing them to work with multiple remotes such as origin and upstream and choose the relevant repository source. [2def20e5](https://github.com/electrocucaracha/ai-changelog/commit/2def20e5d5e978fc9317813dbcb51638247e1484)
+
+## [10.2.0] - 2026-08-25
+
+### Added
+
+- The release workflow now explicitly pushes all tags and the release tag to the remote, and verifies its presence before proceeding, addressing potential failures and missing tags due to interrupted pushes or existing tags. [25c9a88c](https://github.com/electrocucaracha/ai-changelog/commit/25c9a88cf7e4bb4edd1e73f0b86e0d20ae6f6150)
+
+## [10.1.0] - 2026-08-25
+
+### Added
+
+- Updated release notes for version 10.0.3 to reflect recent changes, including optimized test coverage for AI provider functionality, renaming the package ai_changelog_msg to ai_changelog, and improved changelog entry generation, simplifying the release process by removing the ollama cache and switching to the GitHub CLI. [8b1f8e19](https://github.com/electrocucaracha/ai-changelog/commit/8b1f8e19215b8f6b3246edfdb3bc05f407806e01)
+
 ## [10.0.3] - 2026-08-24
 
 ### Changed

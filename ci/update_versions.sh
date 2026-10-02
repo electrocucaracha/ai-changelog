@@ -91,3 +91,5 @@ for action in $gh_actions; do
     # shellcheck disable=SC2267
     grep -ElRZ "uses: $action@" .github/ | xargs -0 -l sed -i -e "s|uses: $action@.*|uses: $action@$commit_hash|g"
 done
+
+uvx --refresh zizmor --offline --min-severity low .github/

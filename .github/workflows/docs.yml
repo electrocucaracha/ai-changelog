@@ -37,7 +37,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup Python environment
-        uses: $/.github/actions/setup-python-env
+        uses: ./.github/actions/setup-python-env
       - name: Check code style
         run: uvx tox -e lint-check
       - name: Run tests

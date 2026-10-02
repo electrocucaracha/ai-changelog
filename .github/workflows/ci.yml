@@ -25,7 +25,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup Python environment
-        uses: $/.github/actions/setup-python-env
+        uses: ./.github/actions/setup-python-env
       - name: Run unit tests
         run: uvx tox -e py312 -- --cov=ai_changelog --cov-report=term-missing --cov-report=json
       - name: Enforce minimum coverage
@@ -45,7 +45,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup Python environment
-        uses: $/.github/actions/setup-python-env
+        uses: ./.github/actions/setup-python-env
       - name: Start LLMock server
         run: |
           python tests/mock_llm_server.py --host 127.0.0.1 --port 8001 \
@@ -151,7 +151,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup Python environment
-        uses: $/.github/actions/setup-python-env
+        uses: ./.github/actions/setup-python-env
       - name: Install test dependencies
         run: uv sync --extra test
       - name: Restrict mutations to ${{ matrix.module }}

@@ -31,7 +31,7 @@ jobs:
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           enable-cache: false
-      - uses: ai-action/setup-ollama@5f3116a5cd85594f351c3f8600a5ac08e63bc285 # v2.1.1
+      - uses: ai-action/setup-ollama@7251aeb8bd484f01af7bff1f887073bcbd82df5c # v2.1.4
       - name: Generate CHANGELOG.md
         run: |
           uvx --from git+https://github.com/electrocucaracha/ai-changelog.git ai-changelog --create-semver-tags .

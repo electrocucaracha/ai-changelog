@@ -28,10 +28,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: git fetch origin refs/notes/ai-changelog:refs/notes/ai-changelog || true
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: false
-      - uses: ai-action/setup-ollama@bb1a15e4315698e668874dc3aad323d7c6d57ede # v2.1.0
+      - uses: ai-action/setup-ollama@6782d243db5fbcbf7583532ce0b5122f64242689 # v2.1.5
       - name: Generate CHANGELOG.md
         run: |
           uvx --from git+https://github.com/electrocucaracha/ai-changelog.git ai-changelog --create-semver-tags .

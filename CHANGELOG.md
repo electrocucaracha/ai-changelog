@@ -12,6 +12,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.7.6] - 2026-10-23
+
+### Changed
+
+- Updated dependencies to their latest stable versions, improving CI reliability and keeping dependencies current. [55051d60](https://github.com/electrocucaracha/ai-changelog/commit/55051d60d012f34b4505abc07cc28f8e56962aa5)
+
+## [10.7.5] - 2026-10-11
+
+### Changed
+
+- Enhanced automation and CI maintenance by standardizing the setup-python-env action across GitHub workflows and introducing a new zizmor command with offline and autofix options for .github/ files. [61613b65](https://github.com/electrocucaracha/ai-changelog/commit/61613b655dd1fc60693f1f6002bad8e1bad9cc99)
+
+## [10.7.4] - 2026-10-11
+
+### Changed
+
+- Simplified maintenance and reduced complexity by upgrading GitHub Actions to their latest releases and delegating version updates to gh-updater. [a1d42d38](https://github.com/electrocucaracha/ai-changelog/commit/a1d42d381c35464afe7f3ebbba01b23ab6a621dc)
+
+## [10.7.3] - 2026-10-02
+
+### Changed
+
+- Simplified the setup-python-env action path in GitHub Actions to use a relative reference, ensuring the local action is correctly located and used by the workflow files. [2d601b01](https://github.com/electrocucaracha/ai-changelog/commit/2d601b013872d5e40c8c01064abc6fb64d4cfb60)
+
+## [10.7.2] - 2026-10-02
+
+### Changed
+
+- Updated the ai-prepare-commit-msg repository version in .pre-commit-config.yaml to v19.8.1, incorporating upstream fixes and improvements without introducing any breaking behavior or migration requirements. [54edfbcc](https://github.com/electrocucaracha/ai-changelog/commit/54edfbcc310915e39dca2c20991db88b529c250a)
+
+## [10.7.1] - 2026-10-01
+
+### Changed
+
+- Simplified GitHub Actions workflows to ensure consistency and compatibility with updated tooling by updating action references to use the "$/" syntax and removing redundant installation steps. [6a60ef37](https://github.com/electrocucaracha/ai-changelog/commit/6a60ef3718f3972cca28e16bd1a11b8d1ecb8304)
+
+## [10.7.0] - 2026-09-29
+
+### Added
+
+- Modernized the changelog to include detailed records of new features, workflow enhancements, dependency updates, and bugfixes for releases 10.1.0 through 10.6.0. [a34bf33e](https://github.com/electrocucaracha/ai-changelog/commit/a34bf33ea534ffddc029a6f841eac0d7cc8e711b)
+
 ## [10.6.0] - 2026-09-29
 
 ### Added

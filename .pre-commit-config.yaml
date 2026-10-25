@@ -48,5 +48,7 @@ repos:
     rev: v20.3.7
     hooks:
       - id: ai-prepare-commit
+        name: generate commit message with AI
+        verbose: true
         stages:
           - prepare-commit-msg

@@ -12,6 +12,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.9.3] - 2026-10-30
+
+### Changed
+
+- Streamlined the update process for managed version files by centralizing maintenance and reducing duplication. [e122660e](https://github.com/electrocucaracha/ai-changelog/commit/e122660e03652a7955acc4a82493adc5a3c4d429)
+
+## [10.9.2] - 2026-10-30
+
+### Changed
+
+- Updated GitHub Actions and pre-commit hooks to their latest versions, incorporating upstream improvements and bugfixes that ensure improved reliability, compatibility, and access to recent features. [366827e3](https://github.com/electrocucaracha/ai-changelog/commit/366827e3aeb0f29b5c3d2fc0947996c357064461)
+
+## [10.9.1] - 2026-10-30
+
+### Changed
+
+- Optimized compatibility with downstream dependencies by raising the minimum required version of filelock to 4.2.1. [46d7d643](https://github.com/electrocucaracha/ai-changelog/commit/46d7d64345933434c9b0c08bfe27ebcb43c76b12)
+
+## [10.9.0] - 2026-10-25
+
+### Added
+
+- Enabled verbose output for the ai-prepare-commit hook in pre-commit, providing more detailed logs during commit message generation, aiding in debugging, and clarifying the commit message generation process, with a custom display name set for clarity. [52c120ff](https://github.com/electrocucaracha/ai-changelog/commit/52c120ffb450d887a1e21e2d85a9c65396865cd7)
+
+## [10.8.0] - 2026-10-23
+
+### Added
+
+- Modernized release notes for versions 10.7.0 through 10.7.6, providing detailed historical context for recent improvements and maintenance activities that include enhancements to CI reliability, standardization of GitHub workflow actions, and dependency updates. [4571a727](https://github.com/electrocucaracha/ai-changelog/commit/4571a72770df85c73a3d5e3041ec7cfd0623515f)
+
 ## [10.7.6] - 2026-10-23
 
 ### Changed

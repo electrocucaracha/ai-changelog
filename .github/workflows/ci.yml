@@ -145,6 +145,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        python-version: ['3.14']
         module: [ai_provider, changelog, config, git_helper, main]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -152,6 +153,8 @@ jobs:
           persist-credentials: false
       - name: Setup Python environment
         uses: ./.github/actions/setup-python-env # zizmor: ignore[self-repository]
+        with:
+          python-version: ${{ matrix.python-version }}
       - name: Install test dependencies
         run: uv sync --extra test
       - name: Restrict mutations to ${{ matrix.module }}

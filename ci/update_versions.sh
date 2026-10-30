@@ -37,7 +37,7 @@ EOF
 if ! command -v uvx >/dev/null; then
     curl -LsSf https://astral.sh/uv/install.sh | sh
 fi
-uv sync --upgrade
+uv sync --upgrade --all-extras
 uvx pre-commit autoupdate
 uv run --no-project --with git+https://github.com/electrocucaracha/gh-updater.git gh-updater .
 uvx --refresh zizmor --offline --min-severity low .github/ --fix=all

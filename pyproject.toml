@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Generate AI-powered summaries of git commit diffs and store them in git notes"
 readme = "README.md"
 license = {text = "Apache-2.0"}
-requires-python = ">=3.12"
+requires-python = ">=3.10,<3.15"
 keywords = ["git", "ai", "summary", "changelog", "notes"]
 classifiers = [
     "Development Status :: 3 - Alpha",

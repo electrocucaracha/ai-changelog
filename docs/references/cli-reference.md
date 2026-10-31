@@ -86,6 +86,18 @@ so set provider credentials directly in your shell.
 
 - `CHANGELOG_ENABLE_HEADROOM` (`true` or `false`, defaults to `true`)
 
+### Optional Telemetry
+
+- `CHANGELOG_TELEMETRY_ENDPOINT`: Full OTLP/HTTP metrics URL, commonly ending
+  in `/v1/metrics`. Unset or blank disables telemetry.
+- `OTEL_EXPORTER_OTLP_METRICS_HEADERS`: Optional authentication headers for
+  the receiver.
+- `OTEL_EXPORTER_OTLP_METRICS_CERTIFICATE`: Optional private CA certificate
+  path for the receiver.
+
+See [Export usage telemetry](../how-to-guides/telemetry.md) for metrics and
+privacy details.
+
 ### Common Base Or Version Variables
 
 - `OPENAI_BASE_URL`

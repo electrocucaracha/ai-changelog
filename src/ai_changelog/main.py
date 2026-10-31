@@ -30,6 +30,7 @@ from typing import Any, NamedTuple
 
 import click
 
+from ai_changelog import telemetry
 from ai_changelog.ai_provider import AIProvider
 from ai_changelog.changelog import (
     ChangelogBuilder,
@@ -754,6 +755,7 @@ def _ensure_markdownlint_md024_disable(changelog_text: str) -> tuple[str, bool]:
     envvar="CHANGELOG_LITELLM_HEADERS_JSON",
     help="Optional JSON object with extra headers for LiteLLM requests",
 )
+@telemetry.instrument_cli
 def cli(
     repo_path: str,
     model: str,
@@ -860,6 +862,7 @@ def cli(
         ai_provider: AIProvider | None = None
         commits = repo.get_all_commits(limit=limit)
         total_commits = len(commits)
+        telemetry.add("commits.discovered", total_commits)
         logger.debug("Retrieved %d commits (limit=%s)", total_commits, limit)
 
         if total_commits == 0:
@@ -944,6 +947,10 @@ def cli(
             f"already-noted={already_noted_count}, "
             f"empty-diff={empty_diff_count}"
         )
+        telemetry.add("commits.actionable", len(actionable_commits))
+        telemetry.add("commits.already_noted", already_noted_count)
+        telemetry.add("commits.empty_diff", empty_diff_count)
+        telemetry.add("summaries.requested", len(summaries_to_generate))
 
         if not summaries_to_generate:
             click.echo(
@@ -1038,6 +1045,8 @@ def cli(
         logger.info(
             "Done — processed=%d skipped=%d failed=%d", processed, skipped, failed
         )
+        telemetry.add("summaries.processed", processed)
+        telemetry.add("summaries.failed", failed)
 
         if ai_provider is not None:
             usage = ai_provider.token_usage

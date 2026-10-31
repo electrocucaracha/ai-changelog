@@ -10,6 +10,7 @@ Use these as lookup material while implementing workflows.
 ## Available references
 
 - [CLI reference](cli-reference.md)
+- [Telemetry configuration](cli-reference.md#optional-telemetry)
 
 ## Next
 

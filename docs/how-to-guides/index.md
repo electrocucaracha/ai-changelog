@@ -11,6 +11,7 @@ Use these when you already understand the basics and need outcome-focused steps.
 
 - [GitHub Actions release setup](github-actions-release.md)
 - [Add a custom LLM provider](custom-providers.md)
+- [Export usage telemetry](telemetry.md)
 
 ## Next
 

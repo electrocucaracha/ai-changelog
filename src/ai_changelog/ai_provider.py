@@ -45,6 +45,7 @@ else:
     except ImportError:  # pragma: no cover - optional dependency
         _HeadroomCallback = None  # type: ignore[assignment]
 
+from ai_changelog import telemetry
 from ai_changelog.config import Config
 
 logger = logging.getLogger(__name__)
@@ -317,29 +318,37 @@ class AIProvider:
         max_tokens: int,
     ) -> Any:
         """Call the model with bounded retries for transient failures."""
-        for attempt in range(1, self._max_completion_attempts + 1):  # pragma: no mutate
-            try:
-                return self._completion_with_ollama_auto_pull(
-                    messages=messages,
-                    temperature=temperature,
-                    max_tokens=max_tokens,  # pragma: no mutate
-                )
-            except Exception as error:
-                if (
-                    not self._is_retryable_completion_error(error)
-                    or attempt >= self._max_completion_attempts  # pragma: no mutate
-                ):
-                    raise
+        with telemetry.request(self.model, "completion") as record:
+            for attempt in range(
+                1, self._max_completion_attempts + 1
+            ):  # pragma: no mutate
+                try:
+                    response = self._completion_with_ollama_auto_pull(
+                        messages=messages,
+                        temperature=temperature,
+                        max_tokens=max_tokens,  # pragma: no mutate
+                    )
+                except Exception as error:
+                    if (
+                        not self._is_retryable_completion_error(error)
+                        or attempt >= self._max_completion_attempts  # pragma: no mutate
+                    ):
+                        raise
 
-                delay_seconds = self._base_retry_delay_seconds * (2 ** (attempt - 1))
-                logger.warning(
-                    "Transient AI API error on attempt %d/%d: %s. Retrying in %.1fs",  # pragma: no mutate
-                    attempt,
-                    self._max_completion_attempts,
-                    error,  # pragma: no mutate
-                    delay_seconds,
-                )
-                time.sleep(delay_seconds)
+                    delay_seconds = self._base_retry_delay_seconds * (
+                        2 ** (attempt - 1)
+                    )
+                    logger.warning(
+                        "Transient AI API error on attempt %d/%d: %s. Retrying in %.1fs",  # pragma: no mutate
+                        attempt,
+                        self._max_completion_attempts,
+                        error,  # pragma: no mutate
+                        delay_seconds,
+                    )
+                    time.sleep(delay_seconds)
+                else:
+                    record(response)
+                    return response
 
         raise RuntimeError("Unreachable retry state while calling AI provider")
 

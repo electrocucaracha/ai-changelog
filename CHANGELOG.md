@@ -12,6 +12,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.12.0] - 2026-10-30
+
+### Added
+
+- Enabled users and maintainers to monitor usage patterns and behavior, supporting observability and analysis use cases, with opt-out controls via environment variables. [cf113af9](https://github.com/electrocucaracha/ai-changelog/commit/cf113af9810b3db4b47241bfa090687416da0f2b)
+
+## [10.11.1] - 2026-10-30
+
+### Changed
+
+- Optimized test dependencies by downgrading pytest to version 8.4.2 and pinning it to version 9 to avoid incompatibilities with newer major versions, and by using the --all-extras flag in the uv sync step to ensure consistency between dependencies and their lockfile. [6cb24d19](https://github.com/electrocucaracha/ai-changelog/commit/6cb24d195a74ac723479ab9a8ad99af91504ef1d)
+
+## [10.11.0] - 2026-10-30
+
+### Added
+
+- Enabled test coverage for Python 3.14 by updating the CI workflow to include it in the test matrix and modifying the setup step to explicitly receive the matrix-defined Python version. [67e9e2b8](https://github.com/electrocucaracha/ai-changelog/commit/67e9e2b83d6dc179607c11f289b81e4854ffea89)
+
+## [10.10.2] - 2026-10-30
+
+### Changed
+
+- Updated the minimum Python version requirement to 3.11, ensuring compatibility with dependencies and features available from this version. [6613010d](https://github.com/electrocucaracha/ai-changelog/commit/6613010d65ab52d8a0d701e0880f136ae8c9c3fa)
+
+## [10.10.1] - 2026-10-30
+
+### Changed
+
+- Lowered the minimum Python version to 3.10 and capped the maximum at 3.14, allowing users to run the project on a broader set of environments without breaking behavior. [fee63955](https://github.com/electrocucaracha/ai-changelog/commit/fee63955505fee3075240a79dd22eadf966297e5)
+
+## [10.10.0] - 2026-10-30
+
+### Added
+
+- Documented recent code maintenance, dependency updates, workflow improvements, and compatibility adjustments for versions 10.8.0 through 10.9.3. [9f13dea6](https://github.com/electrocucaracha/ai-changelog/commit/9f13dea6da2a10f75583e515030c76a189a59563)
+
 ## [10.9.3] - 2026-10-30
 
 ### Changed

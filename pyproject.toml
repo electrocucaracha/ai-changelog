@@ -41,7 +41,7 @@ test = [
     "pytest>=9.0.3,<10",
     "pytest-mock",
     "pytest-cov",
-    "mutmut",
+    "mutmut>=3.8.1,<4",
     "mypy",
 ]
 eval = [

@@ -45,7 +45,7 @@ func:
 	@echo "Functional tests complete!"
 
 .PHONY: lint
-lint: clean
+lint: clean lock-check
 	sudo -E $(DOCKER_CMD) run --rm -v $$(pwd):/tmp/lint \
 	-e RUN_LOCAL=true \
 	-e LINTER_RULES_PATH=/ \
@@ -67,7 +67,12 @@ fmt: clean
 	npx prettier . --write
 	command -v uvx > /dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
 	uvx tox -e lint
+	$(MAKE) lock-check
 	@echo "Format complete!"
+
+.PHONY: lock-check
+lock-check:
+	uv lock --check
 
 .PHONY: clean
 clean:

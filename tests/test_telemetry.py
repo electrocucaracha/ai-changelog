@@ -77,10 +77,12 @@ def test_request_counts_failures_and_survives_pricing_errors(
         raise RuntimeError("pricing unavailable")
 
     monkeypatch.setattr("litellm.completion_cost", fail_pricing)
-    with pytest.raises(RuntimeError, match="request failed"):
-        with telemetry.request("model", "completion") as record:
-            record(SimpleNamespace(usage=SimpleNamespace(prompt_tokens=2)))
-            raise RuntimeError("request failed")
+    with (
+        pytest.raises(RuntimeError, match="request failed"),
+        telemetry.request("model", "completion") as record,
+    ):
+        record(SimpleNamespace(usage=SimpleNamespace(prompt_tokens=2)))
+        raise RuntimeError("request failed")
 
     values = metrics.snapshot()
     assert values["completion.failures"] == 1

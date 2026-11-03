@@ -347,6 +347,46 @@ class TestConfig:
 
         assert config.namespace == "override-namespace"
 
+    def test_config_from_env_retry_overrides_beat_env(self, monkeypatch):
+        """Explicit retry settings take precedence over environment settings."""
+        monkeypatch.setenv("CHANGELOG_RETRY_ATTEMPTS", "7")
+        monkeypatch.setenv("CHANGELOG_RETRY_BACKOFF_SECONDS", "4.5")
+
+        config = Config.from_env(retry_attempts=2, retry_backoff_seconds=0.25)
+
+        assert config.retry_attempts == 2
+        assert config.retry_backoff_seconds == 0.25
+
+    def test_config_from_env_preserves_litellm_overrides(self, monkeypatch):
+        """Explicit gateway settings and headers reach the configuration unchanged."""
+        monkeypatch.setenv("CHANGELOG_LITELLM_HEADERS_JSON", '{"X-Org": "env"}')
+        headers = {"X-Org": "override", "X-Product": "changelog"}
+
+        config = Config.from_env(
+            litellm_api_base="https://gateway.example.test/v1",
+            litellm_api_key="test-key",
+            litellm_extra_headers=headers,
+        )
+
+        assert config.litellm_api_base == "https://gateway.example.test/v1"
+        assert config.litellm_api_key == "test-key"
+        assert config.litellm_extra_headers == headers
+
+    @pytest.mark.parametrize("enabled", [True, False])
+    def test_config_from_env_headroom_override_beats_env(self, monkeypatch, enabled):
+        """Both boolean overrides take precedence, including explicit False."""
+        monkeypatch.setenv("CHANGELOG_ENABLE_HEADROOM", "off" if enabled else "on")
+
+        config = Config.from_env(enable_headroom=enabled)
+
+        assert config.enable_headroom is enabled
+
+    def test_config_from_env_has_no_headers_when_unset(self, monkeypatch):
+        """Absent header configuration remains None rather than an empty value."""
+        monkeypatch.delenv("CHANGELOG_LITELLM_HEADERS_JSON", raising=False)
+
+        assert Config.from_env().litellm_extra_headers is None
+
     def test_config_from_env_reads_api_base(self, monkeypatch):
         """Test LiteLLM API base URL reading from environment."""
         # API base is read from native LiteLLM env vars, not CHANGELOG_*

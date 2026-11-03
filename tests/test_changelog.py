@@ -13,14 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 from datetime import UTC, datetime
 from types import SimpleNamespace
+
+import pytest
 
 from ai_changelog.changelog import (
     ChangelogBuilder,
     ChangelogItem,
     ReleaseSection,
     SemanticVersion,
+    StoredNote,
     _extract_release_sections_kac,
     _find_insertion_point_kac,
     _is_unreleased_heading,
@@ -32,6 +36,7 @@ from ai_changelog.changelog import (
     merge_changelogs_with_keepachangelog,
     parse_conventional_commit,
     parse_note_metadata,
+    parse_stored_note,
 )
 
 
@@ -257,6 +262,69 @@ def test_note_metadata_roundtrip_and_category_precedence():
 
     assert category == "Added"
     assert summary == "Added support for auto-tagging."
+
+
+def test_structured_note_roundtrip_preserves_precomputed_entry():
+    """Structured notes preserve normalized metadata and the precomputed entry."""
+    note = format_note("  added  ", "  Summary details.  ", "  Added a feature.  ")
+
+    assert json.loads(note) == {
+        "version": 1,
+        "category": "Added",
+        "summary": "Summary details.",
+        "changelog_entry": "Added a feature.",
+    }
+    assert parse_stored_note(note) == StoredNote(
+        category="Added",
+        summary="Summary details.",
+        changelog_entry="Added a feature.",
+        version=1,
+    )
+
+
+def test_parse_stored_note_normalizes_text_and_preserves_version():
+    """Reading notes trims text, normalizes categories, and retains the version."""
+    note = json.dumps(
+        {
+            "version": 2,
+            "category": "fixed",
+            "summary": "  Fixed a bug.  ",
+            "changelog_entry": "  Fixed user-visible behavior.  ",
+        }
+    )
+
+    assert parse_stored_note(note) == StoredNote(
+        category="Fixed",
+        summary="Fixed a bug.",
+        changelog_entry="Fixed user-visible behavior.",
+        version=2,
+    )
+
+
+def test_parse_stored_note_defaults_optional_fields_and_blank_summary():
+    """Older structured notes default their version and missing entry."""
+    note = json.dumps({"category": "Changed", "summary": "   "})
+
+    assert parse_stored_note(note) == StoredNote(
+        category="Changed", summary="No summary available.", version=1
+    )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("category", None),
+        ("category", "Unknown"),
+        ("summary", None),
+        ("version", "1"),
+        ("changelog_entry", 42),
+    ],
+)
+def test_parse_stored_note_rejects_invalid_fields(field: str, value: object):
+    """Each structured field is validated independently of the other fields."""
+    payload = {"category": "Added", "summary": "A feature.", field: value}
+
+    assert parse_stored_note(json.dumps(payload)) is None
 
 
 def test_build_changelog_prefers_note_category_metadata():
@@ -1533,8 +1601,6 @@ def test_semantic_version_bump_raises_for_unsupported_release_type():
     """SemanticVersion.bump must raise ValueError for an unrecognised release type."""
     version = SemanticVersion(1, 0, 0)
 
-    import pytest
-
     with pytest.raises(ValueError, match="Unsupported release type"):
         version.bump("hotfix")
 
@@ -1595,8 +1661,6 @@ def test_diversify_leading_verb_returns_original_when_body_has_no_leading_word()
 
 def test_format_note_raises_for_unknown_category():
     """format_note must raise ValueError for a category not in CATEGORY_ORDER."""
-
-    import pytest
 
     with pytest.raises(ValueError, match="Unsupported category"):
         format_note("Unknown", "Some summary text.")

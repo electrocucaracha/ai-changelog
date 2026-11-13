@@ -26,6 +26,8 @@ jobs:
           persist-credentials: false
       - name: Setup Python environment
         uses: ./.github/actions/setup-python-env # zizmor: ignore[self-repository]
+        with:
+          python-version: "3.12"
       - name: Run unit tests
         run: uvx tox -e py312 -- --cov=ai_changelog --cov-report=term-missing --cov-report=json
       - name: Enforce minimum coverage
@@ -46,6 +48,8 @@ jobs:
           persist-credentials: false
       - name: Setup Python environment
         uses: ./.github/actions/setup-python-env # zizmor: ignore[self-repository]
+        with:
+          python-version: "3.12"
       - name: Start LLMock server
         run: |
           python tests/mock_llm_server.py --host 127.0.0.1 --port 8001 \

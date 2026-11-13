@@ -38,6 +38,8 @@ jobs:
           persist-credentials: false
       - name: Setup Python environment
         uses: ./.github/actions/setup-python-env # zizmor: ignore[self-repository]
+        with:
+          python-version: "3.12"
       - name: Check code style
         run: uvx tox -e lint-check
       - name: Run tests

@@ -12,6 +12,90 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.16.1] - 2026-11-15
+
+### Changed
+
+- Updated CI workflows and pre-commit hook versions to leverage the latest fixes and features, with the release workflow now using ai-action/setup-ollama version 2.1.19, the update workflow using gh-workflows version 13.3.1, and the pre-commit hook using ai-prepare-commit-msg version 20.14.1. [4da29cde](https://github.com/electrocucaracha/ai-changelog/commit/4da29cdeea391c5621968ff19299d17cbde27086)
+
+## [10.16.0] - 2026-11-13
+
+### Added
+
+- Enabled suppression of unnecessary code duplication warnings in GitHub workflows by adding explicit ignore comments around repeated workflow steps. [98d75119](https://github.com/electrocucaracha/ai-changelog/commit/98d751192cee32f1742d5c8c229eac4379c5523c)
+
+## [10.15.0] - 2026-11-13
+
+### Added
+
+- Optimized the Python version used in CI testing by explicitly setting it to 3.12 in the setup-python-env action for both job sections, ensuring consistent use and reducing environment mismatches. [f7216ef6](https://github.com/electrocucaracha/ai-changelog/commit/f7216ef6a258101fb0ac2f8c044d433c4dfa03b2)
+
+## [10.14.0] - 2026-11-06
+
+### Added
+
+- Introduced a CODEOWNERS file to automatically request reviews from @electrocucaracha for all files, clarifying code review responsibility and supporting repository governance practices. [a2d70d03](https://github.com/electrocucaracha/ai-changelog/commit/a2d70d038885dd98b8754f9ce6a1cf31b3e033ff)
+
+## [10.13.9] - 2026-11-06
+
+### Changed
+
+- Updated the project's dependencies to the latest versions, with `docker/login-action` now at `v4.8.0`, `ai-action/setup-ollama` at `v2.1.17`, and `coverage` at `7.17.2`, potentially impacting the project's build and testing processes. [161b6d4b](https://github.com/electrocucaracha/ai-changelog/commit/161b6d4b8a62ffb999d0fe68826b52107e3f2a76)
+
+## [10.13.8] - 2026-11-02
+
+### Changed
+
+- Improved test coverage for serialization compatibility and configuration behavior by enabling explicit environment variable overrides for retry options, LiteLLM gateway settings, and extra headers. [719a7048](https://github.com/electrocucaracha/ai-changelog/commit/719a7048e1f7f549c3e002cb47a9ea8f06c5620f)
+
+## [10.13.7] - 2026-11-01
+
+### Fixed
+
+- The README.md file is now included in container builds, providing documentation for review, inspection, or automated processes. [d660ab5e](https://github.com/electrocucaracha/ai-changelog/commit/d660ab5e543e1b1a4556668ecd17ecc45e882223)
+
+## [10.13.6] - 2026-11-01
+
+### Changed
+
+- Restricted the mutmut test dependency to version >=3.8.1,<4 to ensure compatibility with the desired range of mutmut versions and prevent unexpected issues from major version updates. [6da17982](https://github.com/electrocucaracha/ai-changelog/commit/6da17982100ccaba676fc124cd81a8a978410b77)
+
+## [10.13.5] - 2026-11-01
+
+### Changed
+
+- Modernized the telemetry test structure by consolidating nested `with` statements into a single statement using multiple context managers, without altering test behavior or impacting API, CLI contract, security, or configuration schema. [d02fc1bd](https://github.com/electrocucaracha/ai-changelog/commit/d02fc1bd3c09dcddb4fe9f63409a79134e6dcd75)
+
+## [10.13.4] - 2026-11-01
+
+### Changed
+
+- Upgraded the pre-commit hook and dependencies to enhance commit message generation and ensure access to latest fixes and improvements. [445e4e1f](https://github.com/electrocucaracha/ai-changelog/commit/445e4e1f63c5dbe19fe109ede73ad8cc253eb9b7)
+
+## [10.13.3] - 2026-11-01
+
+### Changed
+
+- Optimized telemetry functionality with comprehensive tests for collection, export, and integration with the CLI, ensuring robust handling of invalid input, active metrics context, and exporter behavior, and updated pytest version in dependencies to >=9.0.3,<10. [7653705b](https://github.com/electrocucaracha/ai-changelog/commit/7653705b458e744339dc85c1fa08ea2a66b7db19)
+
+## [10.13.2] - 2026-11-01
+
+### Changed
+
+- Enabled automatic lockfile checks during lint and format workflows, ensuring the uv.lock file remains consistent with pyproject.toml and preventing dependency drift. [74c73a69](https://github.com/electrocucaracha/ai-changelog/commit/74c73a6903a01905017ce60da5b5d69b7af9b3ba)
+
+## [10.13.1] - 2026-10-30
+
+### Changed
+
+- Improved the reliability of GitHub Actions workflows by enforcing consistent YAML parsing with double quotes around the Python version in the matrix value. [9ebc1b30](https://github.com/electrocucaracha/ai-changelog/commit/9ebc1b30ad0ecbf940b26c04ea84d556cd047868)
+
+## [10.13.0] - 2026-10-30
+
+### Added
+
+- Optimized documentation for versions 10.10.0 through 10.12.0, including feature releases, dependency optimizations, test coverage updates, and Python version compatibility changes, providing users and maintainers with a complete record of recent project evolution. [66c8427a](https://github.com/electrocucaracha/ai-changelog/commit/66c8427add966047d5d3f9676ca7f844001411a6)
+
 ## [10.12.0] - 2026-10-30
 
 ### Added
@@ -184,31 +268,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Optimized test coverage for AI provider functionality by adding parameterized tests for model pull behavior, retry logic, and token usage accounting, and by verifying ollama base URL parsing, tags endpoint filtering, and debug log capitalization, while also protecting the summarize_diff system prompt hash against subtle mutations and refactoring main tests to share non-interactive output capture logic. [54901b8e](https://x-access-token:ghs_15368_eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRobmQiLCJjdHgiOiJGcFBlS0U2UzFYN0VtTG02alhpWjdJaUJSRGR2bXZfdVloNXV2cnA4Q3lOMFRkM1hWdEItUXZFIiwiZXhwIjoxNzg3NjI5MzQ2LCJpYXQiOjE3ODc2MjU3NDYsImlzcyI6ImdpdGh1YiIsImp0aSI6IjgyMDhmMWUwLWUwMTEtNGM0MS1hZDU0LTM5Zjg1ODQwMDQxZSIsInZlciI6M30.Td_FhSIj5DR5ZDew_AqApOrTAWSCq3HCd5YWIIfQOG0u9wj7BguuKRS6E-yWoElI8j9nX0cKrqBChk-hfQxqDQ@github.com/electrocucaracha/ai-changelog/commit/54901b8e8bc79262ee2a60f39442b9c84f6c8fa4)
+- Optimized test coverage for AI provider functionality by adding parameterized tests for model pull behavior, retry logic, and token usage accounting, and by verifying ollama base URL parsing, tags endpoint filtering, and debug log capitalization, while also protecting the summarize_diff system prompt hash against subtle mutations and refactoring main tests to share non-interactive output capture logic. [54901b8e](https://github.com/electrocucaracha/ai-changelog/commit/54901b8e8bc79262ee2a60f39442b9c84f6c8fa4)
 
 ## [10.0.2] - 2026-08-22
 
 ### Changed
 
-- Renamed the package ai_changelog_msg to ai_changelog throughout the codebase, including source, tests, configuration, and documentation, to improve clarity and align the package name with the CLI entry point. [ff3d0079](https://x-access-token:ghs_15368_eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRobmQiLCJjdHgiOiJGcFBlS0U2UzFYN0VtTG02alhpWjdJaUJSRGR2bXZfdVloNXV2cnA4Q3lOMFRkM1hWdEItUXZFIiwiZXhwIjoxNzg3NjI5MzQ2LCJpYXQiOjE3ODc2MjU3NDYsImlzcyI6ImdpdGh1YiIsImp0aSI6IjgyMDhmMWUwLWUwMTEtNGM0MS1hZDU0LTM5Zjg1ODQwMDQxZSIsInZlciI6M30.Td_FhSIj5DR5ZDew_AqApOrTAWSCq3HCd5YWIIfQOG0u9wj7BguuKRS6E-yWoElI8j9nX0cKrqBChk-hfQxqDQ@github.com/electrocucaracha/ai-changelog/commit/ff3d007930eb7a30455f60eda4ed439636d9f871)
+- Renamed the package ai_changelog_msg to ai_changelog throughout the codebase, including source, tests, configuration, and documentation, to improve clarity and align the package name with the CLI entry point. [ff3d0079](https://github.com/electrocucaracha/ai-changelog/commit/ff3d007930eb7a30455f60eda4ed439636d9f871)
 
 ## [10.0.1] - 2026-08-22
 
 ### Changed
 
-- Improved changelog entry generation and result preservation in concurrent summary generation, ensuring correct commit context application and result retention in all execution scenarios. [25930412](https://x-access-token:ghs_15368_eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRobmQiLCJjdHgiOiJGcFBlS0U2UzFYN0VtTG02alhpWjdJaUJSRGR2bXZfdVloNXV2cnA4Q3lOMFRkM1hWdEItUXZFIiwiZXhwIjoxNzg3NjI5MzQ2LCJpYXQiOjE3ODc2MjU3NDYsImlzcyI6ImdpdGh1YiIsImp0aSI6IjgyMDhmMWUwLWUwMTEtNGM0MS1hZDU0LTM5Zjg1ODQwMDQxZSIsInZlciI6M30.Td_FhSIj5DR5ZDew_AqApOrTAWSCq3HCd5YWIIfQOG0u9wj7BguuKRS6E-yWoElI8j9nX0cKrqBChk-hfQxqDQ@github.com/electrocucaracha/ai-changelog/commit/25930412688890eb738ade3f2e5939568f04598c)
+- Improved changelog entry generation and result preservation in concurrent summary generation, ensuring correct commit context application and result retention in all execution scenarios. [25930412](https://github.com/electrocucaracha/ai-changelog/commit/25930412688890eb738ade3f2e5939568f04598c)
 
 ## [10.0.0] - 2026-08-22
 
 ### Removed
 
-- Simplified the release process by removing the ollama cache and switching to the GitHub CLI for releases, ensuring fresh model downloads and improving overall reliability. [aee20372](https://x-access-token:ghs_15368_eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRobmQiLCJjdHgiOiJGcFBlS0U2UzFYN0VtTG02alhpWjdJaUJSRGR2bXZfdVloNXV2cnA4Q3lOMFRkM1hWdEItUXZFIiwiZXhwIjoxNzg3NjI5MzQ2LCJpYXQiOjE3ODc2MjU3NDYsImlzcyI6ImdpdGh1YiIsImp0aSI6IjgyMDhmMWUwLWUwMTEtNGM0MS1hZDU0LTM5Zjg1ODQwMDQxZSIsInZlciI6M30.Td_FhSIj5DR5ZDew_AqApOrTAWSCq3HCd5YWIIfQOG0u9wj7BguuKRS6E-yWoElI8j9nX0cKrqBChk-hfQxqDQ@github.com/electrocucaracha/ai-changelog/commit/aee203722d4eab2a54778ab74b96f173a2fc5ae6)
+- Simplified the release process by removing the ollama cache and switching to the GitHub CLI for releases, ensuring fresh model downloads and improving overall reliability. [aee20372](https://github.com/electrocucaracha/ai-changelog/commit/aee203722d4eab2a54778ab74b96f173a2fc5ae6)
 
 ## [9.2.3] - 2026-08-22
 
 ### Changed
 
-- Streamlined the changelog entries for versions 8.11.0 through 8.4.0, providing a clear and comprehensive history of recent changes that improves readability, accuracy, and consistency for users and contributors. [0e257df4](https://x-access-token:ghs_15368_eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRobmQiLCJjdHgiOiJGcFBlS0U2UzFYN0VtTG02alhpWjdJaUJSRGR2bXZfdVloNXV2cnA4Q3lOMFRkM1hWdEItUXZFIiwiZXhwIjoxNzg3NjI5MzQ2LCJpYXQiOjE3ODc2MjU3NDYsImlzcyI6ImdpdGh1YiIsImp0aSI6IjgyMDhmMWUwLWUwMTEtNGM0MS1hZDU0LTM5Zjg1ODQwMDQxZSIsInZlciI6M30.Td_FhSIj5DR5ZDew_AqApOrTAWSCq3HCd5YWIIfQOG0u9wj7BguuKRS6E-yWoElI8j9nX0cKrqBChk-hfQxqDQ@github.com/electrocucaracha/ai-changelog/commit/0e257df48cd78744805d59215856b144e4bfad86)
+- Streamlined the changelog entries for versions 8.11.0 through 8.4.0, providing a clear and comprehensive history of recent changes that improves readability, accuracy, and consistency for users and contributors. [0e257df4](https://github.com/electrocucaracha/ai-changelog/commit/0e257df48cd78744805d59215856b144e4bfad86)
 
 ## [9.2.2] - 2026-08-22
 
@@ -258,7 +342,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Streamlined the release process by delegating model selection to downstream tools and enabling the changelog commit step to continue on error. [a1878b14](https://github.com/electrocucaracha/ai-changelog/commit/a1878b146a027a065223b78413b19fe7c9cb814d)
 
-## [8.6.1] - 2026-08-21
+## [8.7.1] - 2026-08-21
 
 ### Fixed
 
